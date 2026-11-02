@@ -24,6 +24,15 @@ for (const combo of catalog.combinations) {
   }else if(combo.processMode==='negative_digital'){
     assert.equal(combo.paper,null); assert(combo.id.endsWith('__digital_scan'));
     if(combo.status==='ready') assert(combo.qa.referenceModel?.startsWith('film-lab-'));
+  }else if(combo.processMode==='reference_interpretation'){
+    assert.equal(combo.paper,null); assert.equal(combo.id,`${film.id}__reference`);
+    assert.equal(combo.outputOrigin,'generated_digital_interpretation');
+    assert.equal(combo.referencesAreRealFilm,true); assert.equal(combo.outputIsRealFilm,false);
+    assert(catalog.referenceStudy?.looks.some(look=>look.film===film.id&&look.number===combo.number));
+    if(combo.status==='ready'){
+      assert.equal(combo.qa.referenceModel,'film-lab-reference-interpretation-v1');
+      assert.equal(combo.qa.upstreamFilmPaperPipelineApplied,false);
+    }
   }else{
     assert(catalog.papers.some(p=>p.id===combo.paper)); assert.equal(combo.processMode,'negative_print');
   }
@@ -61,8 +70,9 @@ for (const combo of catalog.combinations) {
 }
 for(const film of catalog.films){
   const choices=catalog.combinations.filter(c=>c.film===film.id);
-  assert.equal(choices.length,film.type==='positive'?1:catalog.papers.length+1);
-  assert.equal(new Set(choices.map(c=>c.paper)).size,choices.length);
+  const hasReference=catalog.referenceStudy?.looks.some(look=>look.film===film.id)?1:0;
+  assert.equal(choices.length,film.type==='positive'?1:catalog.papers.length+1+hasReference);
+  assert.equal(new Set(choices.map(c=>`${c.processMode}:${c.paper}`)).size,choices.length);
 }
 for(const [status,count] of Object.entries(catalog.counts)) assert.equal(count,catalog.combinations.filter(c=>c.status===status).length);
 console.log(JSON.stringify({passed:true,combinations:seenIds.size,cubes,assets,counts:catalog.counts},null,2));

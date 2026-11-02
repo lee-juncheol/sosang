@@ -9,6 +9,7 @@ const combinations: Combination[] = [
   { id: 'portra__endura', film: 'portra', paper: 'endura', processMode: 'negative_print', number: 1, status: 'ready' },
   { id: 'portra__crystal', film: 'portra', paper: 'crystal', processMode: 'negative_print', number: 2, status: 'ready' },
   { id: 'portra__digital_scan', film: 'portra', paper: null, processMode: 'negative_digital', number: 161, status: 'ready' },
+  { id: 'portra__reference', film: 'portra', paper: null, processMode: 'reference_interpretation', number: 177, status: 'ready' },
   { id: 'velvia__direct_scan', film: 'velvia', paper: null, processMode: 'positive_direct', number: 41, status: 'ready' },
 ]
 
@@ -40,4 +41,12 @@ test('a missing digital asset never falls back to print or the wrong paperless p
   unavailable.push({ id: 'wrong_mode', film: 'portra', paper: null, processMode: 'positive_direct', number: 99, status: 'ready' })
   assert.equal(findLook(unavailable, negative, 'endura', 'negative_digital'), undefined)
   assert.equal(findLook(combinations, negative, 'missing_paper', 'negative_print'), undefined)
+})
+
+test('real-film reference look is independent from paper and experimental digital scan', () => {
+  assert.equal(findLook(combinations, negative, 'crystal', 'reference_interpretation')?.id, 'portra__reference')
+  assert.equal(findLook(combinations, negative, 'endura', 'reference_interpretation')?.id, 'portra__reference')
+  assert.equal(findLook(combinations, { id: 'unsupported', type: 'negative' }, 'endura', 'reference_interpretation'), undefined)
+  assert.equal(findLook(combinations.filter(c => c.processMode !== 'reference_interpretation'), negative, 'endura', 'reference_interpretation'), undefined)
+  assert.equal(findLook(combinations, slide, 'endura', 'reference_interpretation')?.id, 'velvia__direct_scan')
 })

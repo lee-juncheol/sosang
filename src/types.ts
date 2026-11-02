@@ -2,8 +2,11 @@ export interface Asset { path: string; name: string; bytes: number; sha256: stri
 export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string }
 export interface Sample { id: string; name: string; category: string; credit: string; source: string | null; path: string; width: number; height: number; inputKind: 'camera-std' | 'synthetic-srgb' | 'uploaded-srgb'; sourceFilename?: string; previewLut: 'std' }
 export interface Metric { mean: number; p95: number; p99: number; max: number; samples: number }
-export type NegativeProcessMode = 'negative_print' | 'negative_digital'
+export type NegativeProcessMode = 'negative_print' | 'negative_digital' | 'reference_interpretation'
 export type ProcessMode = NegativeProcessMode | 'positive_direct'
+export interface FilmReference { title: string; url: string; author?: string; evidence?: string; camera?: string; exposure?: string; development?: string; scanner?: string; post?: string; role?: string; observation?: string }
+export interface ReferenceLook { film: string; name: string; description: string; adjustments?: string[]; references: FilmReference[] }
+export interface ReferenceStudy { methodId: string; looks: ReferenceLook[]; limitation?: string }
 export interface Combination {
   id: string; film: string; paper: string | null; number: number;
   processMode: ProcessMode;
@@ -16,4 +19,5 @@ export interface Catalog {
   schemaVersion: number; engineCommit: string; engineVersion: string; adapter: string;
   films: Stock[]; papers: Stock[]; samples: Sample[]; combinations: Combination[];
   counts: Record<string, number>; output: string; resolution: number
+  referenceStudy?: ReferenceStudy
 }
