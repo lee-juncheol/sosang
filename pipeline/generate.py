@@ -30,6 +30,7 @@ from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral, apply_trili
 from spektrafilm_lut_creator.qa.reference import run_pipeline_at
 from pipeline.samples import prepare, save_image
 from pipeline.slide import INIT_PRINT_PROFILE, SlideBundleBuilder, run_slide_reference
+from pipeline.std import bake_std, run_std_reference, STD_GENERATION, STD_INPUT_GAIN, STD_CONTRACT
 
 
 def combination_choices(stocks):
@@ -103,11 +104,11 @@ def generate_one(job):
         vlog=bundle.luts[0][1].table
         if not np.isfinite(vlog).all():
             raise ValueError('Engine produced non-finite values')
-        # Record bounded-output policy from upstream; no additional hidden clipping.
-        coordinates=std_to_vlog(cube_grid(33))
-        if coordinates.min()<0 or coordinates.max()>1:
-            raise ValueError('Analytic adapter outside source LUT domain')
-        std=apply_tetrahedral(vlog,coordinates).reshape(33,33,33,3)
+        # Preserve the native input interpretation, but evaluate the continuous
+        # engine at STD grid nodes instead of interpolating the V-Log cube.
+        std=bake_std(spec,bundle,is_slide=is_slide)
+        if not np.isfinite(std).all():
+            raise ValueError('Engine produced non-finite STD values')
         writer=LumixCubeFormat()
         vlog_path=directory / f'{number:04d}VLOG.cube'
         std_path=directory / f'{number:04d}STD.cube'
@@ -125,13 +126,17 @@ def generate_one(job):
         samples=np.concatenate([rng.random((CONFIG['qa_random_samples'],3)),gray,patches])
         direct=run_slide_reference(spec,samples) if is_slide else run_pipeline_at(spec,bundle,0,samples)
         fidelity={name:metrics(fn(vlog_disk,samples),direct) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
-        # An independent continuous composition is evaluated off-grid, against
-        # the final written 33-point STD file. No identity/circular comparison.
+        # Direct engine evaluation at off-grid STD inputs measures end-to-end
+        # error, including the analytic adapter. Never use a baked LUT as truth.
+        std_direct=run_std_reference(spec,bundle,samples,is_slide=is_slide)
+        std_fidelity={name:metrics(fn(std_disk,samples),std_direct) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
+        # Retained only to compare against the legacy VLOG-cube composition.
+        # This is a diagnostic difference, not the STD accuracy reference.
         composed=apply_tetrahedral(vlog_disk,std_to_vlog(samples))
-        std_errors={name:metrics(fn(std_disk,samples),composed) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
-        if not np.isfinite(direct).all():
+        legacy_std_difference={name:metrics(fn(std_disk,samples),composed) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
+        if not np.isfinite(direct).all() or not np.isfinite(std_direct).all():
             raise ValueError('Non-finite direct engine reference')
-        gray_out=apply_tetrahedral(vlog_disk,std_to_vlog(gray))
+        gray_out=apply_tetrahedral(std_disk,gray)
         tone_delta=float((gray_out[-1]-gray_out[0]).mean())
         if tone_delta<=0:
             raise ValueError('Inverted or flat black-to-white tone response')
@@ -139,8 +144,8 @@ def generate_one(job):
         # Explicit engineering review flags, not claims of perceptual accuracy.
         if fidelity['tetrahedral']['p99']>0.05:
             warnings.append('V-Log 전체 도메인의 상위 1% 보간 오차가 0.05를 넘습니다. 고채도·극단 노출를 검토하세요.')
-        if std_errors['tetrahedral']['p99']>0.02:
-            warnings.append('STD 합성의 상위 1% 보간 오차가 0.02를 넘습니다. 색 경계를 검토하세요.')
+        if std_fidelity['tetrahedral']['p99']>0.02:
+            warnings.append('STD와 직접 엔진 사이의 상위 1% 보간 오차가 0.02를 넘습니다. 색 경계를 검토하세요.')
         previews={}
         for sample in json.loads((PUBLIC/'samples/manifest.json').read_text()):
             source=np.asarray(Image.open(PUBLIC/sample['path'].lstrip('/')).convert('RGB'))/255.
@@ -152,7 +157,10 @@ def generate_one(job):
             previews[sample['id']]=describe(path)
         qa={"fileChecks":"passed","rowsPerCube":35937,"serializationMaxError":roundtrip,
             "processMode":record['processMode'],"scanFilm":is_slide,
-            "vlogVsDirectEngine":fidelity,"stdVsContinuousComposition":std_errors,
+            "vlogVsDirectEngine":fidelity,"stdVsDirectEngine":std_fidelity,
+            "stdGeneration":STD_GENERATION,"stdInputGain":STD_INPUT_GAIN,
+            "stdVsContinuousComposition":legacy_std_difference,
+            "stdVsContinuousCompositionPurpose":"Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
             "grayBlackToWhiteDelta":tone_delta,"warnings":warnings,"cameraVerified":False,
             "sampling":"4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
             "cameraInterpolation":"unknown; both tetrahedral and trilinear measured"}
@@ -165,7 +173,8 @@ def generate_one(job):
                         "note":"Required only to initialize upstream runtime; printing stages are bypassed and paper is not applied."} if is_slide else None),
                     "adapter":{"id":CONFIG['adapter'],"target":"S1M2 / S1II (camera validation pending)",
                     "source":"https://pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf",
-                    "contract":"L_STD(x) = tetrahedral(L_VLOG, VLogEncode(sRGBDecode(x) @ sRGB_to_VGamut.T))",
+                    "generation":STD_GENERATION,"inputGain":STD_INPUT_GAIN,
+                    "contract":STD_CONTRACT,
                     "limitation":"Analytic working model; does not invert the camera's proprietary Standard rendering."},
                     "effects":{"grain":False,"halation":False,"blur":False,"autoExposure":False},
                     "gamutPolicy":"Upstream input RGC + CAM16-UCS output compression; upstream final [0,1] boundary clamp; no extra creative clipping.",
@@ -184,6 +193,12 @@ Processing mode: {record['processMode']}; scan_film={is_slide}
 S1M2 / S1II physical camera validation: NOT performed.
 Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
 Standard mapping is approximate; clipped highlights cannot be recovered.
+STD grid nodes are evaluated directly through the upstream engine using the
+analytic sRGB -> V-Gamut -> V-Log input mapping. No intermediate VLOG cube
+is interpolated. Native input gain remains 1.0; no exposure boost is added.
+stdVsDirectEngine in qa.json is the end-to-end STD accuracy measurement.
+stdVsContinuousComposition is only a diagnostic difference from the legacy
+VLOG-cube composition, not the accuracy reference.
 Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
 captures or a synthetic sRGB chart. No extra V-Log/gamma transform is used.
 They are not a validation against camera-applied LUT captures.
@@ -196,7 +211,7 @@ File checks and measured interpolation errors: qa.json
 Settings and provenance: provenance.json
 '''
         (directory/'README.txt').write_text(readme)
-        (directory/'CHANGELOG.txt').write_text('Generated by Film Lab from unmodified spektrafilm profiles. Composed an analytic sRGB -> V-Gamut -> V-Log adapter to produce a new STD input LUT. Shortened camera filenames. Changes and derived LUTs remain CC BY-SA 4.0.\n')
+        (directory/'CHANGELOG.txt').write_text('Generated by Film Lab from unmodified spektrafilm profiles. STD v2 evaluates analytic sRGB -> V-Gamut -> V-Log coordinates directly through the continuous engine, removing intermediate VLOG cube interpolation. Native input gain remains 1.0; VLOG generation and film/paper profiles are unchanged. Added direct-engine off-grid STD QA. Shortened camera filenames. Changes and derived LUTs remain CC BY-SA 4.0.\n')
         shutil.copyfile(UPSTREAM/'SPEKTRAFILM_LICENSE.txt',directory/'SPEKTRAFILM_LICENSE.txt')
         zip_path=directory/f'{number:04d}LUTS.zip'
         with zipfile.ZipFile(zip_path,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as archive:

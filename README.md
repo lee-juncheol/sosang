@@ -69,7 +69,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 |---|---|
 | `src/` | 한국어 선택·비교·다운로드 UI |
 | `pipeline/config/default.json` | 명시적인 생성 설정 |
-| `pipeline/generate.py` | 실제 엔진·STD 합성·QA·ZIP·카탈로그 |
+| `pipeline/generate.py` | 실제 엔진·STD 직접 계산·QA·ZIP·카탈로그 |
 | `pipeline/slide.py` | 슬라이드 직접 스캔용 builder 및 독립 런타임 QA |
 | `public/catalog.json` | 실제 상태/자산/해시 |
 | `public/luts/<film>__<paper>/` | `.cube`, ZIP, QA, provenance, 샘플 |
@@ -82,7 +82,11 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 
 네거티브는 V-Log/V-Gamut → 필름·인화 시뮬레이션 → sRGB, 슬라이드는 V-Log/V-Gamut → 필름 현상·직접 스캔 → sRGB입니다. 그레인, 할레이션, 블러, 자동 노출은 비활성화했습니다. upstream 입력 gamut compression과 CAM16-UCS 출력 gamut compression, 최종 bounded 출력 규칙을 사용합니다.
 
-STD는 `L_std(x) = L_vlog(A_std(x))`를 33³ 격자에서 다시 샘플링합니다. `A_std`는 sRGB 디코딩 → 공개 행렬의 V-Gamut 변환 → Panasonic V-Log 인코딩입니다. `.cube` 태그만 바꾸지 않습니다. 두 파일 모두 최종 **sRGB 출력**이며 Rec.709와 구분합니다.
+STD v2 (`analytic-srgb-vgamut-vlog-direct-v2`)는 **sRGB 입력 33³ 격자를 연속 엔진으로 직접 계산**합니다. `L_std(x) = sRGBEncode(Engine_linear(sRGBDecode(x) @ sRGB_to_VGamut.T))`이며, upstream의 출력 경계 규칙을 적용합니다. 이전 v1의 `L_vlog(A_std(x))` 중간 33³ V-Log LUT를 거치지 않으므로, 격자 보간을 중복하는 오차를 제거합니다. 다운로드한 STD 파일을 적용할 때에는 최종 33³ 격자 보간 한 번이 필요합니다. V-Log 파일의 입력·생성 방식은 유지합니다. 두 파일 모두 최종 **sRGB 출력**이며 Rec.709와 구분합니다.
+
+STD의 선형 입력 배율은 기존과 같은 **1.0배·기본 노출**입니다. upstream의 sRGB LUT 기본값 `stops_above_midgray=auto`는 입력 배율 2.88배(약 +1.53 EV)를 사용하지만, 이번 수정에서는 이를 추가 적용하지 않습니다. 이미 카메라에서 렌더링한 STD JPEG의 기준 노출을 실측하지 않았으므로 더 밝은 설정을 더 정확하다고 간주하지 않습니다. UI에는 `STD 근사 · 기본 노출`을 표시하고, 별도의 노출 전환은 제공하지 않습니다.
+
+같은 인화지를 사용할 때에는 upstream의 필름별 중성 인화 필터와 중간 회색 기준 인화 노출 정규화가 색편향과 밝기를 맞춥니다. 필름별 감도·현상·염료 데이터는 다르지만, 모든 네거티브에는 공통 DIR coupler 계수를 사용하는 등 모델의 근사도 있습니다. 같은 인화지의 결과가 비슷하다는 이유로 색이나 채도를 임의로 증폭하지 않습니다. 실물 필름과의 정확도 검증에는 같은 장면의 필름·디지털 촬영과 통제된 현상·스캔 기준이 필요합니다.
 
 Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 아닙니다. S1II 기종별 후보와의 차이를 측정했지만 실측 정답이 없어 정확도 우열을 주장하지 않습니다. 선택 근거와 비교 결과는 `docs/validation.md`에 있습니다.
 
@@ -107,6 +111,6 @@ Python 테스트와 업로드 렌더러의 JavaScript 테스트로 색 변환, �
 
 Derived from spektrafilm by Andrea Volpato. https://github.com/andreavolpato/spektrafilm
 
-원본 소프트웨어와 이 프로젝트 코드는 GPLv3로 제공합니다. 프로파일 및 파생 LUT는 CC BY-SA 4.0이며 원본 라이선스를 각 ZIP에 그대로 포함했습니다. Film Lab에서 생성과 STD 합성을 수행한 변경 기록도 포함합니다. 제품명은 임시 이름이며 spektrafilm 또는 Panasonic의 공식 제휴를 뜻하지 않습니다.
+원본 소프트웨어와 이 프로젝트 코드는 GPLv3로 제공합니다. 프로파일 및 파생 LUT는 CC BY-SA 4.0이며 원본 라이선스를 각 ZIP에 그대로 포함했습니다. Film Lab에서 LUT 생성과 STD 입력의 직접 엔진 계산을 수행한 변경 기록도 포함합니다. 제품명은 임시 이름이며 spektrafilm 또는 Panasonic의 공식 제휴를 뜻하지 않습니다.
 
 사진: 사용자 촬영, 모든 권리는 촬영자에게 있습니다. 사진은 코드 GPLv3 및 LUT CC BY-SA 라이선스의 적용 대상이 아닙니다. 기술 테스트 패턴은 Film Lab, CC0입니다. 사진별 원본 해시, 카메라 설정, 준비 과정은 `public/samples/manifest.json`에 기록했습니다. 사이트 접근 권한은 기존 소유자 비공개 상태를 유지합니다.

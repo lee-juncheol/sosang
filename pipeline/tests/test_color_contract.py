@@ -9,6 +9,7 @@ from spektrafilm_lut_creator.formats.lumix import LumixCubeFormat
 from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral, apply_trilinear
 from spektrafilm_lut_creator.bundles import BundleSpec
 from spektrafilm_lut_creator.builders import BundleBuilder
+from pipeline.std import bake_std, run_std_reference
 
 
 def test_panasonic_reference_anchors_and_independent_colour_science():
@@ -40,17 +41,21 @@ def test_axis_order_writer_and_independent_readers(tmp_path):
     np.testing.assert_allclose(apply_trilinear(table,points),scipy,atol=1e-12)
 
 
-def test_generated_std_is_composed_not_retagged():
+def test_generated_std_matches_direct_engine_not_retagged_vlog():
     base=PUBLIC/'luts/kodak_portra_400__kodak_portra_endura'
     vlog=read_cube(base/'0086VLOG.cube','VLOG')
     std=read_cube(base/'0086STD.cube','STD')
     assert np.max(np.abs(vlog-std)) > .2
     samples=np.random.default_rng(12).random((20000,3))
-    reference=apply_tetrahedral(vlog,std_to_vlog(samples))
+    spec=BundleSpec(film_profile='kodak_portra_400',print_profiles=('kodak_portra_endura',),
+                    input_color_space=CONFIG['input'],output_color_space=CONFIG['output'],
+                    stops_above_midgray=None,output_gamut_compress=CONFIG['output_gamut_compress'])
+    bundle=BundleBuilder(spec).build()
+    reference=run_std_reference(spec,bundle,samples)
     # Independent colour-science reader/interpolator evaluates the saved file.
     evaluated=colour.read_LUT(str(base/'0086STD.cube')).apply(samples)
     error=np.max(np.abs(reference-evaluated),axis=1)
-    assert np.quantile(error,.99) < .01
+    assert np.quantile(error,.99) < .005
 
 
 def test_regeneration_is_byte_identical(tmp_path):
@@ -58,8 +63,9 @@ def test_regeneration_is_byte_identical(tmp_path):
                     input_color_space=CONFIG['input'],output_color_space=CONFIG['output'],
                     topology='1lut',resolution=33,target=CONFIG['target'],
                     stops_above_midgray=None,output_gamut_compress=CONFIG['output_gamut_compress'])
-    table=BundleBuilder(spec).build().luts[0][1].table
-    std=apply_tetrahedral(table,std_to_vlog(cube_grid(33))).reshape(33,33,33,3)
+    bundle=BundleBuilder(spec).build()
+    table=bundle.luts[0][1].table
+    std=bake_std(spec,bundle)
     base=PUBLIC/'luts/kodak_portra_400__kodak_portra_endura'
     for tag,values in [('VLOG',table),('STD',std)]:
         path=tmp_path/f'0086{tag}.cube'

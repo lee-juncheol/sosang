@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0006770727423481074,
-      "p95": 0.0021756051301148197,
-      "p99": 0.0035261088538231637,
-      "max": 0.006317578412145031,
+      "mean": 0.0005586250228197951,
+      "p95": 0.0014918164286076064,
+      "p99": 0.0023582333069049723,
+      "max": 0.0048647316889792735,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0007037083704507548,
-      "p95": 0.0021721686612475822,
-      "p99": 0.0036876906625751184,
-      "max": 0.006724736864364644,
+      "mean": 0.0006228572483260787,
+      "p95": 0.0017201593658000489,
+      "p99": 0.0027381832019683044,
+      "max": 0.005040738637579034,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7869137697767649,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.004345555656252044,
+      "p95": 0.009454831041302894,
+      "p99": 0.014138205776312088,
+      "max": 0.022790602161075202,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.004311263795836646,
+      "p95": 0.009346237792899642,
+      "p99": 0.01411851934234005,
+      "max": 0.023103291906908408,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.7875873333333333,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",

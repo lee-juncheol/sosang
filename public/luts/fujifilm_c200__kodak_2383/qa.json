@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0006288502262797887,
-      "p95": 0.001974295869894402,
-      "p99": 0.003247760442255074,
-      "max": 0.005897665527812568,
+      "mean": 0.0005388392669819569,
+      "p95": 0.0014471148028766066,
+      "p99": 0.0021965717646124003,
+      "max": 0.005316184008230029,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0006741452333356639,
-      "p95": 0.002070018696180896,
-      "p99": 0.0034115435509879644,
-      "max": 0.0060717784529018826,
+      "mean": 0.0006118651947341707,
+      "p95": 0.0017058352662175414,
+      "p99": 0.0028093236175219354,
+      "max": 0.007063506349580362,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.8210071632843289,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.004061933024614782,
+      "p95": 0.008991199743895084,
+      "p99": 0.01359515653975948,
+      "max": 0.021398186225063065,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.004025370984021837,
+      "p95": 0.00887578751442558,
+      "p99": 0.013446225284470299,
+      "max": 0.021546787208298612,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.8215819999999999,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
