@@ -1,7 +1,7 @@
 {
   "fileChecks": "passed",
   "rowsPerCube": 35937,
-  "serializationMaxError": 4.999998274302087e-07,
+  "serializationMaxError": 4.999985561970899e-07,
   "processMode": "negative_print",
   "scanFilm": false,
   "vlogVsDirectEngine": {
@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0010136731581375565,
-      "p95": 0.003540203523004853,
-      "p99": 0.005718526383574831,
-      "max": 0.010410251156673461,
+      "mean": 0.000750895208596833,
+      "p95": 0.0021142413309821312,
+      "p99": 0.0031636167116641783,
+      "max": 0.007998979797366801,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0011345353536244386,
-      "p95": 0.003934520313575548,
-      "p99": 0.006422719680176532,
-      "max": 0.010846318178660386,
+      "mean": 0.0009482003911663676,
+      "p95": 0.0028445061539086355,
+      "p99": 0.004289612287701975,
+      "max": 0.009046075868473724,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7818406963033407,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.006913107449676044,
+      "p95": 0.018075406706275384,
+      "p99": 0.025073029318263527,
+      "max": 0.03656854443394858,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.006796192354688987,
+      "p95": 0.017863738196646675,
+      "p99": 0.024841946268039608,
+      "max": 0.03633414287792197,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.782217,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
