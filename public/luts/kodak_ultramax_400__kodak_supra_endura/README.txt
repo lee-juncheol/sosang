@@ -1,5 +1,7 @@
 Film Lab / Kodak Ultramax 400 + Kodak Professional Supra Endura
 
+Processing mode: negative_print; scan_film=False
+
 0119VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
 0119STD.cube: Standard/sRGB analytic working model input -> sRGB output
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
