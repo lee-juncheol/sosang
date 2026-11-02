@@ -2,9 +2,11 @@ export interface Asset { path: string; name: string; bytes: number; sha256: stri
 export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string }
 export interface Sample { id: string; name: string; category: string; credit: string; source: string | null; path: string; width: number; height: number; inputKind: 'camera-std' | 'synthetic-srgb' | 'uploaded-srgb'; sourceFilename?: string; previewLut: 'std' }
 export interface Metric { mean: number; p95: number; p99: number; max: number; samples: number }
+export type NegativeProcessMode = 'negative_print' | 'negative_digital'
+export type ProcessMode = NegativeProcessMode | 'positive_direct'
 export interface Combination {
   id: string; film: string; paper: string | null; number: number;
-  processMode: 'negative_print' | 'positive_direct';
+  processMode: ProcessMode;
   status: 'ready' | 'failed' | 'unsupported' | 'not-generated'; reason?: string;
   seconds?: number; files?: Record<'vlog' | 'std' | 'zip' | 'qa' | 'provenance', Asset>;
   previews?: Record<string, Asset>;

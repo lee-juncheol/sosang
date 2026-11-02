@@ -7,6 +7,7 @@ import numpy as np
 
 from pipeline.common import std_to_vlog
 from pipeline.slide import run_slide_reference
+from pipeline.digital import run_digital_reference
 from spektrafilm_lut_creator.grid import cube_grid
 from spektrafilm_lut_creator.qa.reference import run_pipeline_at
 
@@ -19,7 +20,7 @@ STD_CONTRACT = (
 )
 
 
-def run_std_reference(spec, bundle, samples, *, is_slide=False):
+def run_std_reference(spec, bundle, samples, *, is_slide=False, is_digital=False):
     """Evaluate encoded sRGB coordinates through the continuous runtime."""
     if spec.input_color_space != 'Panasonic V-Log' or spec.output_color_space != 'sRGB':
         raise ValueError('STD adapter requires Panasonic V-Log input and sRGB output')
@@ -28,12 +29,16 @@ def run_std_reference(spec, bundle, samples, *, is_slide=False):
     coordinates = std_to_vlog(np.asarray(samples, dtype=np.float64).reshape(-1, 3))
     if not np.isfinite(coordinates).all() or coordinates.min() < 0 or coordinates.max() > 1:
         raise ValueError('Analytic adapter outside source domain')
+    if is_slide and is_digital:
+        raise ValueError('Select either positive direct scan or negative digital conversion')
+    if is_digital:
+        return run_digital_reference(spec, coordinates)
     if is_slide:
         return run_slide_reference(spec, coordinates)
     return run_pipeline_at(spec, bundle, 0, coordinates)
 
 
-def bake_std(spec, bundle, *, is_slide=False):
+def bake_std(spec, bundle, *, is_slide=False, is_digital=False):
     """One engine evaluation per STD grid node; final cube uses R-fastest order."""
     n = spec.resolution
-    return run_std_reference(spec, bundle, cube_grid(n), is_slide=is_slide).reshape(n, n, n, 3)
+    return run_std_reference(spec, bundle, cube_grid(n), is_slide=is_slide, is_digital=is_digital).reshape(n, n, n, 3)

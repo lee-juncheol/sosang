@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { Asset, Catalog, Combination, Sample, Stock } from './types'
+import type { Asset, Catalog, Combination, NegativeProcessMode, Sample, Stock } from './types'
 import { fetchVerifiedAsset } from './assets'
 import { PHOTO_ACCEPT, usePhotoLook, usePhotoUpload } from './usePhoto'
+import { findLook, processModeFor } from './lookSelection'
 import './style.css'
 
 const paths: Record<string, React.ReactNode> = {
@@ -30,7 +31,7 @@ function FilmMark({ stock }: { stock: Stock }) {
   return <span className="film-mark" style={{ '--stock-color': stockColor(stock) } as React.CSSProperties}><span className="film-cap"/><span className="film-body"><span>{stock.brand === 'Kodak' ? 'K' : 'F'}</span><b>{iso}</b><i/></span></span>
 }
 
-function Preview({ sample, combo, mode, resultPath, processingError, retry }: { sample: Sample; combo: Combination; mode: 'original' | 'compare' | 'look'; resultPath?: string; processingError?: string; retry?: () => void }) {
+function Preview({ sample, combo, mode, resultPath, processingError, retry, lookLabel }: { sample: Sample; combo: Combination; mode: 'original' | 'compare' | 'look'; resultPath?: string; processingError?: string; retry?: () => void; lookLabel: string }) {
   const [split, setSplit] = useState(50)
   const [loaded, setLoaded] = useState({ source: false, result: false })
   const [failed, setFailed] = useState(false)
@@ -41,7 +42,7 @@ function Preview({ sample, combo, mode, resultPath, processingError, retry }: { 
   const error = failed ? '이미지를 불러오지 못했습니다. 다시 시도해 주세요.' : processingError
   return <div className={`preview ${mode}`} aria-busy={!ready && !error}>
     <img className="preview-image" src={sample.path} alt={`${sample.name}: ${beforeLabel}`} onLoad={() => setLoaded(s => ({ ...s, source: true }))} onError={() => setFailed(true)} />
-    {showResult && resultPath && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={resultPath} alt={`${sample.name}: 선택한 필름 룩 STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
+    {showResult && resultPath && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={resultPath} alt={`${sample.name}: ${lookLabel} STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
     {ready && available && !failed && <>
       {mode !== 'look' && <span className="image-tag before">{beforeLabel}</span>}
       {mode === 'compare' && <><div className="divider" style={{ left: `${split}%` }}><span>‹ ›</span></div><input className="comparison-range" type="range" min="0" max="100" value={split} onChange={e => setSplit(+e.target.value)} aria-label="이미지 비교 경계" aria-valuetext={`기준 이미지 ${split}%, 필름 적용 ${100 - split}%`} /></>}
@@ -57,6 +58,7 @@ function App() {
   const [attempt, setAttempt] = useState(0)
   const [filmId, setFilmId] = useState('kodak_portra_400')
   const [paperId, setPaperId] = useState('kodak_portra_endura')
+  const [negativeMode, setNegativeMode] = useState<NegativeProcessMode>('negative_print')
   const [brand, setBrand] = useState('모두')
   const [search, setSearch] = useState('')
   const [sampleId, setSampleId] = useState('std_playground')
@@ -69,8 +71,10 @@ function App() {
   const [dragging, setDragging] = useState(false)
   const upload = usePhotoUpload(() => { setSampleId('@upload'); setMode('compare') })
   const activePhoto = sampleId === '@upload' ? upload.photo : null
-  const directScan = catalog?.films.find(f => f.id === filmId)?.type === 'positive'
-  const activeCombo = catalog?.combinations.find(c => c.film === filmId && c.paper === (directScan ? null : paperId))
+  const selectedFilm = catalog?.films.find(f => f.id === filmId) || catalog?.films[0]
+  const selectedPaper = catalog?.papers.find(p => p.id === paperId) || catalog?.papers[0]
+  const processMode = selectedFilm ? processModeFor(selectedFilm, negativeMode) : 'negative_print'
+  const activeCombo = catalog && selectedFilm && selectedPaper ? findLook(catalog.combinations, selectedFilm, selectedPaper.id, negativeMode) : undefined
   const photoLook = usePhotoLook(activePhoto, activeCombo?.status === 'ready' ? activeCombo.files?.std : undefined)
 
   useEffect(() => {
@@ -98,11 +102,14 @@ function App() {
   }
 
   if (!catalog) return <main className="initial-state"><div className="brand-logo">F<span>↗</span></div><h1>Film Lab</h1><p role="status">{loadError || '필름 실험실을 준비하고 있습니다.'}</p>{loadError && <button onClick={() => setAttempt(n => n + 1)}>다시 불러오기</button>}</main>
-  const film = catalog.films.find(f => f.id === filmId) || catalog.films[0]
-  const paper = catalog.papers.find(p => p.id === paperId) || catalog.papers[0]
+  const film = selectedFilm!
+  const paper = selectedPaper!
   const isSlide = film.type === 'positive'
-  const combo = catalog.combinations.find(c => c.film === film.id && c.paper === (isSlide ? null : paper.id))!
-  const processLabel = isSlide ? '인화지 없음 · 필름 직접 스캔' : paper.name
+  const isDigital = processMode !== 'negative_print'
+  const isNegativeDigital = processMode === 'negative_digital'
+  const combo: Combination = activeCombo || { id: `${film.id}__${processMode}`, film: film.id, paper: isDigital ? null : paper.id, processMode, number: 0, status: 'not-generated', reason: '선택한 처리 방식의 LUT가 아직 준비되지 않았습니다.' }
+  const processLabel = isSlide ? '인화지 없음 · 슬라이드 직접 스캔' : isNegativeDigital ? 'Film Lab 디지털 변환 · 실험' : paper.name
+  const referenceLabel = isNegativeDigital ? '디지털 변환 기준' : '직접 엔진'
   const sample = activePhoto?.sample || catalog.samples.find(s => s.id === sampleId) || catalog.samples[0]
   const resultPath = activePhoto ? photoLook.path : combo.previews?.[sample.id]?.path
   const selectedAsset = combo.files?.[format]
@@ -114,7 +121,7 @@ function App() {
   return <>
     <header className="topbar"><a className="brand-link" href="/" aria-label="Film Lab 홈"><div className="brand-logo">F<span>↗</span></div><span className="brand-word">film<span>lab</span><small>COLOR, YOUR WAY.</small></span></a><div className="topbar-right"><span className="camera-badge"><Icon name="camera" size={15}/> LUMIX S1M2</span><span className="version">BETA 0.2</span><button className="about-button" onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>제작 정보</span></button></div></header>
     <main>
-      <div className="intro"><div><span className="eyebrow">THE FILM & PAPER STUDIO</span><h1>당신의 다음 색.</h1><p>필름과 인화지를 조합하거나 슬라이드를 직접 스캔해, 나만의 색을 찾아보세요.</p></div><div className="catalog-stat"><span className="live-dot"/>실제 엔진으로 생성한 <b>{catalog.counts.ready}개 조합</b><small>33³ LUT · sRGB 출력</small></div></div>
+      <div className="intro"><div><span className="eyebrow">THE FILM & PAPER STUDIO</span><h1>당신의 다음 색.</h1><p>인화지 인화와 디지털 스캔으로 필름의 색을 비교해 보세요.</p></div><div className="catalog-stat"><span className="live-dot"/>프로파일로 생성한 <b>{catalog.counts.ready}개 조합</b><small>33³ LUT · sRGB 출력</small></div></div>
       <div className="workspace">
         <aside className="film-library" aria-label="필름 선택">
           <div className="section-label"><span><b>01</b> 필름 라이브러리</span><small>{catalog.films.length}</small></div>
@@ -125,9 +132,9 @@ function App() {
         </aside>
 
         <section className="preview-panel" aria-label="룩 미리보기">
-          <div className="preview-heading"><div><span className="eyebrow">YOUR SELECTED LOOK</span><h2>{shortName(film.name)} {isSlide ? <small className="scan-heading">필름 직접 스캔</small> : <><span>×</span> {shortName(paper.name)}</>}</h2></div><span className="look-number">LOOK {String(combo.number).padStart(3,'0')}</span></div>
+          <div className="preview-heading"><div><span className="eyebrow">YOUR SELECTED LOOK</span><h2>{shortName(film.name)} {isDigital ? <small className="scan-heading">{isSlide ? '슬라이드 직접 스캔' : '디지털 스캔'}{isNegativeDigital && <em className="experimental-badge">실험</em>}</small> : <><span>×</span> {shortName(paper.name)}</>}</h2></div><span className="look-number">{combo.number ? `LOOK ${String(combo.number).padStart(3,'0')}` : 'PREPARING'}</span></div>
           <div className="preview-toolbar"><span><i className={combo.status === 'ready' ? 'live-dot' : 'muted-dot'}/>{combo.status === 'ready' ? 'STD 근사 · 기본 노출' : '미지원 / 미생성'}</span><div className="view-switch"><button title="원본 보기" aria-label="원본 보기" aria-pressed={mode === 'original'} className={mode === 'original' ? 'active' : ''} onClick={() => setMode('original')}><span>원본</span></button><button title="비교 보기" aria-label="비교 보기" aria-pressed={mode === 'compare'} className={mode === 'compare' ? 'active' : ''} onClick={() => setMode('compare')}><Icon name="compare" size={16}/><span>비교</span></button><button title="적용 결과만 보기" aria-label="적용 결과만 보기" aria-pressed={mode === 'look'} className={mode === 'look' ? 'active' : ''} onClick={() => setMode('look')}><Icon name="image" size={16}/><span>적용</span></button></div></div>
-          <Preview key={`${combo.id}-${sample.id}-${resultPath || photoLook.error || 'pending'}`} sample={sample} combo={combo} mode={mode} resultPath={resultPath} processingError={photoLook.error || undefined} retry={activePhoto ? photoLook.retry : undefined}/>
+          <Preview key={`${combo.id}-${sample.id}-${resultPath || photoLook.error || 'pending'}`} sample={sample} combo={combo} mode={mode} resultPath={resultPath} processingError={photoLook.error || undefined} retry={activePhoto ? photoLook.retry : undefined} lookLabel={`${film.name} · ${processLabel}`}/>
           <div className="preview-caption"><span>{sample.category}</span><span>{combo.status !== 'ready' ? '선택한 룩의 준비 상태를 확인해 주세요' : mode === 'compare' ? '경계를 드래그해 비교하세요 ↔' : mode === 'original' ? 'LUT 적용 전 원본' : '다운로드용 STD LUT · 100% 적용'}</span></div>
           <div className={`photo-upload ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true) }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }} onDrop={e => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) void upload.upload(file) }}>
             <input ref={fileInput} className="file-input" type="file" accept={PHOTO_ACCEPT} aria-label="사진 파일 선택" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload.upload(file) }}/>
@@ -143,14 +150,19 @@ function App() {
           <div className="sample-credit">{sample.credit}{sample.source && <a href={sample.source} target="_blank" rel="noreferrer">출처 <Icon name="external" size={10}/></a>}</div>
         </section>
 
-        <aside className="recipe-panel" aria-label="인화지와 다운로드">
-          <div className="paper-section"><div className="section-label"><span><b>02</b> {isSlide ? '슬라이드 스캔' : '인화지 선택'}</span><small>{isSlide ? 'DIRECT' : catalog.papers.length}</small></div>
-            {isSlide ? <div className="direct-scan-note" role="status"><Icon name="film" size={22}/><strong>인화지 없음 · 필름 직접 스캔</strong><p>슬라이드는 현상한 필름 자체를 스캔합니다. 인화지 프로파일은 적용하지 않습니다.</p></div> : <p className="section-description">필름의 색을 완성하는 마지막 단계</p>}
-            <fieldset className="paper-fieldset" disabled={isSlide} aria-label={isSlide ? '인화지 선택 (슬라이드에서는 사용하지 않음)' : '인화지'}><div className="paper-list" role="radiogroup" aria-label="인화지">{catalog.papers.map(p => <label className={`paper-option ${!isSlide && p.id === paper.id ? 'selected' : ''}`} key={p.id}><input type="radio" name="paper" value={p.id} checked={!isSlide && p.id === paper.id} onChange={() => { setPaperId(p.id); setNotice('') }}/><span className="paper-radio"/><span><strong>{shortName(p.name)}</strong><small>{p.brand} {!isSlide && p.id === film.recommendedPrint && <em>권장 조합</em>}</small></span></label>)}</div></fieldset>
-            {!isSlide && <p className="paper-balance-note">중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다. <button onClick={() => dialog.current?.showModal()}>생성 기준 보기</button></p>}
+        <aside className="recipe-panel" aria-label="처리 방식과 다운로드">
+          <div className="paper-section"><div className="section-label"><span><b>02</b> 처리 방식</span><small>{isDigital ? 'SCAN' : 'PRINT'}</small></div>
+            <fieldset className="process-switch"><legend className="sr-only">처리 방식 선택</legend>
+              <label className={`process-option ${!isDigital ? 'selected' : ''}`}><input type="radio" name="process-mode" value="negative_print" aria-label="인화지 인화" disabled={isSlide} checked={!isDigital} onChange={() => { setNegativeMode('negative_print'); setNotice('') }}/><span>인화지 인화</span></label>
+              <label className={`process-option ${isDigital ? 'selected' : ''}`}><input type="radio" name="process-mode" value="digital_scan" aria-label="디지털 스캔" checked={isDigital} onChange={() => { if (!isSlide) setNegativeMode('negative_digital'); setNotice('') }}/><span>디지털 스캔</span></label>
+            </fieldset>
+            {isDigital ? <div className={`direct-scan-note ${isNegativeDigital ? 'experimental-scan' : ''}`} role="status"><Icon name="film" size={22}/><strong>{processLabel}</strong><p>{isSlide ? '슬라이드는 현상한 필름 자체를 스캔합니다. 인화지 프로파일은 적용하지 않습니다.' : '인화지 없이 네거티브를 양화로 바꾸는 Film Lab의 실험 모드입니다. 모든 필름에 공통된 고정 변환을 사용하며, 사진별 자동 노출은 적용하지 않습니다.'}</p></div> : <p className="section-description">필름의 색을 완성하는 인화지를 선택하세요.</p>}
+            <fieldset className="paper-fieldset" disabled={isDigital} aria-label={isDigital ? '인화지 선택 (디지털 스캔에서는 사용하지 않음)' : '인화지'}><div className="paper-list" role="radiogroup" aria-label="인화지">{catalog.papers.map(p => <label className={`paper-option ${!isDigital && p.id === paper.id ? 'selected' : ''}`} key={p.id}><input type="radio" name="paper" value={p.id} checked={!isDigital && p.id === paper.id} onChange={() => { setPaperId(p.id); setNotice('') }}/><span className="paper-radio"/><span><strong>{shortName(p.name)}</strong><small>{p.brand} {!isDigital && p.id === film.recommendedPrint && <em>권장 조합</em>}</small></span></label>)}</div></fieldset>
+            {!isDigital && <p className="paper-balance-note">중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다. <button onClick={() => dialog.current?.showModal()}>생성 기준 보기</button></p>}
           </div>
           <div className="export-section"><div className="section-label"><span><b>03</b> LUT 내보내기</span><Icon name="download" size={16}/></div><div className="export-spec"><span>출력 <b>sRGB</b></span><span>격자 <b>33 × 33 × 33</b></span></div><label className="output-label" htmlFor="output-format">카메라 입력 베이스</label><select id="output-format" value={format} onChange={e => { setFormat(e.target.value as typeof format); setNotice('') }}><option value="zip">V-Log + Standard (ZIP)</option><option value="vlog">V-Log / V-Gamut (.cube)</option><option value="std">Standard / sRGB (.cube)</option></select>
-            <button className="download-button" disabled={!selectedAsset || combo.status !== 'ready' || downloading} onClick={() => selectedAsset && void download(selectedAsset)}><Icon name="download" size={18}/><span>{downloading ? '파일 검증 중…' : combo.status === 'ready' ? 'LUT 다운로드' : '다운로드 준비 전'}</span>{!downloading && <Icon name="arrow" size={17}/>}</button>
+            <p className="export-process">{isDigital ? processLabel : `인화지 인화 · ${shortName(paper.name)}`}</p>
+            <button className="download-button" aria-label={`${processLabel} LUT 다운로드`} disabled={!selectedAsset || combo.status !== 'ready' || downloading} onClick={() => selectedAsset && void download(selectedAsset)}><Icon name="download" size={18}/><span>{downloading ? '파일 검증 중…' : combo.status === 'ready' ? 'LUT 다운로드' : '다운로드 준비 전'}</span>{!downloading && <Icon name="arrow" size={17}/>}</button>
             <div className="download-meta">{selectedAsset ? <><span>{formatName}</span><span>{sizeLabel(selectedAsset.bytes)}</span></> : <span>{combo.status === 'unsupported' ? '이 조합은 지원하지 않습니다.' : '생성된 파일이 없습니다.'}</span>}</div>
             <p className="download-notice" role="status" aria-live="polite">{notice}</p>
             <div className="camera-notice"><span className="amber-dot"/><p>S1M2 실기 검증 전<strong>STD는 수식 기반 근사 변환입니다.</strong></p><button onClick={() => dialog.current?.showModal()} aria-label="검증 상세 보기"><Icon name="info" size={16}/></button></div>
@@ -163,9 +175,10 @@ function App() {
     <dialog ref={dialog} className="details-dialog" onClick={e => { if (e.target === dialog.current) dialog.current?.close() }}>
       <div className="dialog-inner"><div className="dialog-heading"><div><span className="eyebrow">BEHIND THE LOOK</span><h2>출처와 생성 정보</h2></div><button className="icon-button" onClick={() => dialog.current?.close()} aria-label="상세 정보 닫기"><Icon name="close"/></button></div>
       <p className="detail-intro">{film.name} · {processLabel}</p>
-      <dl className="details-grid"><dt>엔진</dt><dd>spektrafilm {catalog.engineVersion}<code>{catalog.engineCommit}</code></dd><dt>V-Log 입력</dt><dd>Panasonic V-Log / V-Gamut</dd><dt>STD 입력</dt><dd>Standard/sRGB 수식 근사 · 직접 엔진 생성<code>{catalog.adapter}</code></dd><dt>STD 노출</dt><dd>기본 노출 (현재 기준) · 선형 입력 배율 1.0배</dd><dt>출력</dt><dd>sRGB · 33³ · Full range 0–1</dd><dt>처리 방식</dt><dd>{isSlide ? '슬라이드 현상 → 필름 직접 스캔 (인화지 없음)' : '네거티브 현상 → 인화지 인화 → 스캔'}</dd><dt>생성 상태</dt><dd>{combo.status === 'ready' ? '파일 검사 완료 · 보간 오차 측정 완료' : combo.reason}</dd><dt>실기 검증</dt><dd className="amber-text">S1M2 / S1II에서 아직 검증하지 않았습니다.</dd></dl>
-      {combo.qa && <><h3>측정된 보간 오차</h3><p>출력 sRGB의 최대 채널 절대 오차. 4,350개 입력과 사면체 보간을 사용했습니다. 엔진 계산을 LUT가 얼마나 잘 근사하는지 측정하며, 실물 필름이나 카메라 색을 검증한 수치는 아닙니다.</p><table><thead><tr><th>비교</th><th>평균</th><th>99백분위</th><th>최대</th></tr></thead><tbody>{[['V-Log ↔ 직접 엔진',combo.qa.vlogVsDirectEngine.tetrahedral],...(combo.qa.stdVsDirectEngine ? [['STD ↔ 직접 엔진',combo.qa.stdVsDirectEngine.tetrahedral]] : [])].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{combo.qa.warnings.map(w => <p key={w} className="amber-text">{w}</p>)}</>}
-      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 프로파일을 실제로 계산했습니다. 네거티브는 필름과 인화지를 조합하고, 슬라이드는 인화 단계를 건너뛰어 필름 자체를 직접 스캔합니다. 그레인·할레이션·블러·자동 노출을 끄고 픽셀별 색과 톤만 LUT에 담았습니다.</p><p>STD는 sRGB 33³ 격자를 선형광으로 디코딩하고 V-Gamut으로 변환한 뒤, 연속 엔진을 직접 계산해 생성합니다. 중간 V-Log LUT 격자를 거치지 않아 두 번 보간하던 오차를 줄였습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><p>STD 입력은 기존과 같은 선형 배율 1.0배를 유지합니다. upstream sRGB LUT의 기본 입력 배율은 2.88배(약 +1.53 EV)이지만, 이를 추가 적용하지 않았습니다. 카메라 STD 렌더링의 기준 노출이 실측되지 않았으므로 두 설정의 밝기 차이를 정확도 우열로 해석하지 않습니다.</p><p>같은 인화지를 사용하면 엔진의 필름별 중성 인화 필터와 중간 회색 기준 노출 정규화가 밝기·색편향을 맞춥니다. 그래서 필름별 차이가 작을 수 있습니다. 차이를 키우기 위한 별도 채도·색보정은 적용하지 않았으며, 이 모델과 실제 필름 촬영·현상·스캔 결과의 일치는 별도 검증이 필요합니다.</p><h3>내 사진 업로드</h3><p>JPG·PNG·WebP 파일을 브라우저에서 읽고 sRGB로 처리합니다. 사진은 서버로 전송하거나 저장하지 않으며 페이지를 닫거나 새로고침하면 사라집니다. 미리보기는 긴 변 최대 2,048px이며 원본 파일은 변경하지 않습니다. 내 사진의 EXIF나 LUT OFF 여부는 자동 검증하지 않습니다. RAW·HEIC는 JPG로 변환해 주세요.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성과 STD 입력의 직접 엔진 계산을 수행했습니다. 공식 제휴 제품이 아닙니다.</p>
+      <dl className="details-grid"><dt>엔진</dt><dd>spektrafilm {catalog.engineVersion}<code>{catalog.engineCommit}</code></dd><dt>V-Log 입력</dt><dd>Panasonic V-Log / V-Gamut</dd><dt>STD 입력</dt><dd>Standard/sRGB 수식 근사 · 직접 변환 생성<code>{catalog.adapter}</code></dd><dt>STD 노출</dt><dd>기본 노출 (현재 기준) · 선형 입력 배율 1.0배</dd><dt>출력</dt><dd>sRGB · 33³ · Full range 0–1</dd><dt>처리 방식</dt><dd>{isSlide ? '슬라이드 현상 → 필름 직접 스캔 (인화지 없음)' : isNegativeDigital ? '네거티브 현상 → Film Lab 고정 디지털 양화 변환 (실험 · 인화지 없음)' : '네거티브 현상 → 인화지 인화 → 스캔'}</dd><dt>생성 상태</dt><dd>{combo.status === 'ready' ? '파일 검사 완료 · 보간 오차 측정 완료' : combo.reason}</dd><dt>실기 검증</dt><dd className="amber-text">S1M2 / S1II에서 아직 검증하지 않았습니다.</dd></dl>
+      {combo.qa && <><h3>측정된 보간 오차</h3><p>출력 sRGB의 최대 채널 절대 오차. 4,350개 입력과 사면체 보간을 사용했습니다. {isNegativeDigital ? 'Film Lab의 고정 디지털 변환까지 포함한 연속 계산' : '엔진 계산'}을 LUT가 얼마나 잘 근사하는지 측정하며, 실물 필름이나 카메라 색을 검증한 수치는 아닙니다.</p><table><thead><tr><th>비교</th><th>평균</th><th>99백분위</th><th>최대</th></tr></thead><tbody>{[[`V-Log ↔ ${referenceLabel}`,combo.qa.vlogVsDirectEngine.tetrahedral],...(combo.qa.stdVsDirectEngine ? [[`STD ↔ ${referenceLabel}`,combo.qa.stdVsDirectEngine.tetrahedral]] : [])].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{combo.qa.warnings.map(w => <p key={w} className="amber-text">{w}</p>)}</>}
+      {isNegativeDigital && <><h3>디지털 스캔 기준</h3><p>D50 조명과 가상 RGB 센서로 필름을 읽고, 필름 베이스의 색을 제거합니다. 필름마다 18.4% 회색 한 점을 기준으로 색과 밝기의 균형을 맞춘 뒤, 모든 필름에 공통된 톤 곡선으로 양화 변환합니다. 회색 기준 보정값은 필름마다 다르지만 사진마다 다시 계산하지 않습니다. 실측 스캐너 프로파일이 아닌 Film Lab의 고정된 실험적 해석입니다.</p></>}
+      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 프로파일을 계산합니다. 인화지 인화는 네거티브 필름과 인화지를 조합합니다. 슬라이드는 필름 자체를 직접 스캔합니다. 네거티브 디지털 스캔은 인화지를 거치지 않고 Film Lab의 고정 양화 변환을 적용하는 별도 실험 모드이며, 원본 엔진의 기본 인화 방식과 구분합니다. 그레인·할레이션·블러·사진별 자동 노출은 적용하지 않습니다.</p><p>STD는 sRGB 33³ 격자를 선형광으로 디코딩하고 V-Gamut으로 변환한 뒤, 필름 계산과 선택한 출력 변환을 직접 실행해 생성합니다. 중간 V-Log LUT 격자를 거치지 않아 두 번 보간하던 오차를 줄였습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><p>STD 입력은 기존과 같은 선형 배율 1.0배를 유지합니다. upstream sRGB LUT의 기본 입력 배율은 2.88배(약 +1.53 EV)이지만, 이를 추가 적용하지 않았습니다. 카메라 STD 렌더링의 기준 노출이 실측되지 않았으므로 두 설정의 밝기 차이를 정확도 우열로 해석하지 않습니다.</p><p>인화지 인화 모드에서 같은 인화지를 사용하면 엔진의 필름별 중성 인화 필터와 중간 회색 기준 노출 정규화가 밝기·색편향을 맞춥니다. 그래서 필름별 차이가 작을 수 있습니다. 차이를 키우기 위한 별도 채도·색보정은 적용하지 않았으며, 이 모델과 실제 필름 촬영·현상·스캔 결과의 일치는 별도 검증이 필요합니다.</p><h3>내 사진 업로드</h3><p>JPG·PNG·WebP 파일을 브라우저에서 읽고 sRGB로 처리합니다. 사진은 서버로 전송하거나 저장하지 않으며 페이지를 닫거나 새로고침하면 사라집니다. 미리보기는 긴 변 최대 2,048px이며 원본 파일은 변경하지 않습니다. 내 사진의 EXIF나 LUT OFF 여부는 자동 검증하지 않습니다. RAW·HEIC는 JPG로 변환해 주세요.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성과 STD 입력의 직접 계산을 수행했으며, 네거티브 디지털 모드에는 별도의 고정 양화 변환을 추가했습니다. 공식 제휴 제품이 아닙니다.</p>
       <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">원본 엔진 ↗</a><a href="/licenses/SPEKTRAFILM_LICENSE.txt" target="_blank" rel="noreferrer">LUT 라이선스 ↗</a>{combo.files && <><a href={combo.files.qa.path} target="_blank" rel="noreferrer">QA 보고서 ↗</a><a href={combo.files.provenance.path} target="_blank" rel="noreferrer">생성 설정 · 해시 ↗</a></>}</div>
       </div>
     </dialog>

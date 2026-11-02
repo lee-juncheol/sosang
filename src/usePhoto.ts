@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Asset, Sample } from './types'
 
 export interface Photo { sample: Sample; pixels: Uint8ClampedArray<ArrayBuffer>; originalWidth: number; originalHeight: number }
@@ -57,13 +57,16 @@ export function usePhotoUpload(onSelected: () => void) {
 
 export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
   const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<{ key: string; path?: string; error?: string }>({ key: '' })
+  const [state, setState] = useState<{ request: object | null; path?: string; error?: string }>({ request: null })
   const key = photo && asset ? `${photo.sample.id}-${asset.sha256}-${attempt}` : ''
+  // A → B → A must start a new request: the first A's object URL was revoked
+  // when B started, even if A's photo/LUT key is identical on the return trip.
+  const request = useMemo(() => ({ key }), [photo, asset, key])
   useEffect(() => {
     if (!photo || !asset) return
     let active = true, resultUrl = ''
     let worker: Worker | undefined
-    const fail = (message: string) => { if (active) setState({ key, error: message }) }
+    const fail = (message: string) => { if (active) setState({ request, error: message }) }
     try {
       worker = new Worker(new URL('./lut.worker.ts', import.meta.url), { type: 'module' })
       worker.onmessage = async (event: MessageEvent<{ pixels?: Uint8ClampedArray<ArrayBuffer>; error?: string }>) => {
@@ -76,7 +79,7 @@ export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
           if (!context) throw new Error('미리보기를 만들지 못했습니다.')
           context.putImageData(new ImageData(event.data.pixels, canvas.width, canvas.height), 0, 0)
           const blob = await canvasBlob(canvas)
-          if (active) { resultUrl = URL.createObjectURL(blob); setState({ key, path: resultUrl }) }
+          if (active) { resultUrl = URL.createObjectURL(blob); setState({ request, path: resultUrl }) }
         } catch (e) { fail(e instanceof Error ? e.message : '미리보기를 만들지 못했습니다.') }
       }
       worker.onerror = () => fail('LUT 처리 중 문제가 생겼습니다. 다시 시도해 주세요.')
@@ -84,6 +87,6 @@ export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
       worker.postMessage({ pixels, asset }, [pixels.buffer])
     } catch { fail('이 브라우저에서 LUT 처리를 시작하지 못했습니다.') }
     return () => { active = false; worker?.terminate(); URL.revokeObjectURL(resultUrl) }
-  }, [photo, asset, key])
-  return { path: key && state.key === key ? state.path : undefined, error: key && state.key === key ? state.error : undefined, retry: () => setAttempt(n => n + 1) }
+  }, [photo, asset, request])
+  return { path: key && state.request === request ? state.path : undefined, error: key && state.request === request ? state.error : undefined, retry: () => setAttempt(n => n + 1) }
 }

@@ -20,6 +20,9 @@ for (const combo of catalog.combinations) {
   const film=catalog.films.find(f=>f.id===combo.film); assert(film);
   if(film.type==='positive'){
     assert.equal(combo.paper,null); assert.equal(combo.processMode,'positive_direct');
+  }else if(combo.processMode==='negative_digital'){
+    assert.equal(combo.paper,null); assert(combo.id.endsWith('__digital_scan'));
+    if(combo.status==='ready') assert(combo.qa.referenceModel?.startsWith('film-lab-'));
   }else{
     assert(catalog.papers.some(p=>p.id===combo.paper)); assert.equal(combo.processMode,'negative_print');
   }
@@ -51,7 +54,7 @@ for (const combo of catalog.combinations) {
 }
 for(const film of catalog.films){
   const choices=catalog.combinations.filter(c=>c.film===film.id);
-  assert.equal(choices.length,film.type==='positive'?1:catalog.papers.length);
+  assert.equal(choices.length,film.type==='positive'?1:catalog.papers.length+1);
   assert.equal(new Set(choices.map(c=>c.paper)).size,choices.length);
 }
 for(const [status,count] of Object.entries(catalog.counts)) assert.equal(count,catalog.combinations.filter(c=>c.status===status).length);
