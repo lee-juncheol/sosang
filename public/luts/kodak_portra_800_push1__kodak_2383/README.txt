@@ -1,5 +1,7 @@
 Film Lab / Kodak Portra 800 (Push 1) + Kodak Vision 2383
 
+Processing mode: negative_print; scan_film=False
+
 0098VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
 0098STD.cube: Standard/sRGB analytic working model input -> sRGB output
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
