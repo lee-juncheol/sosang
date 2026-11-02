@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Asset, Catalog, Combination, Sample, Stock } from './types'
+import { fetchVerifiedAsset } from './assets'
+import { PHOTO_ACCEPT, usePhotoLook, usePhotoUpload } from './usePhoto'
 import './style.css'
 
 const paths: Record<string, React.ReactNode> = {
+  upload: <><path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v5h16v-5"/></>,
   download: <><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 16v5h14v-5"/></>,
   chevron: <path d="m9 5 7 7-7 7"/>,
   search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></>,
@@ -27,24 +30,24 @@ function FilmMark({ stock }: { stock: Stock }) {
   return <span className="film-mark" style={{ '--stock-color': stockColor(stock) } as React.CSSProperties}><span className="film-cap"/><span className="film-body"><span>{stock.brand === 'Kodak' ? 'K' : 'F'}</span><b>{iso}</b><i/></span></span>
 }
 
-function Preview({ sample, combo, mode }: { sample: Sample; combo: Combination; mode: 'original' | 'compare' | 'look' }) {
+function Preview({ sample, combo, mode, resultPath, processingError, retry }: { sample: Sample; combo: Combination; mode: 'original' | 'compare' | 'look'; resultPath?: string; processingError?: string; retry?: () => void }) {
   const [split, setSplit] = useState(50)
   const [loaded, setLoaded] = useState({ source: false, result: false })
   const [failed, setFailed] = useState(false)
-  const result = combo.previews?.[sample.id]
-  const available = combo.status === 'ready' && !!result
+  const available = combo.status === 'ready'
   const showResult = available && mode !== 'original'
   const ready = loaded.source && (!showResult || loaded.result)
-  const beforeLabel = sample.inputKind === 'camera-std' ? 'STD 원본 · LUT OFF' : '기준 sRGB'
-  return <div className={`preview ${mode}`} aria-busy={!ready && !failed}>
+  const beforeLabel = sample.inputKind === 'camera-std' ? 'STD 원본 · LUT OFF' : sample.inputKind === 'uploaded-srgb' ? '내 사진 · 원본' : '기준 sRGB'
+  const error = failed ? '이미지를 불러오지 못했습니다. 다시 시도해 주세요.' : processingError
+  return <div className={`preview ${mode}`} aria-busy={!ready && !error}>
     <img className="preview-image" src={sample.path} alt={`${sample.name}: ${beforeLabel}`} onLoad={() => setLoaded(s => ({ ...s, source: true }))} onError={() => setFailed(true)} />
-    {showResult && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={result.path} alt={`${sample.name}: 선택한 필름과 인화지 STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
+    {showResult && resultPath && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={resultPath} alt={`${sample.name}: 선택한 필름과 인화지 STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
     {ready && available && !failed && <>
       {mode !== 'look' && <span className="image-tag before">{beforeLabel}</span>}
       {mode === 'compare' && <><div className="divider" style={{ left: `${split}%` }}><span>‹ ›</span></div><input className="comparison-range" type="range" min="0" max="100" value={split} onChange={e => setSplit(+e.target.value)} aria-label="이미지 비교 경계" aria-valuetext={`기준 이미지 ${split}%, 필름 적용 ${100 - split}%`} /></>}
       {showResult && <span className="image-tag after"><i/> STD LUT 100%</span>}
     </>}
-    {(!ready || failed || !available) && <div className="preview-overlay"><Icon name={failed ? 'info' : available ? 'image' : 'film'} size={28}/><strong>{failed ? '이미지를 불러오지 못했습니다' : available ? '미리보기를 불러오는 중' : combo.status === 'unsupported' ? '이 조합은 아직 지원하지 않아요' : '아직 준비되지 않은 조합입니다'}</strong><p>{failed ? '네트워크 연결을 확인하고 샘플을 다시 선택해 주세요.' : !available ? combo.reason : '선택한 조합의 실제 LUT 적용 이미지를 가져옵니다.'}</p></div>}
+    {(!ready || failed || (mode !== 'original' && (!available || error))) && <div className="preview-overlay"><Icon name={error ? 'info' : available ? 'image' : 'film'} size={28}/><strong>{error ? '미리보기를 만들지 못했습니다' : available ? (sample.inputKind === 'uploaded-srgb' ? '내 사진에 LUT를 적용하는 중' : '미리보기를 불러오는 중') : combo.status === 'unsupported' ? '이 조합은 아직 지원하지 않아요' : '아직 준비되지 않은 조합입니다'}</strong><p>{error || (!available ? combo.reason : sample.inputKind === 'uploaded-srgb' ? '사진은 내 기기 안에서만 처리합니다.' : '선택한 조합의 실제 LUT 적용 이미지를 가져옵니다.')}</p>{error && retry && <button className="retry-button" onClick={retry}>다시 시도</button>}</div>}
   </div>
 }
 
@@ -62,6 +65,13 @@ function App() {
   const [downloading, setDownloading] = useState(false)
   const [notice, setNotice] = useState('')
   const dialog = useRef<HTMLDialogElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const upload = usePhotoUpload(() => { setSampleId('@upload'); setMode('compare') })
+  const activePhoto = sampleId === '@upload' ? upload.photo : null
+  const activeCombo = catalog?.combinations.find(c => c.film === filmId && c.paper === paperId)
+  const photoLook = usePhotoLook(activePhoto, activeCombo?.status === 'ready' ? activeCombo.files?.std : undefined)
+
   useEffect(() => {
     const controller = new AbortController()
     setLoadError('')
@@ -77,17 +87,7 @@ function App() {
   async function download(asset: Asset) {
     setDownloading(true); setNotice('')
     try {
-      const response = await fetch(asset.path)
-      if (!response.ok) throw new Error('파일을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.')
-      let buffer = await response.arrayBuffer()
-      // Production delivers lossless gzip assets. Some hosts transparently
-      // decode them; only decompress when the gzip magic bytes are present.
-      const magic = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength))
-      if (asset.encoding === 'gzip' && magic[0] === 0x1f && magic[1] === 0x8b) {
-        buffer = await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
-      }
-      const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))).map(n => n.toString(16).padStart(2, '0')).join('')
-      if (digest !== asset.sha256 || buffer.byteLength !== asset.bytes) throw new Error('파일 검증에 실패했습니다. 페이지를 새로고침해 주세요.')
+      const buffer = await fetchVerifiedAsset(asset)
       const url = URL.createObjectURL(new Blob([buffer], { type: asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain' }))
       const a = document.createElement('a'); a.href = url; a.download = asset.name; document.body.append(a); a.click(); a.remove()
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
@@ -100,7 +100,8 @@ function App() {
   const film = catalog.films.find(f => f.id === filmId) || catalog.films[0]
   const paper = catalog.papers.find(p => p.id === paperId) || catalog.papers[0]
   const combo = catalog.combinations.find(c => c.film === film.id && c.paper === paper.id)!
-  const sample = catalog.samples.find(s => s.id === sampleId) || catalog.samples[0]
+  const sample = activePhoto?.sample || catalog.samples.find(s => s.id === sampleId) || catalog.samples[0]
+  const resultPath = activePhoto ? photoLook.path : combo.previews?.[sample.id]?.path
   const selectedAsset = combo.files?.[format]
   const filtered = catalog.films.filter(f => (brand === '모두' || f.brand === brand) && f.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (a.id === 'kodak_portra_400' ? -1 : b.id === 'kodak_portra_400' ? 1 : a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)))
@@ -123,11 +124,19 @@ function App() {
         <section className="preview-panel" aria-label="룩 미리보기">
           <div className="preview-heading"><div><span className="eyebrow">YOUR SELECTED LOOK</span><h2>{shortName(film.name)} <span>×</span> {shortName(paper.name)}</h2></div><span className="look-number">LOOK {String(combo.number).padStart(3,'0')}</span></div>
           <div className="preview-toolbar"><span><i className={combo.status === 'ready' ? 'live-dot' : 'muted-dot'}/>{combo.status === 'ready' ? 'STD LUT 미리보기' : '미지원 / 미생성'}</span><div className="view-switch"><button title="원본 보기" aria-label="원본 보기" aria-pressed={mode === 'original'} className={mode === 'original' ? 'active' : ''} onClick={() => setMode('original')}><span>원본</span></button><button title="비교 보기" aria-label="비교 보기" aria-pressed={mode === 'compare'} className={mode === 'compare' ? 'active' : ''} onClick={() => setMode('compare')}><Icon name="compare" size={16}/><span>비교</span></button><button title="적용 결과만 보기" aria-label="적용 결과만 보기" aria-pressed={mode === 'look'} className={mode === 'look' ? 'active' : ''} onClick={() => setMode('look')}><Icon name="image" size={16}/><span>적용</span></button></div></div>
-          <Preview key={`${combo.id}-${sample.id}`} sample={sample} combo={combo} mode={mode}/>
+          <Preview key={`${combo.id}-${sample.id}-${resultPath || photoLook.error || 'pending'}`} sample={sample} combo={combo} mode={mode} resultPath={resultPath} processingError={photoLook.error || undefined} retry={activePhoto ? photoLook.retry : undefined}/>
           <div className="preview-caption"><span>{sample.category}</span><span>{combo.status !== 'ready' ? '준비된 네거티브 필름을 선택해 주세요' : mode === 'compare' ? '경계를 드래그해 비교하세요 ↔' : mode === 'original' ? 'LUT 적용 전 원본' : '다운로드용 STD LUT · 100% 적용'}</span></div>
+          <div className={`photo-upload ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true) }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }} onDrop={e => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) void upload.upload(file) }}>
+            <input ref={fileInput} className="file-input" type="file" accept={PHOTO_ACCEPT} aria-label="사진 파일 선택" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload.upload(file) }}/>
+            <div className="upload-heading"><div><strong>내 사진으로 확인하기</strong><p>사진을 끌어놓거나 파일을 선택하세요.</p></div><button className="upload-button" disabled={upload.loading} onClick={() => fileInput.current?.click()}><Icon name="upload" size={15}/>{upload.loading ? '사진 읽는 중…' : upload.photo ? '사진 바꾸기' : '사진 업로드'}</button></div>
+            <p className="upload-hint">JPG · PNG · WebP / 최대 30 MB · 서버 전송 없이 내 기기에서 처리</p>
+            {upload.photo && <div className="uploaded-photo"><button className={`uploaded-choice ${activePhoto ? 'selected' : ''}`} aria-pressed={!!activePhoto} onClick={() => setSampleId('@upload')}><img src={upload.photo.sample.path} alt=""/><span><strong>{upload.photo.sample.name}</strong><small>{upload.photo.originalWidth} × {upload.photo.originalHeight} · 미리보기 {upload.photo.sample.width} × {upload.photo.sample.height}</small></span>{activePhoto && <Icon name="check" size={15}/>}</button><button className="remove-photo" aria-label="업로드한 사진 제거" onClick={() => { upload.clear(); if (activePhoto) setSampleId('std_playground') }}><Icon name="close" size={16}/></button></div>}
+            <p className="upload-error" role="alert">{upload.error}</p>
+            <span className="sr-only" role="status">{upload.loading ? '사진을 읽고 있습니다.' : upload.photo ? `${upload.photo.sample.name} 사진을 불러왔습니다.` : ''}</span>
+          </div>
           <div className="samples-heading"><span className="section-label">샘플 이미지</span><span>S1M2 · STD 촬영본</span></div>
           <div className="sample-grid">{catalog.samples.map(s => <button key={s.id} className={`sample-option ${sample.id === s.id ? 'selected' : ''}`} aria-pressed={sample.id === s.id} onClick={() => setSampleId(s.id)}><div><img src={s.path} alt="" loading="lazy"/>{sample.id === s.id && <span><Icon name="check" size={12}/></span>}</div><strong>{s.name}</strong></button>)}</div>
-          <div className="preview-note"><Icon name="info" size={15}/><p>{sample.inputKind === 'camera-std' ? '직접 촬영한 Standard 원본에 다운로드용 STD LUT를 100% 적용했습니다.' : 'sRGB 테스트 패턴에 다운로드용 STD LUT를 100% 적용했습니다.'} 내보내기 형식을 바꿔도 미리보기는 STD 기준입니다. <button onClick={() => dialog.current?.showModal()}>생성 방식 보기</button></p></div>
+          <div className="preview-note"><Icon name="info" size={15}/><p>{activePhoto ? '내 사진은 Standard/sRGB 입력으로 처리합니다. STD·LUT OFF 사진을 권장하며, 보정된 사진에는 색이 중복 적용될 수 있습니다. 미리보기는 긴 변 최대 2,048px로 축소합니다.' : sample.inputKind === 'camera-std' ? '직접 촬영한 Standard 원본에 다운로드용 STD LUT를 100% 적용했습니다.' : 'sRGB 테스트 패턴에 다운로드용 STD LUT를 100% 적용했습니다.'} 내보내기 형식을 바꿔도 미리보기는 STD 기준입니다. <button onClick={() => dialog.current?.showModal()}>생성 방식 보기</button></p></div>
           <div className="sample-credit">{sample.credit}{sample.source && <a href={sample.source} target="_blank" rel="noreferrer">출처 <Icon name="external" size={10}/></a>}</div>
         </section>
 
@@ -151,7 +160,7 @@ function App() {
       <p className="detail-intro">{film.name} + {paper.name}</p>
       <dl className="details-grid"><dt>엔진</dt><dd>spektrafilm {catalog.engineVersion}<code>{catalog.engineCommit}</code></dd><dt>V-Log 입력</dt><dd>Panasonic V-Log / V-Gamut</dd><dt>STD 입력</dt><dd>Standard/sRGB 수식 기반 근사 모델</dd><dt>출력</dt><dd>sRGB · 33³ · Full range 0–1</dd><dt>생성 상태</dt><dd>{combo.status === 'ready' ? '파일 검사 완료 · 보간 오차 측정 완료' : combo.reason}</dd><dt>실기 검증</dt><dd className="amber-text">S1M2 / S1II에서 아직 검증하지 않았습니다.</dd></dl>
       {combo.qa && <><h3>측정된 보간 오차</h3><p>출력 sRGB의 최대 채널 절대 오차. 4,350개 입력과 사면체 보간을 사용했습니다. 아래 수치는 카메라 색 정확도가 아닙니다.</p><table><thead><tr><th>비교</th><th>평균</th><th>99백분위</th><th>최대</th></tr></thead><tbody>{[['V-Log ↔ 직접 엔진',combo.qa.vlogVsDirectEngine.tetrahedral],['STD ↔ 연속 합성',combo.qa.stdVsContinuousComposition.tetrahedral]].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{combo.qa.warnings.map(w => <p key={w} className="amber-text">{w}</p>)}</>}
-      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 필름과 인화지 프로파일을 실제로 계산했습니다. 그레인·할레이션·블러·자동 노출을 끄고 픽셀별 색과 톤만 LUT에 담았습니다.</p><p>STD는 sRGB 디코딩 → V-Gamut 변환 → V-Log 인코딩을 V-Log LUT 앞에 합성했습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성·STD 합성을 수행했습니다. 공식 제휴 제품이 아닙니다.</p>
+      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 필름과 인화지 프로파일을 실제로 계산했습니다. 그레인·할레이션·블러·자동 노출을 끄고 픽셀별 색과 톤만 LUT에 담았습니다.</p><p>STD는 sRGB 디코딩 → V-Gamut 변환 → V-Log 인코딩을 V-Log LUT 앞에 합성했습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><h3>내 사진 업로드</h3><p>JPG·PNG·WebP 파일을 브라우저에서 읽고 sRGB로 처리합니다. 사진은 서버로 전송하거나 저장하지 않으며 페이지를 닫거나 새로고침하면 사라집니다. 미리보기는 긴 변 최대 2,048px이며 원본 파일은 변경하지 않습니다. 내 사진의 EXIF나 LUT OFF 여부는 자동 검증하지 않습니다. RAW·HEIC는 JPG로 변환해 주세요.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성·STD 합성을 수행했습니다. 공식 제휴 제품이 아닙니다.</p>
       <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">원본 엔진 ↗</a><a href="/licenses/SPEKTRAFILM_LICENSE.txt" target="_blank" rel="noreferrer">LUT 라이선스 ↗</a>{combo.files && <><a href={combo.files.qa.path} target="_blank" rel="noreferrer">QA 보고서 ↗</a><a href={combo.files.provenance.path} target="_blank" rel="noreferrer">생성 설정 · 해시 ↗</a></>}</div>
       </div>
     </dialog>

@@ -23,6 +23,14 @@ npm run preview
 
 개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 프로덕션 빌드는 LUT 전송용 파일에 무손실 gzip 압축을 적용하고 브라우저에서 원래 `.cube`로 복원합니다. 원본/ZIP의 LUT 내용은 바뀌지 않습니다. 다운로드 전 원본 파일 크기/SHA-256을 검사합니다. HTTPS 또는 localhost의 Web Crypto와 현대 브라우저의 DecompressionStream을 사용합니다.
 
+## 내 사진으로 미리보기
+
+미리보기 아래 **사진 업로드**를 누르거나 업로드 영역에 파일을 끌어놓습니다. JPG/JPEG·PNG·WebP 한 장(최대 30 MiB, 8,000만 화소)을 읽습니다. HEIC·RAW는 먼저 JPG로 변환해야 합니다. 사진 바꾸기, 제거, 기본 샘플과 내 사진 사이의 전환을 지원합니다.
+
+사진은 서버로 보내지 않고 브라우저 메모리에서만 처리합니다. 새로고침하면 사라지고 원본 파일은 변경하지 않습니다. 브라우저 디코더가 EXIF 방향을 반영한 후 sRGB canvas로 변환하며 미리보기의 긴 변은 최대 2,048px입니다. 업로드 사진의 Standard/LUT OFF 여부는 자동 판독하지 않습니다. STD·LUT OFF 촬영본을 권장합니다.
+
+선택한 다운로드용 STD LUT를 SHA-256/크기로 확인하고 Web Worker에서 사면체 보간을 적용합니다. 필름·인화지 변경 시 진행 중인 작업을 취소하고 마지막 선택을 렌더링합니다. 원본·비교·적용 보기와 키보드 비교 슬라이더를 동일하게 사용할 수 있습니다. 결과는 PNG로 표시해 추가 손실 압축을 하지 않습니다. 이미지 파일 자체의 다운로드 기능은 제공하지 않습니다.
+
 ## Python 환경과 재생성
 
 upstream: https://github.com/andreavolpato/spektrafilm
@@ -82,13 +90,14 @@ Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 
 
 ```bash
 .venv/bin/python -m pytest pipeline/tests -q
+npm test
 npm run verify:assets
 npm run build
 # 프로덕션 압축 전송 파일도 원본 해시와 대조
 npm run verify:assets -- dist
 ```
 
-21개 Python 테스트, 256개 LUT의 형식·수치, 1,408개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
+21개 Python 테스트, 업로드 렌더러의 6개 JavaScript 테스트, 256개 LUT의 형식·수치, 1,408개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
 
 ## 출처
 
