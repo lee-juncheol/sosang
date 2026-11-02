@@ -13,7 +13,7 @@ from pipeline.common import PUBLIC, ROOT, sha256
 def test_camera_samples_are_verified_lut_off_and_color_unchanged():
     manifest = json.loads((PUBLIC / 'samples/manifest.json').read_text())
     cameras = [sample for sample in manifest if sample['inputKind'] == 'camera-std']
-    assert len(cameras) == 3
+    assert len(cameras) == 5
     for sample in cameras:
         meta = sample['cameraMetadata']
         assert meta['Model'] == 'DC-S1M2'
@@ -33,7 +33,7 @@ def test_camera_samples_are_verified_lut_off_and_color_unchanged():
     'kodak_portra_400__kodak_portra_endura',
     'fujifilm_c200__fujifilm_crystal_archive_typeii',
 ])
-@pytest.mark.parametrize('sample_id', ['std_figures', 'std_closeup', 'std_shelf'])
+@pytest.mark.parametrize('sample_id', ['std_playground', 'std_playground_panel', 'std_figures', 'std_closeup', 'std_shelf'])
 def test_preview_matches_independently_read_exported_std_cube(combo_id, sample_id):
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
     combo = next(c for c in catalog['combinations'] if c['id'] == combo_id)

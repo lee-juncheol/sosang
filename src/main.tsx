@@ -56,7 +56,7 @@ function App() {
   const [paperId, setPaperId] = useState('kodak_portra_endura')
   const [brand, setBrand] = useState('모두')
   const [search, setSearch] = useState('')
-  const [sampleId, setSampleId] = useState('std_figures')
+  const [sampleId, setSampleId] = useState('std_playground')
   const [mode, setMode] = useState<'original' | 'compare' | 'look'>('compare')
   const [format, setFormat] = useState<'vlog' | 'std' | 'zip'>('zip')
   const [downloading, setDownloading] = useState(false)
