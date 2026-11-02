@@ -5,6 +5,7 @@ import {gunzipSync} from 'node:zlib';
 import assert from 'node:assert/strict';
 const root = path.resolve(process.argv[2] || 'public');
 const catalog = JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf8'));
+assert.equal(catalog.schemaVersion,2);
 const seenIds = new Set(), seenNames = new Set();
 let cubes = 0, assets = 0;
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -16,7 +17,12 @@ for(const sample of catalog.samples){
 }
 for (const combo of catalog.combinations) {
   assert(!seenIds.has(combo.id)); seenIds.add(combo.id);
-  assert(catalog.films.some(f=>f.id===combo.film)); assert(catalog.papers.some(p=>p.id===combo.paper));
+  const film=catalog.films.find(f=>f.id===combo.film); assert(film);
+  if(film.type==='positive'){
+    assert.equal(combo.paper,null); assert.equal(combo.processMode,'positive_direct');
+  }else{
+    assert(catalog.papers.some(p=>p.id===combo.paper)); assert.equal(combo.processMode,'negative_print');
+  }
   if (combo.status !== 'ready') { assert(!combo.files); assert(combo.reason); continue; }
   assert.deepEqual(Object.keys(combo.previews).sort(),sampleIds);
   for (const asset of [...Object.values(combo.files),...Object.values(combo.previews)]) {
@@ -43,6 +49,10 @@ for (const combo of catalog.combinations) {
     cubes++;
   }
 }
-assert.equal(catalog.combinations.length,catalog.films.length*catalog.papers.length);
+for(const film of catalog.films){
+  const choices=catalog.combinations.filter(c=>c.film===film.id);
+  assert.equal(choices.length,film.type==='positive'?1:catalog.papers.length);
+  assert.equal(new Set(choices.map(c=>c.paper)).size,choices.length);
+}
 for(const [status,count] of Object.entries(catalog.counts)) assert.equal(count,catalog.combinations.filter(c=>c.status===status).length);
 console.log(JSON.stringify({passed:true,combinations:seenIds.size,cubes,assets,counts:catalog.counts},null,2));

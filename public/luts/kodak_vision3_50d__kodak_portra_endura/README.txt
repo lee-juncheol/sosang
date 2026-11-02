@@ -1,5 +1,7 @@
 Film Lab / Kodak Vision3 50D + Kodak Professional Portra Endura
 
+Processing mode: negative_print; scan_film=False
+
 0158VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
 0158STD.cube: Standard/sRGB analytic working model input -> sRGB output
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.

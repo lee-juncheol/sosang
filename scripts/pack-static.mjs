@@ -1,4 +1,4 @@
-// Lossless transport compression keeps all 128 looks within static hosting
+// Lossless transport compression keeps all generated looks within static hosting
 // limits. Raw local artifacts and ZIP contents remain byte-for-byte intact.
 import fs from 'node:fs/promises';
 import path from 'node:path';

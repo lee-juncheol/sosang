@@ -41,7 +41,7 @@ function Preview({ sample, combo, mode, resultPath, processingError, retry }: { 
   const error = failed ? '이미지를 불러오지 못했습니다. 다시 시도해 주세요.' : processingError
   return <div className={`preview ${mode}`} aria-busy={!ready && !error}>
     <img className="preview-image" src={sample.path} alt={`${sample.name}: ${beforeLabel}`} onLoad={() => setLoaded(s => ({ ...s, source: true }))} onError={() => setFailed(true)} />
-    {showResult && resultPath && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={resultPath} alt={`${sample.name}: 선택한 필름과 인화지 STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
+    {showResult && resultPath && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined }}><img className="preview-image" src={resultPath} alt={`${sample.name}: 선택한 필름 룩 STD LUT 적용`} onLoad={() => setLoaded(s => ({ ...s, result: true }))} onError={() => setFailed(true)} /></div>}
     {ready && available && !failed && <>
       {mode !== 'look' && <span className="image-tag before">{beforeLabel}</span>}
       {mode === 'compare' && <><div className="divider" style={{ left: `${split}%` }}><span>‹ ›</span></div><input className="comparison-range" type="range" min="0" max="100" value={split} onChange={e => setSplit(+e.target.value)} aria-label="이미지 비교 경계" aria-valuetext={`기준 이미지 ${split}%, 필름 적용 ${100 - split}%`} /></>}
@@ -69,7 +69,8 @@ function App() {
   const [dragging, setDragging] = useState(false)
   const upload = usePhotoUpload(() => { setSampleId('@upload'); setMode('compare') })
   const activePhoto = sampleId === '@upload' ? upload.photo : null
-  const activeCombo = catalog?.combinations.find(c => c.film === filmId && c.paper === paperId)
+  const directScan = catalog?.films.find(f => f.id === filmId)?.type === 'positive'
+  const activeCombo = catalog?.combinations.find(c => c.film === filmId && c.paper === (directScan ? null : paperId))
   const photoLook = usePhotoLook(activePhoto, activeCombo?.status === 'ready' ? activeCombo.files?.std : undefined)
 
   useEffect(() => {
@@ -78,7 +79,7 @@ function App() {
     fetch('/catalog.json', { signal: controller.signal }).then(async r => {
       if (!r.ok) throw new Error(`카탈로그를 불러올 수 없습니다 (${r.status})`)
       const data = await r.json() as Catalog
-      if (data.schemaVersion !== 1 || !data.films.length || !data.papers.length || !data.combinations.length) throw new Error('지원하지 않는 카탈로그입니다.')
+      if (data.schemaVersion !== 2 || !data.films.length || !data.papers.length || !data.combinations.length) throw new Error('지원하지 않는 카탈로그입니다.')
       setCatalog(data)
     }).catch(e => { if (e.name !== 'AbortError') setLoadError(e.message) })
     return () => controller.abort()
@@ -99,7 +100,9 @@ function App() {
   if (!catalog) return <main className="initial-state"><div className="brand-logo">F<span>↗</span></div><h1>Film Lab</h1><p role="status">{loadError || '필름 실험실을 준비하고 있습니다.'}</p>{loadError && <button onClick={() => setAttempt(n => n + 1)}>다시 불러오기</button>}</main>
   const film = catalog.films.find(f => f.id === filmId) || catalog.films[0]
   const paper = catalog.papers.find(p => p.id === paperId) || catalog.papers[0]
-  const combo = catalog.combinations.find(c => c.film === film.id && c.paper === paper.id)!
+  const isSlide = film.type === 'positive'
+  const combo = catalog.combinations.find(c => c.film === film.id && c.paper === (isSlide ? null : paper.id))!
+  const processLabel = isSlide ? '인화지 없음 · 필름 직접 스캔' : paper.name
   const sample = activePhoto?.sample || catalog.samples.find(s => s.id === sampleId) || catalog.samples[0]
   const resultPath = activePhoto ? photoLook.path : combo.previews?.[sample.id]?.path
   const selectedAsset = combo.files?.[format]
@@ -109,23 +112,23 @@ function App() {
   function selectFilm(id: string) { setFilmId(id); setNotice('') }
 
   return <>
-    <header className="topbar"><a className="brand-link" href="/" aria-label="Film Lab 홈"><div className="brand-logo">F<span>↗</span></div><span className="brand-word">film<span>lab</span><small>COLOR, YOUR WAY.</small></span></a><div className="topbar-right"><span className="camera-badge"><Icon name="camera" size={15}/> LUMIX S1M2</span><span className="version">BETA 0.1</span><button className="about-button" onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>제작 정보</span></button></div></header>
+    <header className="topbar"><a className="brand-link" href="/" aria-label="Film Lab 홈"><div className="brand-logo">F<span>↗</span></div><span className="brand-word">film<span>lab</span><small>COLOR, YOUR WAY.</small></span></a><div className="topbar-right"><span className="camera-badge"><Icon name="camera" size={15}/> LUMIX S1M2</span><span className="version">BETA 0.2</span><button className="about-button" onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>제작 정보</span></button></div></header>
     <main>
-      <div className="intro"><div><span className="eyebrow">THE FILM & PAPER STUDIO</span><h1>당신의 다음 색.</h1><p>필름을 고르고, 인화지를 더하고. 나만의 룩을 카메라에 담아보세요.</p></div><div className="catalog-stat"><span className="live-dot"/>실제 엔진으로 생성한 <b>{catalog.counts.ready}개 조합</b><small>33³ LUT · sRGB 출력</small></div></div>
+      <div className="intro"><div><span className="eyebrow">THE FILM & PAPER STUDIO</span><h1>당신의 다음 색.</h1><p>필름과 인화지를 조합하거나 슬라이드를 직접 스캔해, 나만의 색을 찾아보세요.</p></div><div className="catalog-stat"><span className="live-dot"/>실제 엔진으로 생성한 <b>{catalog.counts.ready}개 조합</b><small>33³ LUT · sRGB 출력</small></div></div>
       <div className="workspace">
         <aside className="film-library" aria-label="필름 선택">
           <div className="section-label"><span><b>01</b> 필름 라이브러리</span><small>{catalog.films.length}</small></div>
           <label className="search-field"><Icon name="search" size={16}/><input placeholder="필름 검색" aria-label="필름 검색" value={search} onChange={e => setSearch(e.target.value)}/>{search && <button aria-label="검색 지우기" onClick={() => setSearch('')}><Icon name="close" size={14}/></button>}</label>
           <div className="brand-filters" aria-label="필름 브랜드">{['모두','Kodak','Fujifilm'].map(b => <button key={b} aria-pressed={brand === b} className={brand === b ? 'active' : ''} onClick={() => setBrand(b)}>{b}</button>)}</div>
-          <div className="film-list">{filtered.length ? filtered.map(f => <button key={f.id} className={`film-option ${f.id === film.id ? 'selected' : ''}`} aria-pressed={f.id === film.id} onClick={() => selectFilm(f.id)}><FilmMark stock={f}/><span className="film-copy"><small>{f.brand.toUpperCase()}</small><strong>{shortName(f.name)}</strong><span>{f.type === 'positive' ? '슬라이드 · 미지원' : f.use === 'movie' ? '컬러 네거티브 · 시네마' : '컬러 네거티브'}</span></span>{f.id === film.id && <span className="selected-check"><Icon name="check" size={12}/></span>}</button>) : <div className="no-results">검색 결과가 없습니다.<button onClick={() => { setSearch(''); setBrand('모두') }}>모든 필름 보기</button></div>}</div>
+          <div className="film-list">{filtered.length ? filtered.map(f => <button key={f.id} className={`film-option ${f.id === film.id ? 'selected' : ''}`} aria-pressed={f.id === film.id} onClick={() => selectFilm(f.id)}><FilmMark stock={f}/><span className="film-copy"><small>{f.brand.toUpperCase()}</small><strong>{shortName(f.name)}</strong><span>{f.type === 'positive' ? '슬라이드 · 직접 스캔' : f.use === 'movie' ? '컬러 네거티브 · 시네마' : '컬러 네거티브'}</span></span>{f.id === film.id && <span className="selected-check"><Icon name="check" size={12}/></span>}</button>) : <div className="no-results">검색 결과가 없습니다.<button onClick={() => { setSearch(''); setBrand('모두') }}>모든 필름 보기</button></div>}</div>
           <div className="library-foot"><Icon name="film" size={16}/><span>프로파일 제공 <a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">spektrafilm ↗</a></span></div>
         </aside>
 
         <section className="preview-panel" aria-label="룩 미리보기">
-          <div className="preview-heading"><div><span className="eyebrow">YOUR SELECTED LOOK</span><h2>{shortName(film.name)} <span>×</span> {shortName(paper.name)}</h2></div><span className="look-number">LOOK {String(combo.number).padStart(3,'0')}</span></div>
+          <div className="preview-heading"><div><span className="eyebrow">YOUR SELECTED LOOK</span><h2>{shortName(film.name)} {isSlide ? <small className="scan-heading">필름 직접 스캔</small> : <><span>×</span> {shortName(paper.name)}</>}</h2></div><span className="look-number">LOOK {String(combo.number).padStart(3,'0')}</span></div>
           <div className="preview-toolbar"><span><i className={combo.status === 'ready' ? 'live-dot' : 'muted-dot'}/>{combo.status === 'ready' ? 'STD LUT 미리보기' : '미지원 / 미생성'}</span><div className="view-switch"><button title="원본 보기" aria-label="원본 보기" aria-pressed={mode === 'original'} className={mode === 'original' ? 'active' : ''} onClick={() => setMode('original')}><span>원본</span></button><button title="비교 보기" aria-label="비교 보기" aria-pressed={mode === 'compare'} className={mode === 'compare' ? 'active' : ''} onClick={() => setMode('compare')}><Icon name="compare" size={16}/><span>비교</span></button><button title="적용 결과만 보기" aria-label="적용 결과만 보기" aria-pressed={mode === 'look'} className={mode === 'look' ? 'active' : ''} onClick={() => setMode('look')}><Icon name="image" size={16}/><span>적용</span></button></div></div>
           <Preview key={`${combo.id}-${sample.id}-${resultPath || photoLook.error || 'pending'}`} sample={sample} combo={combo} mode={mode} resultPath={resultPath} processingError={photoLook.error || undefined} retry={activePhoto ? photoLook.retry : undefined}/>
-          <div className="preview-caption"><span>{sample.category}</span><span>{combo.status !== 'ready' ? '준비된 네거티브 필름을 선택해 주세요' : mode === 'compare' ? '경계를 드래그해 비교하세요 ↔' : mode === 'original' ? 'LUT 적용 전 원본' : '다운로드용 STD LUT · 100% 적용'}</span></div>
+          <div className="preview-caption"><span>{sample.category}</span><span>{combo.status !== 'ready' ? '선택한 룩의 준비 상태를 확인해 주세요' : mode === 'compare' ? '경계를 드래그해 비교하세요 ↔' : mode === 'original' ? 'LUT 적용 전 원본' : '다운로드용 STD LUT · 100% 적용'}</span></div>
           <div className={`photo-upload ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true) }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }} onDrop={e => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) void upload.upload(file) }}>
             <input ref={fileInput} className="file-input" type="file" accept={PHOTO_ACCEPT} aria-label="사진 파일 선택" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload.upload(file) }}/>
             <div className="upload-heading"><div><strong>내 사진으로 확인하기</strong><p>사진을 끌어놓거나 파일을 선택하세요.</p></div><button className="upload-button" disabled={upload.loading} onClick={() => fileInput.current?.click()}><Icon name="upload" size={15}/>{upload.loading ? '사진 읽는 중…' : upload.photo ? '사진 바꾸기' : '사진 업로드'}</button></div>
@@ -141,8 +144,9 @@ function App() {
         </section>
 
         <aside className="recipe-panel" aria-label="인화지와 다운로드">
-          <div className="paper-section"><div className="section-label"><span><b>02</b> 인화지 선택</span><small>{catalog.papers.length}</small></div><p className="section-description">필름의 색을 완성하는 마지막 단계</p>
-            <div className="paper-list" role="radiogroup" aria-label="인화지">{catalog.papers.map(p => <label className={`paper-option ${p.id === paper.id ? 'selected' : ''}`} key={p.id}><input type="radio" name="paper" value={p.id} checked={p.id === paper.id} onChange={() => { setPaperId(p.id); setNotice('') }}/><span className="paper-radio"/><span><strong>{shortName(p.name)}</strong><small>{p.brand} {p.id === film.recommendedPrint && <em>권장 조합</em>}</small></span></label>)}</div>
+          <div className="paper-section"><div className="section-label"><span><b>02</b> {isSlide ? '슬라이드 스캔' : '인화지 선택'}</span><small>{isSlide ? 'DIRECT' : catalog.papers.length}</small></div>
+            {isSlide ? <div className="direct-scan-note" role="status"><Icon name="film" size={22}/><strong>인화지 없음 · 필름 직접 스캔</strong><p>슬라이드는 현상한 필름 자체를 스캔합니다. 인화지 프로파일은 적용하지 않습니다.</p></div> : <p className="section-description">필름의 색을 완성하는 마지막 단계</p>}
+            <fieldset className="paper-fieldset" disabled={isSlide} aria-label={isSlide ? '인화지 선택 (슬라이드에서는 사용하지 않음)' : '인화지'}><div className="paper-list" role="radiogroup" aria-label="인화지">{catalog.papers.map(p => <label className={`paper-option ${!isSlide && p.id === paper.id ? 'selected' : ''}`} key={p.id}><input type="radio" name="paper" value={p.id} checked={!isSlide && p.id === paper.id} onChange={() => { setPaperId(p.id); setNotice('') }}/><span className="paper-radio"/><span><strong>{shortName(p.name)}</strong><small>{p.brand} {!isSlide && p.id === film.recommendedPrint && <em>권장 조합</em>}</small></span></label>)}</div></fieldset>
           </div>
           <div className="export-section"><div className="section-label"><span><b>03</b> LUT 내보내기</span><Icon name="download" size={16}/></div><div className="export-spec"><span>출력 <b>sRGB</b></span><span>격자 <b>33 × 33 × 33</b></span></div><label className="output-label" htmlFor="output-format">카메라 입력 베이스</label><select id="output-format" value={format} onChange={e => { setFormat(e.target.value as typeof format); setNotice('') }}><option value="zip">V-Log + Standard (ZIP)</option><option value="vlog">V-Log / V-Gamut (.cube)</option><option value="std">Standard / sRGB (.cube)</option></select>
             <button className="download-button" disabled={!selectedAsset || combo.status !== 'ready' || downloading} onClick={() => selectedAsset && void download(selectedAsset)}><Icon name="download" size={18}/><span>{downloading ? '파일 검증 중…' : combo.status === 'ready' ? 'LUT 다운로드' : '다운로드 준비 전'}</span>{!downloading && <Icon name="arrow" size={17}/>}</button>
@@ -157,10 +161,10 @@ function App() {
 
     <dialog ref={dialog} className="details-dialog" onClick={e => { if (e.target === dialog.current) dialog.current?.close() }}>
       <div className="dialog-inner"><div className="dialog-heading"><div><span className="eyebrow">BEHIND THE LOOK</span><h2>출처와 생성 정보</h2></div><button className="icon-button" onClick={() => dialog.current?.close()} aria-label="상세 정보 닫기"><Icon name="close"/></button></div>
-      <p className="detail-intro">{film.name} + {paper.name}</p>
-      <dl className="details-grid"><dt>엔진</dt><dd>spektrafilm {catalog.engineVersion}<code>{catalog.engineCommit}</code></dd><dt>V-Log 입력</dt><dd>Panasonic V-Log / V-Gamut</dd><dt>STD 입력</dt><dd>Standard/sRGB 수식 기반 근사 모델</dd><dt>출력</dt><dd>sRGB · 33³ · Full range 0–1</dd><dt>생성 상태</dt><dd>{combo.status === 'ready' ? '파일 검사 완료 · 보간 오차 측정 완료' : combo.reason}</dd><dt>실기 검증</dt><dd className="amber-text">S1M2 / S1II에서 아직 검증하지 않았습니다.</dd></dl>
+      <p className="detail-intro">{film.name} · {processLabel}</p>
+      <dl className="details-grid"><dt>엔진</dt><dd>spektrafilm {catalog.engineVersion}<code>{catalog.engineCommit}</code></dd><dt>V-Log 입력</dt><dd>Panasonic V-Log / V-Gamut</dd><dt>STD 입력</dt><dd>Standard/sRGB 수식 기반 근사 모델</dd><dt>출력</dt><dd>sRGB · 33³ · Full range 0–1</dd><dt>처리 방식</dt><dd>{isSlide ? '슬라이드 현상 → 필름 직접 스캔 (인화지 없음)' : '네거티브 현상 → 인화지 인화 → 스캔'}</dd><dt>생성 상태</dt><dd>{combo.status === 'ready' ? '파일 검사 완료 · 보간 오차 측정 완료' : combo.reason}</dd><dt>실기 검증</dt><dd className="amber-text">S1M2 / S1II에서 아직 검증하지 않았습니다.</dd></dl>
       {combo.qa && <><h3>측정된 보간 오차</h3><p>출력 sRGB의 최대 채널 절대 오차. 4,350개 입력과 사면체 보간을 사용했습니다. 아래 수치는 카메라 색 정확도가 아닙니다.</p><table><thead><tr><th>비교</th><th>평균</th><th>99백분위</th><th>최대</th></tr></thead><tbody>{[['V-Log ↔ 직접 엔진',combo.qa.vlogVsDirectEngine.tetrahedral],['STD ↔ 연속 합성',combo.qa.stdVsContinuousComposition.tetrahedral]].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{combo.qa.warnings.map(w => <p key={w} className="amber-text">{w}</p>)}</>}
-      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 필름과 인화지 프로파일을 실제로 계산했습니다. 그레인·할레이션·블러·자동 노출을 끄고 픽셀별 색과 톤만 LUT에 담았습니다.</p><p>STD는 sRGB 디코딩 → V-Gamut 변환 → V-Log 인코딩을 V-Log LUT 앞에 합성했습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><h3>내 사진 업로드</h3><p>JPG·PNG·WebP 파일을 브라우저에서 읽고 sRGB로 처리합니다. 사진은 서버로 전송하거나 저장하지 않으며 페이지를 닫거나 새로고침하면 사라집니다. 미리보기는 긴 변 최대 2,048px이며 원본 파일은 변경하지 않습니다. 내 사진의 EXIF나 LUT OFF 여부는 자동 검증하지 않습니다. RAW·HEIC는 JPG로 변환해 주세요.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성·STD 합성을 수행했습니다. 공식 제휴 제품이 아닙니다.</p>
+      <h3>어떻게 만들었나요?</h3><p>spektrafilm의 기본 프로파일을 실제로 계산했습니다. 네거티브는 필름과 인화지를 조합하고, 슬라이드는 인화 단계를 건너뛰어 필름 자체를 직접 스캔합니다. 그레인·할레이션·블러·자동 노출을 끄고 픽셀별 색과 톤만 LUT에 담았습니다.</p><p>STD는 sRGB 디코딩 → V-Gamut 변환 → V-Log 인코딩을 V-Log LUT 앞에 합성했습니다. Panasonic Standard 내부 톤 곡선의 역변환이 아니며, 이미 손실된 하이라이트는 복원되지 않습니다.</p><h3>내 사진 업로드</h3><p>JPG·PNG·WebP 파일을 브라우저에서 읽고 sRGB로 처리합니다. 사진은 서버로 전송하거나 저장하지 않으며 페이지를 닫거나 새로고침하면 사라집니다. 미리보기는 긴 변 최대 2,048px이며 원본 파일은 변경하지 않습니다. 내 사진의 EXIF나 LUT OFF 여부는 자동 검증하지 않습니다. RAW·HEIC는 JPG로 변환해 주세요.</p><h3>미리보기와 라이선스</h3><p>촬영 샘플은 사용자 소유의 LUMIX S1M2 Standard 원본입니다. EXIF에서 Standard와 두 LUT의 강도 0을 확인했습니다. 다운로드용 STD LUT를 사면체 보간으로 직접 적용하며 추가 감마·V-Log 변환이나 강도 조절은 하지 않습니다. 웹 미리보기는 축소·WebP 압축본이고, 카메라 내부에서 LUT를 적용한 촬영 결과와의 일치 검증은 별도입니다.</p><p>사용자 촬영 사진의 권리는 촬영자에게 있습니다. 사진에는 LUT의 CC BY-SA 라이선스가 적용되지 않습니다. 기술 테스트 패턴은 CC0입니다.</p><p>LUT는 Andrea Volpato의 spektrafilm 프로파일에서 파생했으며 CC BY-SA 4.0으로 제공합니다. Film Lab에서 LUT 생성·STD 합성을 수행했습니다. 공식 제휴 제품이 아닙니다.</p>
       <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">원본 엔진 ↗</a><a href="/licenses/SPEKTRAFILM_LICENSE.txt" target="_blank" rel="noreferrer">LUT 라이선스 ↗</a>{combo.files && <><a href={combo.files.qa.path} target="_blank" rel="noreferrer">QA 보고서 ↗</a><a href={combo.files.provenance.path} target="_blank" rel="noreferrer">생성 설정 · 해시 ↗</a></>}</div>
       </div>
     </dialog>
