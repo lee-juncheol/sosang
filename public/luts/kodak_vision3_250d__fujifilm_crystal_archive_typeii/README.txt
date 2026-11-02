@@ -1,5 +1,7 @@
 Film Lab / Kodak Vision3 250D + Fujifilm Crystal Archive Type II
 
+Processing mode: negative_print; scan_film=False
+
 0137VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
 0137STD.cube: Standard/sRGB analytic working model input -> sRGB output
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
