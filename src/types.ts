@@ -8,7 +8,7 @@ export interface Combination {
   status: 'ready' | 'failed' | 'unsupported' | 'not-generated'; reason?: string;
   seconds?: number; files?: Record<'vlog' | 'std' | 'zip' | 'qa' | 'provenance', Asset>;
   previews?: Record<string, Asset>;
-  qa?: { fileChecks: string; cameraVerified: boolean; warnings: string[]; vlogVsDirectEngine: { tetrahedral: Metric }; stdVsContinuousComposition: { tetrahedral: Metric } }
+  qa?: { fileChecks: string; cameraVerified: boolean; warnings: string[]; vlogVsDirectEngine: { tetrahedral: Metric }; stdVsDirectEngine?: { tetrahedral: Metric }; stdVsContinuousComposition?: { tetrahedral: Metric } }
 }
 export interface Catalog {
   schemaVersion: number; engineCommit: string; engineVersion: string; adapter: string;
