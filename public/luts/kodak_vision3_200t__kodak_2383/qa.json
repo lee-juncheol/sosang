@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0004900943290622141,
-      "p95": 0.0017073693327234745,
-      "p99": 0.0029324772053567626,
-      "max": 0.008327675446916372,
+      "mean": 0.0004735244042901525,
+      "p95": 0.0012189750040109846,
+      "p99": 0.0021264854593068213,
+      "max": 0.004905753337006838,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0005325834235088617,
-      "p95": 0.001744491869669356,
-      "p99": 0.0031855134416571102,
-      "max": 0.008469866696883516,
+      "mean": 0.0005223752388192592,
+      "p95": 0.001437374515636571,
+      "p99": 0.002666477155038277,
+      "max": 0.006220607705827934,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7896159582431151,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.00282615649474509,
+      "p95": 0.005712234540861838,
+      "p99": 0.008665530283090377,
+      "max": 0.016415878927566352,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0028103235206806275,
+      "p95": 0.005650673869240776,
+      "p99": 0.008382875799567239,
+      "max": 0.016053957169533395,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.790441,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",

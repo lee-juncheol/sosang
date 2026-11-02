@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0005228932867895312,
-      "p95": 0.0016114064766161163,
-      "p99": 0.002468172886099525,
-      "max": 0.004109720849762383,
+      "mean": 0.0004637190601975524,
+      "p95": 0.0011452363894456925,
+      "p99": 0.0015955143598951086,
+      "max": 0.0026311303183472468,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0005585049632302029,
-      "p95": 0.0016864967793970178,
-      "p99": 0.002675132326531013,
-      "max": 0.0043570391073238235,
+      "mean": 0.0005158036346651832,
+      "p95": 0.0013572455060178784,
+      "p99": 0.002020262201018181,
+      "max": 0.0037024253245772076,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7579231980045501,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.0030642956767454313,
+      "p95": 0.006211671674386058,
+      "p99": 0.007812671774774791,
+      "max": 0.014628461133413762,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0030378798267998797,
+      "p95": 0.006166497238763642,
+      "p99": 0.007710096938067964,
+      "max": 0.014628461133413762,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.7585766666666668,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
