@@ -19,5 +19,6 @@ if (!supported(process.version)) {
 const action=process.argv[2] || 'dev';
 function run(args) { const result=spawnSync(runtime,args,{cwd:root,stdio:'inherit'}); if(result.error)throw result.error; if(result.status!==0)process.exit(result.status || 1); }
 if (action==='build') { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build']); run(['scripts/pack-static.mjs']); }
+else if (action==='verify:assets') { run(['scripts/verify-assets.mjs',...process.argv.slice(3)]); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }

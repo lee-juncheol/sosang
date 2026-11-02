@@ -8,10 +8,17 @@ const catalog = JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf
 const seenIds = new Set(), seenNames = new Set();
 let cubes = 0, assets = 0;
 const hash = data => createHash('sha256').update(data).digest('hex');
+const sampleIds = catalog.samples.map(sample=>sample.id).sort();
+for(const sample of catalog.samples){
+  assert.equal(sample.previewLut,'std');
+  const bytes=await fs.readFile(path.join(root,sample.path));
+  if(sample.preparedSha256)assert.equal(hash(bytes),sample.preparedSha256);
+}
 for (const combo of catalog.combinations) {
   assert(!seenIds.has(combo.id)); seenIds.add(combo.id);
   assert(catalog.films.some(f=>f.id===combo.film)); assert(catalog.papers.some(p=>p.id===combo.paper));
   if (combo.status !== 'ready') { assert(!combo.files); assert(combo.reason); continue; }
+  assert.deepEqual(Object.keys(combo.previews).sort(),sampleIds);
   for (const asset of [...Object.values(combo.files),...Object.values(combo.previews)]) {
     const local = path.join(root,asset.path);
     assert(local.startsWith(root+path.sep));

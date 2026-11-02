@@ -38,6 +38,9 @@ def cache_key(film, paper):
     lock = ROOT / 'pipeline/requirements.lock'
     if lock.exists():
         dependencies['requirements.lock'] = sha256(lock)
+    dependencies['sampleManifest'] = sha256(PUBLIC / 'samples/manifest.json')
+    for sample in json.loads((PUBLIC / 'samples/manifest.json').read_text()):
+        dependencies[f"sample:{sample['id']}"] = sha256(PUBLIC / sample['path'].lstrip('/'))
     payload = {"config": CONFIG, "film": film['sha256'], "paper": paper['sha256'], "code": dependencies}
     return hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
 
@@ -121,7 +124,9 @@ def generate_one(job):
         previews={}
         for sample in json.loads((PUBLIC/'samples/manifest.json').read_text()):
             source=np.asarray(Image.open(PUBLIC/sample['path'].lstrip('/')).convert('RGB'))/255.
-            rendered=apply_tetrahedral(vlog_disk,std_to_vlog(source.reshape(-1,3))).reshape(source.shape)
+            # These are already Standard/sRGB pixels. Apply the downloaded
+            # STD cube once, without an extra gamma or V-Log conversion.
+            rendered=apply_tetrahedral(std_disk,source.reshape(-1,3)).reshape(source.shape)
             path=directory/f"{sample['id']}.webp"
             save_image(rendered,path)
             previews[sample['id']]=describe(path)
@@ -139,7 +144,8 @@ def generate_one(job):
                     "limitation":"Analytic working model; does not invert the camera's proprietary Standard rendering."},
                     "effects":{"grain":False,"halation":False,"blur":False,"autoExposure":False},
                     "gamutPolicy":"Upstream input RGC + CAM16-UCS output compression; upstream final [0,1] boundary clamp; no extra creative clipping.",
-                    "preview":"Display-referred sRGB samples -> analytic V-Log re-encoding -> exported VLOG LUT (tetrahedral) -> sRGB. No scene/RAW or camera STD claim.",
+                    "preview":"Verified LUT-OFF S1M2 Standard JPEGs (resized, color unchanged) and a synthetic sRGB chart -> exported STD LUT directly (tetrahedral) -> sRGB. Not a camera-applied LUT accuracy validation.",
+                    "sampleManifestSha256":sha256(PUBLIC/'samples/manifest.json'),
                     "environment":{"python":platform.python_version(),"platform":platform.platform()},
                     "license":"CC BY-SA 4.0; derived from spektrafilm by Andrea Volpato"}
         save_json(directory/'provenance.json',provenance)
@@ -151,7 +157,9 @@ def generate_one(job):
 S1M2 / S1II physical camera validation: NOT performed.
 Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
 Standard mapping is approximate; clipped highlights cannot be recovered.
-Previews are display-sRGB demonstrations, not paired V-Log/STD captures.
+Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
+captures or a synthetic sRGB chart. No extra V-Log/gamma transform is used.
+They are not a validation against camera-applied LUT captures.
 
 Derived from spektrafilm by Andrea Volpato
 https://github.com/andreavolpato/spektrafilm

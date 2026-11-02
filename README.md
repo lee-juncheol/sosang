@@ -50,7 +50,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 .venv/bin/python -m pipeline.generate --only kodak_portra_400__kodak_portra_endura --force
 ```
 
-캐시는 엔진 commit, 설정, 프로파일 내용, 파이프라인 소스와 의존성 잠금 파일의 해시를 사용합니다. 기존 파일의 해시도 확인하며 실패/손상/설정 변경 결과는 재생성합니다. 실패한 조합은 `failed`로 표시하고 다른 조합 생성은 계속합니다. 최종 catalog는 원자적으로 교체됩니다. 생성 중 사이트는 점진적으로 준비된 결과를 표시할 수 있으므로 완성된 배치를 검증한 뒤 배포하세요.
+캐시는 엔진 commit, 설정, 프로파일 내용, 파이프라인 소스, 의존성 잠금 파일, 샘플 manifest와 이미지의 해시를 사용합니다. 기존 파일의 해시도 확인하며 실패/손상/설정 변경 결과는 재생성합니다. 실패한 조합은 `failed`로 표시하고 다른 조합 생성은 계속합니다. 최종 catalog는 원자적으로 교체됩니다. 생성 중 사이트는 점진적으로 준비된 결과를 표시할 수 있으므로 완성된 배치를 검증한 뒤 배포하세요.
 
 ## 파일 위치
 
@@ -74,7 +74,9 @@ STD는 `L_std(x) = L_vlog(A_std(x))`를 33³ 격자에서 다시 샘플링합니
 
 Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 아닙니다. S1II 기종별 후보와의 차이를 측정했지만 실측 정답이 없어 정확도 우열을 주장하지 않습니다. 선택 근거와 비교 결과는 `docs/validation.md`에 있습니다.
 
-미리보기는 CC0/퍼블릭 도메인 sRGB 사진을 분석적으로 V-Log 재인코딩한 후 배포된 LUT를 적용한 공통 룩 예시입니다. 카메라 실측 STD 비교나 RAW 복원 결과가 아닙니다.
+미리보기는 사용자 촬영 S1M2 Standard 사진 3장(PANA8578, PANA8619, P1458338)과 sRGB 기술 패턴을 사용합니다. EXIF의 Standard / 두 LUT 강도 0을 확인한 촬영본만 선택했습니다. 축소·방향 정리한 원본에 **다운로드용 STD LUT를 직접 100% 적용**하며, 감마/V-Log 변환을 추가하지 않습니다. 원본·비교·적용 세 보기로 확인할 수 있습니다. 내보내기 형식 선택과 미리보기는 독립적이며 미리보기는 항상 STD 기준입니다. 카메라 내부에서 LUT를 적용한 결과와의 일치 검증이나 RAW 복원은 아닙니다.
+
+`assets/samples/`에는 재현용 1024px 무손실 WebP와 원본 해시·선별 EXIF 기록이 있습니다. 공개 이미지에는 sRGB ICC만 남기고 EXIF는 제거했습니다. 128개 조합의 출력은 WebP quality 90 미리보기이며 원본 전체 해상도 사진은 배포하지 않습니다.
 
 ## 검증
 
@@ -83,10 +85,10 @@ Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 
 npm run verify:assets
 npm run build
 # 프로덕션 압축 전송 파일도 원본 해시와 대조
-node scripts/verify-assets.mjs dist
+npm run verify:assets -- dist
 ```
 
-9개 Python 테스트, 256개 LUT의 형식·수치, 1,152개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
+17개 Python 테스트, 256개 LUT의 형식·수치, 1,152개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
 
 ## 출처
 
@@ -94,4 +96,4 @@ Derived from spektrafilm by Andrea Volpato. https://github.com/andreavolpato/spe
 
 원본 소프트웨어와 이 프로젝트 코드는 GPLv3로 제공합니다. 프로파일 및 파생 LUT는 CC BY-SA 4.0이며 원본 라이선스를 각 ZIP에 그대로 포함했습니다. Film Lab에서 생성과 STD 합성을 수행한 변경 기록도 포함합니다. 제품명은 임시 이름이며 spektrafilm 또는 Panasonic의 공식 제휴를 뜻하지 않습니다.
 
-사진: Rachel Michetti(coffee, CC0), Stefan van der Walt(chelsea, CC0), NASA(astronaut, public domain), 기술 테스트 패턴(Film Lab, CC0). 사진별 출처는 `public/samples/manifest.json`에 기록했습니다.
+사진: 사용자 촬영, 모든 권리는 촬영자에게 있습니다. 사진은 코드 GPLv3 및 LUT CC BY-SA 라이선스의 적용 대상이 아닙니다. 기술 테스트 패턴은 Film Lab, CC0입니다. 사진별 원본 해시, 카메라 설정, 준비 과정은 `public/samples/manifest.json`에 기록했습니다. 사이트 접근 권한은 기존 소유자 비공개 상태를 유지합니다.

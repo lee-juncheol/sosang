@@ -1,15 +1,17 @@
-"""Known display-referred sRGB examples; no camera-capture claim."""
-from pipeline.common import PUBLIC, save_json
+"""Verified LUT-OFF S1M2 Standard captures and a synthetic sRGB chart."""
+from pipeline.common import ROOT, PUBLIC, save_json, sha256
+import json
+import shutil
 import numpy as np
 from PIL import Image, ImageCms
-from skimage import data
 
-SAMPLES = [
-    {"id": "coffee", "name": "오후의 커피", "category": "정물 · 따뜻한 색", "credit": "Rachel Michetti · CC0 · courtesy of Pikolo Espresso Bar", "source": "https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.coffee"},
-    {"id": "astronaut", "name": "빛과 피부", "category": "인물 · 피부 톤", "credit": "NASA · public domain · Eileen Collins", "source": "https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut"},
-    {"id": "chelsea", "name": "작은 친구", "category": "디테일 · 중간 톤", "credit": "Stefan van der Walt · CC0", "source": "https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.chelsea"},
-    {"id": "chart", "name": "컬러 테스트", "category": "그레이 램프 · 색 패치", "credit": "Film Lab · generated technical test pattern · CC0", "source": None},
-]
+SAMPLE_ROOT = ROOT / 'assets/samples'
+
+
+def sample_definitions():
+    return json.loads((SAMPLE_ROOT / 'manifest.json').read_text()) + [
+        {"id": "chart", "name": "컬러 테스트", "category": "그레이 램프 · 색 패치", "credit": "Film Lab · generated technical test pattern · CC0", "source": None, "inputKind": "synthetic-srgb"},
+    ]
 
 
 def chart():
@@ -32,15 +34,27 @@ def save_image(rgb, path):
 
 
 def prepare():
-    for sample in SAMPLES:
-        rgb = chart() if sample["id"] == "chart" else getattr(data,sample["id"])()
-        # Keep identical geometry for both halves; never crop source differently.
-        sample["width"],sample["height"] = rgb.shape[1],rgb.shape[0]
+    samples = sample_definitions()
+    (PUBLIC / 'samples').mkdir(parents=True, exist_ok=True)
+    for sample in samples:
         sample["path"] = f"/samples/{sample['id']}.webp"
-        sample["input"] = "display-referred sRGB; analytically re-encoded as V-Log before LUT"
-        save_image(rgb/255., PUBLIC / sample["path"].lstrip("/"))
-    save_json(PUBLIC / "samples/manifest.json", SAMPLES)
-    return SAMPLES
+        destination = PUBLIC / sample['path'].lstrip('/')
+        if sample['inputKind'] == 'camera-std':
+            source = SAMPLE_ROOT / f"{sample['id']}.webp"
+            if sha256(source) != sample['preparedSha256']:
+                raise ValueError(f"Prepared sample hash mismatch: {sample['id']}")
+            metadata = sample['cameraMetadata']
+            if metadata['PhotoStyle'] != 'Standard or Custom' or metadata['LUT1Opacity'] != 0 or metadata['LUT2Opacity'] != 0:
+                raise ValueError('Sample must be Standard with both camera LUTs disabled')
+            shutil.copyfile(source, destination)
+        else:
+            save_image(chart()/255., destination)
+        with Image.open(destination) as im:
+            sample['width'], sample['height'] = im.size
+        sample['input'] = 'Encoded sRGB / Standard pixels -> exported STD LUT directly (tetrahedral) -> sRGB'
+        sample['previewLut'] = 'std'
+    save_json(PUBLIC / 'samples/manifest.json', samples)
+    return samples
 
 
 if __name__ == "__main__":

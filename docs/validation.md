@@ -6,8 +6,8 @@
 - 실제 프로파일 20개(negative 16, positive 4), printing 8개를 JSON 메타데이터와 런타임 CLI에서 확인.
 - 네거티브 16 × 인화지 8 = **128개 성공**, 0개 실패. 각 조합 VLOG/STD `.cube`와 ZIP 포함.
 - positive 4 × printing 8 = **32개 미지원**. 동일한 negative printing 경로에서 흑백 끝점의 명도 순서가 반전되는 것을 네 필름 모두 실제 엔진으로 확인하는 회귀 테스트를 작성했다. 별도 direct scan 경로는 후속 작업이다.
-- LUT 파일 **256개**, 묶음 ZIP 128개, 이미지 512개. 전체 정적 자산 약 355 MiB.
-- 프로덕션 배포는 원본 LUT 236.9 MiB를 무손실 gzip 90.1 MiB로 전송하여 `dist/` 전체를 약 213 MiB로 줄인다. 브라우저에서 원래 `.cube`로 복원하며, 256개 파일 전부 압축 해제한 SHA-256이 원본과 일치했다. ZIP은 변경하지 않는다.
+- LUT 파일 **256개**, 묶음 ZIP 128개, 이미지 512개. 전체 정적 자산 약 362 MiB(사용자 STD 샘플 교체 후).
+- 프로덕션 배포는 원본 LUT 236.9 MiB를 무손실 gzip 90.1 MiB로 전송하여 `dist/` 전체를 약 224 MiB로 줄인다. 브라우저에서 원래 `.cube`로 복원하며, 256개 파일 전부 압축 해제한 SHA-256이 원본과 일치했다. ZIP은 변경하지 않는다.
 - 이미 컴파일된 엔진/Numba 캐시 기준 3개 작업 프로세스로 39.03초. 조합별 소요 시간 합 112.398초. 가장 큰 작업 프로세스의 최고 RSS 563,101,696 bytes. 초기 설치·import·컴파일 시간은 포함하지 않는다.
 
 ## 수치 검사
@@ -29,7 +29,7 @@
 
 ## 자동 검사
 
-`python -m pytest pipeline/tests -q`: **9 passed** (upstream GUI 의존성의 Pydantic deprecated 경고 1개).
+`python -m pytest pipeline/tests -q`: **17 passed** (upstream GUI 의존성의 Pydantic deprecated 경고 1개).
 
 - 공개 Panasonic 중간 회색/검정 앵커와 독립 colour-science 변환 비교.
 - 비대칭 색 변환을 이용한 RGB/격자 순서, SciPy 보간, colour-science 파일 reader 교차 검사.
@@ -68,4 +68,29 @@ upstream 코드 `LICENSE`는 GPLv3, 별도 `SPEKTRAFILM_LICENSE.txt`는 프로�
 
 ## 미리보기
 
-scikit-image의 coffee(Rachel Michetti, CC0), astronaut(NASA, public domain), chelsea(Stefan van der Walt, CC0) 및 직접 만든 기술 패턴을 사용했다. 입력은 이미 표시용인 sRGB로 취급하고 디코딩 → V-Gamut → V-Log → 배포 VLOG LUT → sRGB로 평가했다. 웹 이미지는 sRGB ICC를 포함한다. 이는 룩 설명용 샘플이며 장면 선형/RAW 복원이나 카메라 Standard 실측 비교가 아니다.
+첫 버전은 scikit-image의 공개 sRGB 샘플을 사용했다. 당시 128개 조합의 LUT/미리보기 해시는 모두 달랐으나, 커피 사진에서 Portra Endura를 고정하고 다른 필름을 Portra 400과 비교하면 평균 RGB 절댓값 차이가 8비트 기준 약 2.2–7.1이었다. 이는 이 사진의 수치이며 보편적인 지각 차이를 뜻하지 않는다.
+
+사용자 요청에 따라 다음 Standard 촬영본으로 교체했다.
+
+| 표시 이름 | 원본 | 확인 |
+|---|---|---|
+| 피규어와 컬러 | PANA8578.JPG | DC-S1M2, Standard or Custom, sRGB, LUT1/2 강도 0 |
+| 피규어 클로즈업 | PANA8619.JPG | 동일 |
+| 장비 선반 | P1458338.JPG (`STD_source.JPG` 보관본) | 동일 |
+
+기존 작업의 `lut-1`–`lut-5.JPG`는 EXIF에 Cloud LUT가 이미 적용되어 있어 이번 샘플에서 제외했다. 각 원본 SHA-256, 선별 EXIF, 축소 과정은 `assets/samples/manifest.json`에 기록했다. 원본은 그대로 두고 1024px로 축소한 무손실 WebP를 준비했으며 sRGB ICC를 유지하고 EXIF는 공개 이미지에서 제거했다. 색이나 노출은 별도로 수정하지 않았다. 테스트 차트는 합성 sRGB 입력이라고 구분한다.
+
+**표시되는 원본 RGB → 최종 다운로드용 STD `.cube` 직접 사면체 보간 → WebP quality 90** 경로로 512개 미리보기를 다시 생성했다. 추가 sRGB 디코딩/V-Log 인코딩은 하지 않는다. 출력 형식 선택은 다운로드에만 적용되며 화면에 STD 미리보기임을 명시했다. 원본 전체 보기 버튼도 추가했다.
+
+256개 VLOG/STD LUT의 SHA-256은 이전 배포와 전부 동일하다. 새 샘플로 룩을 과장하거나 LUT를 바꾸지 않았다. 모든 샘플에서 128개 조합의 미리보기 해시가 서로 다르다. 독립 colour-science reader/사면체 보간으로 2개 조합 × 3장 결과를 다시 계산해 웹 미리보기와 대조하는 6개 검사를 추가했다. 추가 2개 검사는 카메라 설정·준비 이미지 해시와 전체 조합의 미리보기 구분을 확인한다.
+
+이번 전체 배치 시간은 56.90초(이미 준비된 환경, 3개 프로세스)이다. 실촬영 STD 사진을 사용하지만, 카메라 내부에 같은 LUT를 넣고 찍은 결과와 일치한다는 검증은 아니다. 사진 저작권은 사용자에게 있으며 LUT의 CC BY-SA는 사진에 적용되지 않는다.
+
+### STD 샘플 업데이트 브라우저 확인
+
+- 기본 샘플이 PANA8578의 Standard / LUT OFF 사진임을 화면에서 확인했다.
+- C200 / Crystal Archive / 장비 선반 선택 시 해당 조합의 `std_shelf.webp`로 바뀌는 것을 확인했다.
+- 원본 보기에서는 결과 이미지 레이어가 제거되고, 적용 보기에서는 STD LUT 결과만 보인다.
+- 비교 슬라이더의 키보드 조작 50 → 51 확인.
+- 390×844에서 원본·비교·적용 버튼 및 PANA8619 샘플 전환 확인. 가로 넘침, 깨진 이미지, console error/warning 없음.
+- 소스 및 프로덕션 압축 자산 검사를 모두 통과했다.

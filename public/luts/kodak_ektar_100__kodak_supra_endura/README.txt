@@ -6,7 +6,9 @@ Film Lab / Kodak Ektar 100 + Kodak Professional Supra Endura
 S1M2 / S1II physical camera validation: NOT performed.
 Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
 Standard mapping is approximate; clipped highlights cannot be recovered.
-Previews are display-sRGB demonstrations, not paired V-Log/STD captures.
+Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
+captures or a synthetic sRGB chart. No extra V-Log/gamma transform is used.
+They are not a validation against camera-applied LUT captures.
 
 Derived from spektrafilm by Andrea Volpato
 https://github.com/andreavolpato/spektrafilm
