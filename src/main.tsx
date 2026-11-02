@@ -76,7 +76,13 @@ function App() {
     try {
       const response = await fetch(asset.path)
       if (!response.ok) throw new Error('파일을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.')
-      const buffer = await response.arrayBuffer()
+      let buffer = await response.arrayBuffer()
+      // Production delivers lossless gzip assets. Some hosts transparently
+      // decode them; only decompress when the gzip magic bytes are present.
+      const magic = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength))
+      if (asset.encoding === 'gzip' && magic[0] === 0x1f && magic[1] === 0x8b) {
+        buffer = await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+      }
       const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))).map(n => n.toString(16).padStart(2, '0')).join('')
       if (digest !== asset.sha256 || buffer.byteLength !== asset.bytes) throw new Error('파일 검증에 실패했습니다. 페이지를 새로고침해 주세요.')
       const url = URL.createObjectURL(new Blob([buffer], { type: asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain' }))

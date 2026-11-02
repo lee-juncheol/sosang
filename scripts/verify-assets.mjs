@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {gunzipSync} from 'node:zlib';
 import assert from 'node:assert/strict';
-const root = path.resolve('public');
+const root = path.resolve(process.argv[2] || 'public');
 const catalog = JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf8'));
 const seenIds = new Set(), seenNames = new Set();
 let cubes = 0, assets = 0;
@@ -15,13 +16,17 @@ for (const combo of catalog.combinations) {
     const local = path.join(root,asset.path);
     assert(local.startsWith(root+path.sep));
     const bytes = await fs.readFile(local);
-    assert.equal(bytes.length,asset.bytes); assert.equal(hash(bytes),asset.sha256); assets++;
+    if(asset.encoding==='gzip'){
+      assert.equal(bytes.length,asset.transferBytes);assert.equal(hash(bytes),asset.transferSha256);
+      const raw=gunzipSync(bytes);assert.equal(raw.length,asset.bytes);assert.equal(hash(raw),asset.sha256);
+    }else{assert.equal(bytes.length,asset.bytes);assert.equal(hash(bytes),asset.sha256);} assets++;
   }
   assert.notEqual(combo.files.vlog.sha256,combo.files.std.sha256);
   for (const [key,tag] of [['vlog','VLOG'],['std','STD']]) {
     const file=combo.files[key]; assert(!seenNames.has(file.name)); seenNames.add(file.name);
     assert(file.name.split('.')[0].length<=8);
-    const lines=(await fs.readFile(path.join(root,file.path),'utf8')).trim().split('\n');
+    const bytes=await fs.readFile(path.join(root,file.path));
+    const lines=(file.encoding==='gzip'?gunzipSync(bytes):bytes).toString('utf8').trim().split('\n');
     assert(lines[0].startsWith('TITLE "')); assert.equal(lines[1],`#LUMIXPHOTOSTYLE ${tag}`);
     assert.equal(lines[2],'LUT_3D_SIZE 33');
     assert.equal(lines[3],'DOMAIN_MIN 0.000000 0.000000 0.000000');

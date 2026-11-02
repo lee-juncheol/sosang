@@ -21,7 +21,7 @@ npm run build
 npm run preview
 ```
 
-개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 다운로드 전 파일 크기/SHA-256을 검사합니다. 이 검사는 HTTPS 또는 localhost의 Web Crypto를 사용합니다.
+개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 프로덕션 빌드는 LUT 전송용 파일에 무손실 gzip 압축을 적용하고 브라우저에서 원래 `.cube`로 복원합니다. 원본/ZIP의 LUT 내용은 바뀌지 않습니다. 다운로드 전 원본 파일 크기/SHA-256을 검사합니다. HTTPS 또는 localhost의 Web Crypto와 현대 브라우저의 DecompressionStream을 사용합니다.
 
 ## Python 환경과 재생성
 
@@ -82,6 +82,8 @@ Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 
 .venv/bin/python -m pytest pipeline/tests -q
 npm run verify:assets
 npm run build
+# 프로덕션 압축 전송 파일도 원본 해시와 대조
+node scripts/verify-assets.mjs dist
 ```
 
 9개 Python 테스트, 256개 LUT의 형식·수치, 1,152개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.

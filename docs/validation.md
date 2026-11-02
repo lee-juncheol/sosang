@@ -7,6 +7,7 @@
 - 네거티브 16 × 인화지 8 = **128개 성공**, 0개 실패. 각 조합 VLOG/STD `.cube`와 ZIP 포함.
 - positive 4 × printing 8 = **32개 미지원**. 동일한 negative printing 경로에서 흑백 끝점의 명도 순서가 반전되는 것을 네 필름 모두 실제 엔진으로 확인하는 회귀 테스트를 작성했다. 별도 direct scan 경로는 후속 작업이다.
 - LUT 파일 **256개**, 묶음 ZIP 128개, 이미지 512개. 전체 정적 자산 약 355 MiB.
+- 프로덕션 배포는 원본 LUT 236.9 MiB를 무손실 gzip 90.1 MiB로 전송하여 `dist/` 전체를 약 213 MiB로 줄인다. 브라우저에서 원래 `.cube`로 복원하며, 256개 파일 전부 압축 해제한 SHA-256이 원본과 일치했다. ZIP은 변경하지 않는다.
 - 이미 컴파일된 엔진/Numba 캐시 기준 3개 작업 프로세스로 39.03초. 조합별 소요 시간 합 112.398초. 가장 큰 작업 프로세스의 최고 RSS 563,101,696 bytes. 초기 설치·import·컴파일 시간은 포함하지 않는다.
 
 ## 수치 검사
@@ -51,6 +52,7 @@ macOS Codex in-app browser에서 수행했다.
 - 미지원 Provia의 다운로드 차단, 검색 결과 없음, 상세 정보 dialog 및 Escape 닫기 확인.
 - 390×844 viewport에서 선택·미리보기·다운로드 점검. 페이지 가로 넘침/깨진 이미지 없음.
 - 브라우저 console error/warning 없음.
+- 프로덕션 preview에서도 gzip 전송 → `.cube` 복원 → 원본 해시 검증 → `0086STD.cube` 다운로드 흐름을 별도로 확인했다.
 
 별도 Chrome, Edge, Safari 앱과 Windows 실기, S1M2/LUMIX Lab 카메라 가져오기는 **미검증**이다.
 
