@@ -1,5 +1,7 @@
 Film Lab / Kodak Ektar 100 + Kodak Vision Premier 2393
 
+Processing mode: negative_print; scan_film=False
+
 0051VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
 0051STD.cube: Standard/sRGB analytic working model input -> sRGB output
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
