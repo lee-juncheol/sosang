@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0005215129518258643,
-      "p95": 0.0018171770665300548,
-      "p99": 0.003404934359088109,
-      "max": 0.0053040038714949195,
+      "mean": 0.0004925368946733072,
+      "p95": 0.0013136861872040122,
+      "p99": 0.002089836997937589,
+      "max": 0.0049717019748584945,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0005499346873282574,
-      "p95": 0.0018409545269495093,
-      "p99": 0.0032997319059286474,
-      "max": 0.006583371874907443,
+      "mean": 0.0005236530849308818,
+      "p95": 0.001457385716219922,
+      "p99": 0.0025192035950204277,
+      "max": 0.005757773599482152,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7575190938751563,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.0032680007641268235,
+      "p95": 0.007243723045402868,
+      "p99": 0.011156065411406998,
+      "max": 0.019389671090125127,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0032590941802165814,
+      "p95": 0.0072442359423069745,
+      "p99": 0.011219134814785665,
+      "max": 0.01852253948539484,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.7584413333333333,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
