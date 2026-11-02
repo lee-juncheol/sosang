@@ -2,7 +2,9 @@
 
 필름·인화지 조합을 비교하고 LUMIX V-Log/Standard 입력용 `.cube`를 받는 React + TypeScript + Vite 웹앱입니다. 실제 spektrafilm 엔진으로 사전 생성한 결과를 정적 자산으로 제공합니다.
 
-현재 **128개 조합 / 256개 LUT / 128개 ZIP**을 제공합니다. 각 ZIP은 두 LUT, 생성 설정, QA, 출처, 라이선스를 포함합니다. 필름 20종을 표시하며 네거티브 16종 × 인화지 8종이 준비되어 있습니다. 슬라이드 4종의 32개 조합은 현재 인화 경로에서 톤이 반전되어 제외했습니다. S1M2 실기 검증은 아직 하지 않았습니다.
+현재 **132개 룩 / 264개 LUT / 132개 ZIP**을 제공합니다. 네거티브 16종 × 인화지 8종의 128개 조합과 슬라이드 4종의 직접 스캔 룩입니다. 각 ZIP은 두 LUT, 생성 설정, QA, 출처, 라이선스를 포함합니다. S1M2 실기 검증은 아직 하지 않았습니다.
+
+슬라이드 **Fujifilm Provia 100F · Velvia 100 · Kodak Ektachrome 100 · Kodachrome 64**를 선택하면 인화지 선택이 비활성화되고 `인화지 없음 · 필름 직접 스캔`으로 표시됩니다. 네거티브로 돌아오면 이전 인화지 선택이 복원됩니다. 샘플과 내 사진 미리보기, V-Log/STD/ZIP 다운로드를 모두 지원합니다. [슬라이드 구현 기록](docs/slide-support.md)을 참고하세요.
 
 ## 웹앱 실행
 
@@ -53,6 +55,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 
 ```bash
 .venv/bin/python -m pipeline.generate --only kodak_portra_400__kodak_portra_endura --jobs 1
+.venv/bin/python -m pipeline.generate --only fujifilm_velvia_100__direct_scan --jobs 1
 .venv/bin/python -m pipeline.generate --jobs 3
 # 캐시를 건너뛰고 선택한 조합 재생성
 .venv/bin/python -m pipeline.generate --only kodak_portra_400__kodak_portra_endura --force
@@ -67,6 +70,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 | `src/` | 한국어 선택·비교·다운로드 UI |
 | `pipeline/config/default.json` | 명시적인 생성 설정 |
 | `pipeline/generate.py` | 실제 엔진·STD 합성·QA·ZIP·카탈로그 |
+| `pipeline/slide.py` | 슬라이드 직접 스캔용 builder 및 독립 런타임 QA |
 | `public/catalog.json` | 실제 상태/자산/해시 |
 | `public/luts/<film>__<paper>/` | `.cube`, ZIP, QA, provenance, 샘플 |
 | `public/luts/kodak_portra_400__kodak_portra_endura/` | 기본 조합 (`0086VLOG.cube`, `0086STD.cube`, `0086LUTS.zip`) |
@@ -76,7 +80,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 
 ## 색 변환 계약
 
-V-Log/V-Gamut → 실제 필름·인화 시뮬레이션 → sRGB. 그레인, 할레이션, 블러, 자동 노출은 비활성화했습니다. upstream 입력 gamut compression과 CAM16-UCS 출력 gamut compression, 최종 bounded 출력 규칙을 사용합니다.
+네거티브는 V-Log/V-Gamut → 필름·인화 시뮬레이션 → sRGB, 슬라이드는 V-Log/V-Gamut → 필름 현상·직접 스캔 → sRGB입니다. 그레인, 할레이션, 블러, 자동 노출은 비활성화했습니다. upstream 입력 gamut compression과 CAM16-UCS 출력 gamut compression, 최종 bounded 출력 규칙을 사용합니다.
 
 STD는 `L_std(x) = L_vlog(A_std(x))`를 33³ 격자에서 다시 샘플링합니다. `A_std`는 sRGB 디코딩 → 공개 행렬의 V-Gamut 변환 → Panasonic V-Log 인코딩입니다. `.cube` 태그만 바꾸지 않습니다. 두 파일 모두 최종 **sRGB 출력**이며 Rec.709와 구분합니다.
 
@@ -84,7 +88,7 @@ Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 
 
 미리보기는 사용자 촬영 S1M2 Standard 사진 5장(P1458403, P1458391, PANA8578, PANA8619, P1458338)과 sRGB 기술 패턴을 사용합니다. EXIF의 Standard / 두 LUT 강도 0을 확인한 촬영본만 선택했습니다. 축소·방향 정리한 원본에 **다운로드용 STD LUT를 직접 100% 적용**하며, 감마/V-Log 변환을 추가하지 않습니다. 원본·비교·적용 세 보기로 확인할 수 있습니다. 내보내기 형식 선택과 미리보기는 독립적이며 미리보기는 항상 STD 기준입니다. 첫 화면은 야외 놀이터 전경이며 노란 놀이 패널의 세로 사진도 선택할 수 있습니다. 카메라 내부에서 LUT를 적용한 결과와의 일치 검증이나 RAW 복원은 아닙니다.
 
-`assets/samples/`에는 재현용 최대 960–1024px 무손실 WebP와 원본 해시·선별 EXIF 기록이 있습니다. 공개 이미지에는 sRGB ICC만 남기고 EXIF는 제거했습니다. 128개 조합의 출력은 WebP quality 90 미리보기이며 원본 전체 해상도 사진은 배포하지 않습니다.
+`assets/samples/`에는 재현용 최대 960–1024px 무손실 WebP와 원본 해시·선별 EXIF 기록이 있습니다. 공개 이미지에는 sRGB ICC만 남기고 EXIF는 제거했습니다. 132개 룩의 출력은 WebP quality 90 미리보기이며 원본 전체 해상도 사진은 배포하지 않습니다.
 
 ## 검증
 
@@ -97,7 +101,7 @@ npm run build
 npm run verify:assets -- dist
 ```
 
-21개 Python 테스트, 업로드 렌더러의 6개 JavaScript 테스트, 256개 LUT의 형식·수치, 1,408개 자산 해시, ZIP 내부 파일, 대표 조합의 바이트 단위 재현성을 확인했습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
+Python 테스트와 업로드 렌더러의 JavaScript 테스트로 색 변환, 슬라이드의 인화지 독립성, 원본 엔진과의 오차를 확인합니다. 자산 검증은 264개 LUT와 1,452개 연결 자산의 해시·크기, ZIP 내부 파일을 검사합니다. 최신 실행 결과는 검증 기록에 있습니다. In-app browser에서 실제 세 종류 다운로드와 모바일 흐름을 검증했습니다. 별도 Chrome/Edge/Safari 앱, Windows, 카메라는 미검증입니다. 자세한 수치와 측정 한계는 [검증 기록](docs/validation.md)을 참고하세요.
 
 ## 출처
 

@@ -29,8 +29,21 @@ from spektrafilm_lut_creator.grid import cube_grid
 from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral, apply_trilinear
 from spektrafilm_lut_creator.qa.reference import run_pipeline_at
 from pipeline.samples import prepare, save_image
+from pipeline.slide import INIT_PRINT_PROFILE, SlideBundleBuilder, run_slide_reference
 
-EXCLUSION = "슬라이드/포지티브 필름입니다. 현재 네거티브 → 인화지 경로에서는 톤이 반전되므로 직접 스캔 경로를 구현하기 전까지 제공하지 않습니다."
+
+def combination_choices(stocks):
+    films = [s for s in stocks if s['stage'] == 'filming']
+    papers = [s for s in stocks if s['stage'] == 'printing']
+    for i, film in enumerate(films):
+        # Preserve existing negative filenames; use the first unused number
+        # in each formerly unsupported slide block for its single direct scan.
+        for j, paper in enumerate([None] if film['type'] == 'positive' else papers):
+            yield film, paper, i * len(papers) + j + 1
+
+
+def combination_id(film, paper):
+    return f"{film['id']}__{paper['id'] if paper else 'direct_scan'}"
 
 
 def cache_key(film, paper):
@@ -41,7 +54,10 @@ def cache_key(film, paper):
     dependencies['sampleManifest'] = sha256(PUBLIC / 'samples/manifest.json')
     for sample in json.loads((PUBLIC / 'samples/manifest.json').read_text()):
         dependencies[f"sample:{sample['id']}"] = sha256(PUBLIC / sample['path'].lstrip('/'))
-    payload = {"config": CONFIG, "film": film['sha256'], "paper": paper['sha256'], "code": dependencies}
+    payload = {"config": CONFIG, "film": film['sha256'], "paper": paper['sha256'] if paper else None,
+               "processMode": 'negative_print' if paper else 'positive_direct', "code": dependencies}
+    if paper is None:
+        payload['runtimeInitPrintProfileSha256'] = sha256(PROFILES / f'{INIT_PRINT_PROFILE}.json')
     return hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
 
 
@@ -62,7 +78,8 @@ def valid_cache(record, key):
 
 def generate_one(job):
     film,paper,number,force=job
-    combo_id=f"{film['id']}__{paper['id']}"
+    combo_id=combination_id(film,paper)
+    is_slide=film['type']=='positive'
     directory=PUBLIC / 'luts' / combo_id
     record_path=directory / 'metadata.json'
     key=cache_key(film,paper)
@@ -72,13 +89,16 @@ def generate_one(job):
             return cached
     started=time.perf_counter()
     directory.mkdir(parents=True,exist_ok=True)
-    record={"id":combo_id,"film":film['id'],"paper":paper['id'],"number":number,"cacheKey":key}
+    record={"id":combo_id,"film":film['id'],"paper":paper['id'] if paper else None,"number":number,"cacheKey":key,
+            "processMode":'positive_direct' if is_slide else 'negative_print'}
     try:
-        spec=BundleSpec(film_profile=film['id'],print_profiles=(paper['id'],),
+        if is_slide != (paper is None):
+            raise ValueError('Positive films require no paper; negatives require a paper')
+        spec=BundleSpec(film_profile=film['id'],print_profiles=(INIT_PRINT_PROFILE if is_slide else paper['id'],),
                         input_color_space=CONFIG['input'],output_color_space=CONFIG['output'],
                         topology=CONFIG['topology'],resolution=CONFIG['resolution'],target=CONFIG['target'],
                         stops_above_midgray=CONFIG['stops_above_midgray'],output_gamut_compress=CONFIG['output_gamut_compress'])
-        builder=BundleBuilder(spec)
+        builder=(SlideBundleBuilder if is_slide else BundleBuilder)(spec)
         bundle=builder.build()
         vlog=bundle.luts[0][1].table
         if not np.isfinite(vlog).all():
@@ -103,7 +123,7 @@ def generate_one(job):
         gray=np.repeat(np.linspace(0,1,129)[:,None],3,axis=1)
         patches=cube_grid(5)
         samples=np.concatenate([rng.random((CONFIG['qa_random_samples'],3)),gray,patches])
-        direct=run_pipeline_at(spec,bundle,0,samples)
+        direct=run_slide_reference(spec,samples) if is_slide else run_pipeline_at(spec,bundle,0,samples)
         fidelity={name:metrics(fn(vlog_disk,samples),direct) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
         # An independent continuous composition is evaluated off-grid, against
         # the final written 33-point STD file. No identity/circular comparison.
@@ -131,6 +151,7 @@ def generate_one(job):
             save_image(rendered,path)
             previews[sample['id']]=describe(path)
         qa={"fileChecks":"passed","rowsPerCube":35937,"serializationMaxError":roundtrip,
+            "processMode":record['processMode'],"scanFilm":is_slide,
             "vlogVsDirectEngine":fidelity,"stdVsContinuousComposition":std_errors,
             "grayBlackToWhiteDelta":tone_delta,"warnings":warnings,"cameraVerified":False,
             "sampling":"4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
@@ -138,6 +159,10 @@ def generate_one(job):
         save_json(directory/'qa.json',qa)
         provenance={"engine":{"repository":"https://github.com/andreavolpato/spektrafilm","commit":CONFIG['engine_commit'],"version":CONFIG['engine_version']},
                     "profiles":{"film":film,"paper":paper},"config":CONFIG,"bundle":asdict(bundle.meta),
+                    "processMode":record['processMode'],"scanFilm":is_slide,
+                    "processingPath":'film exposure -> film development -> direct film scan' if is_slide else 'film exposure -> film development -> print exposure -> print development -> print scan',
+                    "runtimeInitPrintProfile":({"id":INIT_PRINT_PROFILE,"sha256":sha256(PROFILES / f'{INIT_PRINT_PROFILE}.json'),
+                        "note":"Required only to initialize upstream runtime; printing stages are bypassed and paper is not applied."} if is_slide else None),
                     "adapter":{"id":CONFIG['adapter'],"target":"S1M2 / S1II (camera validation pending)",
                     "source":"https://pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf",
                     "contract":"L_STD(x) = tetrahedral(L_VLOG, VLogEncode(sRGBDecode(x) @ sRGB_to_VGamut.T))",
@@ -149,7 +174,9 @@ def generate_one(job):
                     "environment":{"python":platform.python_version(),"platform":platform.platform()},
                     "license":"CC BY-SA 4.0; derived from spektrafilm by Andrea Volpato"}
         save_json(directory/'provenance.json',provenance)
-        readme=f'''Film Lab / {film['name']} + {paper['name']}
+        readme=f'''Film Lab / {film['name']} + {paper['name'] if paper else 'Direct film scan (no paper)'}
+
+Processing mode: {record['processMode']}; scan_film={is_slide}
 
 {vlog_path.name}: Panasonic V-Log / V-Gamut input -> sRGB output
 {std_path.name}: Standard/sRGB analytic working model input -> sRGB output
@@ -191,16 +218,12 @@ def catalog(records, stocks):
     combos=[]
     films=[s for s in stocks if s['stage']=='filming']
     papers=[s for s in stocks if s['stage']=='printing']
-    for i,film in enumerate(films):
-        for j,paper in enumerate(papers):
-            cid=f"{film['id']}__{paper['id']}"
-            base={"id":cid,"film":film['id'],"paper":paper['id'],"number":i*len(papers)+j+1}
-            if film['type']!='negative':
-                base.update(status='unsupported',reason=EXCLUSION)
-            else:
-                base=records.get(cid,{**base,"status":"not-generated","reason":"이 조합의 LUT는 아직 생성되지 않았습니다."})
-            combos.append(base)
-    result={"schemaVersion":1,"generatedAt":datetime.now(timezone.utc).isoformat(),"engineCommit":CONFIG['engine_commit'],
+    for film,paper,number in combination_choices(stocks):
+        cid=combination_id(film,paper)
+        base={"id":cid,"film":film['id'],"paper":paper['id'] if paper else None,"number":number,
+              "processMode":'positive_direct' if paper is None else 'negative_print'}
+        combos.append(records.get(cid,{**base,"status":"not-generated","reason":"이 룩의 LUT는 아직 생성되지 않았습니다."}))
+    result={"schemaVersion":2,"generatedAt":datetime.now(timezone.utc).isoformat(),"engineCommit":CONFIG['engine_commit'],
             "engineVersion":CONFIG['engine_version'],"adapter":CONFIG['adapter'],"output":"sRGB","resolution":33,
             "films":films,"papers":papers,"samples":json.loads((PUBLIC/'samples/manifest.json').read_text()),
             "combinations":combos,"counts":{s:sum(c['status']==s for c in combos) for s in ['ready','failed','unsupported','not-generated']}}
@@ -210,7 +233,7 @@ def catalog(records, stocks):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--only',help='film_id__paper_id')
+    parser.add_argument('--only',help='film_id__paper_id or film_id__direct_scan')
     parser.add_argument('--jobs',type=int,default=3)
     parser.add_argument('--force',action='store_true')
     args=parser.parse_args()
@@ -222,21 +245,16 @@ def main():
     prepare()
     stocks=profiles()
     records={}
-    films=[s for s in stocks if s['stage']=='filming']
-    papers=[s for s in stocks if s['stage']=='printing']
     jobs=[]
-    for i,f in enumerate(films):
-        for j,p in enumerate(papers):
-            if f['type']!='negative':
-                continue
-            cid=f"{f['id']}__{p['id']}"
-            path=PUBLIC/'luts'/cid/'metadata.json'
-            if path.exists():
-                old=json.loads(path.read_text())
-                if valid_cache(old,cache_key(f,p)):
-                    records[cid]=old
-            if not args.only or cid==args.only:
-                jobs.append((f,p,i*len(papers)+j+1,args.force))
+    for f,p,number in combination_choices(stocks):
+        cid=combination_id(f,p)
+        path=PUBLIC/'luts'/cid/'metadata.json'
+        if path.exists():
+            old=json.loads(path.read_text())
+            if valid_cache(old,cache_key(f,p)):
+                records[cid]=old
+        if not args.only or cid==args.only:
+            jobs.append((f,p,number,args.force))
     if args.only and not jobs:
         raise SystemExit('Unknown or unsupported combination')
     catalog(records,stocks)
