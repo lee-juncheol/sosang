@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises'
 import { gzipSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { applyStdLut, parseStdCube } from '../src/lut.ts'
-import { fetchVerifiedAsset } from '../src/assets.ts'
+import { extractZipEntry, fetchVerifiedAsset } from '../src/assets.ts'
+import type { Asset } from '../src/types.ts'
 
 const reference = JSON.parse(await readFile(new URL('./fixtures/colour-reference.json', import.meta.url), 'utf8'))
 for (const fixture of reference.fixtures) {
@@ -41,4 +42,78 @@ test('reads raw, packed gzip and host-decoded LUTs; rejects corrupt bytes and HT
     globalThis.fetch = async () => new Response('', { status: 404 })
     await assert.rejects(fetchVerifiedAsset(asset), /가져오지/)
   } finally { globalThis.fetch = originalFetch }
+})
+
+const catalog = JSON.parse(await readFile(new URL('../public/catalog.json', import.meta.url), 'utf8'))
+const zipCombo = catalog.combinations.find((c: { id: string }) => c.id === 'kodak_portra_400__kodak_portra_endura')
+const zipBytes = await readFile(new URL(`../public${zipCombo.files.zip.path}`, import.meta.url))
+const asArrayBuffer = (bytes: Uint8Array): ArrayBuffer => new Uint8Array(bytes).buffer
+const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+const zipAsset = (kind: 'std' | 'vlog', bytes = zipBytes): Asset => ({ ...zipCombo.files[kind], path: zipCombo.files.zip.path, encoding: 'zip-entry', transferBytes: bytes.length, transferSha256: digest(bytes) })
+
+test('ZIP-entry transport extracts actual VLOG and STD cubes byte-for-byte', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () => new Response(zipBytes)
+    for (const kind of ['std', 'vlog'] as const) {
+      const original = await readFile(new URL(`../public${zipCombo.files[kind].path}`, import.meta.url))
+      assert.deepEqual(new Uint8Array(await fetchVerifiedAsset(zipAsset(kind))), new Uint8Array(original))
+    }
+  } finally { globalThis.fetch = originalFetch }
+})
+
+test('ZIP-entry transport authenticates container and extracted file, rejecting corrupt or missing data', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    const corrupt = Buffer.from(zipBytes); corrupt[80] ^= 1
+    globalThis.fetch = async () => new Response(corrupt)
+    await assert.rejects(fetchVerifiedAsset(zipAsset('std')), /검증/)
+    globalThis.fetch = async () => new Response(zipBytes)
+    await assert.rejects(fetchVerifiedAsset({ ...zipAsset('std'), transferBytes: zipBytes.length - 1 }), /검증/)
+    await assert.rejects(fetchVerifiedAsset({ ...zipAsset('std'), transferSha256: undefined }), /검증/)
+    await assert.rejects(fetchVerifiedAsset({ ...zipAsset('std'), name: 'missingSTD.cube' }), /찾지/)
+    await assert.rejects(fetchVerifiedAsset({ ...zipAsset('std'), bytes: zipCombo.files.std.bytes - 1 }), /검증/)
+    await assert.rejects(fetchVerifiedAsset({ ...zipAsset('std'), sha256: '0'.repeat(64) }), /검증/)
+  } finally { globalThis.fetch = originalFetch }
+})
+
+test('ZIP32 parser rejects encrypted, unsupported, out-of-bounds and inconsistent archives', async () => {
+  const end = zipBytes.length - 22
+  assert.equal(zipBytes.readUInt32LE(end), 0x06054b50)
+  const central = zipBytes.readUInt32LE(end + 16)
+  const nameLength = zipBytes.readUInt16LE(central + 28)
+  const firstName = zipBytes.subarray(central + 46, central + 46 + nameLength).toString('utf8')
+  const expectedSize = zipBytes.readUInt32LE(central + 24)
+  const local = zipBytes.readUInt32LE(central + 42)
+  const changes: ((value: Buffer) => void)[] = [
+    value => value.writeUInt16LE(1, central + 8), // encryption
+    value => value.writeUInt16LE(12, central + 10), // unsupported BZIP2
+    value => value.writeUInt32LE(0xffffffff, central + 24), // ZIP64 sentinel
+    value => value.writeUInt16LE(1, end + 4), // split archive
+    value => value.writeUInt32LE(zipBytes.length, end + 16), // directory bounds
+    value => value.writeUInt16LE(0xffff, central + 28), // filename bounds
+    value => value.writeUInt32LE(central, central + 42), // local header overlaps directory
+    value => value.writeUInt32LE(expectedSize - 1, local + 22), // size disagreement
+    value => { value[local + 30] ^= 1 }, // filename disagreement
+  ]
+  for (const change of changes) {
+    const changed = Buffer.from(zipBytes); change(changed)
+    await assert.rejects(extractZipEntry(asArrayBuffer(changed), firstName, expectedSize), /검증/)
+  }
+  for (const truncated of [zipBytes.subarray(0, 10), zipBytes.subarray(0, -1)]) await assert.rejects(extractZipEntry(asArrayBuffer(truncated), firstName, expectedSize), /검증/)
+})
+
+test('ZIP32 stored entries work and deflate support failures are explicit', async () => {
+  // Independent minimal stored ZIP fixture, with matching local/central fields.
+  const name = Buffer.from('test.cube'), payload = Buffer.from('stored LUT bytes')
+  const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50); local.writeUInt16LE(20, 4); local.writeUInt32LE(payload.length, 18); local.writeUInt32LE(payload.length, 22); local.writeUInt16LE(name.length, 26)
+  const directory = Buffer.alloc(46); directory.writeUInt32LE(0x02014b50); directory.writeUInt16LE(20, 6); directory.writeUInt32LE(payload.length, 20); directory.writeUInt32LE(payload.length, 24); directory.writeUInt16LE(name.length, 28)
+  const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50); end.writeUInt16LE(1, 8); end.writeUInt16LE(1, 10); end.writeUInt32LE(directory.length + name.length, 12); end.writeUInt32LE(local.length + name.length + payload.length, 16)
+  const stored = Buffer.concat([local, name, payload, directory, name, end])
+  assert.deepEqual(new Uint8Array(await extractZipEntry(asArrayBuffer(stored), 'test.cube', payload.length)), new Uint8Array(payload))
+  const originalDecompressor = globalThis.DecompressionStream
+  try {
+    globalThis.DecompressionStream = class { constructor() { throw new TypeError('unsupported format') } } as unknown as typeof DecompressionStream
+    await assert.rejects(extractZipEntry(asArrayBuffer(zipBytes), zipCombo.files.std.name, zipCombo.files.std.bytes), /브라우저.*지원하지/)
+  } finally { globalThis.DecompressionStream = originalDecompressor }
 })

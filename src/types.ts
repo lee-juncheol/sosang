@@ -1,4 +1,4 @@
-export interface Asset { path: string; name: string; bytes: number; sha256: string; encoding?: 'gzip'; transferBytes?: number; transferSha256?: string }
+export interface Asset { path: string; name: string; bytes: number; sha256: string; encoding?: 'gzip' | 'zip-entry'; transferBytes?: number; transferSha256?: string }
 export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string }
 export interface Sample { id: string; name: string; category: string; credit: string; source: string | null; path: string; width: number; height: number; inputKind: 'camera-std' | 'synthetic-srgb' | 'uploaded-srgb'; sourceFilename?: string; previewLut: 'std' }
 export interface Metric { mean: number; p95: number; p99: number; max: number; samples: number }

@@ -25,7 +25,7 @@ npm run build
 npm run preview
 ```
 
-개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 프로덕션 빌드는 LUT 전송용 파일에 무손실 gzip 압축을 적용하고 브라우저에서 원래 `.cube`로 복원합니다. 원본/ZIP의 LUT 내용은 바뀌지 않습니다. 다운로드 전 원본 파일 크기/SHA-256을 검사합니다. HTTPS 또는 localhost의 Web Crypto와 현대 브라우저의 DecompressionStream을 사용합니다.
+개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 프로덕션 빌드는 기존 조합별 ZIP 한 벌을 LUT 전송에도 사용해, 개별 `.cube`의 별도 전송 사본을 배포하지 않습니다. manifest의 `encoding: "zip-entry"`에 따라 브라우저가 ZIP의 크기/SHA-256을 확인한 뒤 선택한 `.cube`를 무손실 압축 해제하고, 원본 LUT의 크기/SHA-256을 다시 확인합니다. 이 파일을 미리보기와 개별 LUT 다운로드에 사용하며 ZIP 다운로드도 지원합니다. 로컬 `public/`의 원본 `.cube`·ZIP은 그대로 유지하고, 전송 방식 변경으로 LUT 바이트나 이미지 품질은 달라지지 않습니다. HTTPS 또는 localhost의 Web Crypto와 현대 브라우저의 DecompressionStream을 사용합니다.
 
 ## 내 사진으로 미리보기
 
@@ -106,7 +106,7 @@ Standard의 비공개 톤 처리·노출/게인까지 역변환하는 모델이 
 npm test
 npm run verify:assets
 npm run build
-# 프로덕션 압축 전송 파일도 원본 해시와 대조
+# 프로덕션 ZIP 전송과 추출한 LUT도 원본 해시와 대조
 npm run verify:assets -- dist
 ```
 
