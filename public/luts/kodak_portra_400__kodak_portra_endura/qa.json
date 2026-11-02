@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.00048545016151841806,
-      "p95": 0.0015436233015536651,
-      "p99": 0.0026506787255407413,
-      "max": 0.004701337005837969,
+      "mean": 0.00045671616252927814,
+      "p95": 0.0011569729418950128,
+      "p99": 0.00169208595576148,
+      "max": 0.004041261876055469,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0005285795605623343,
-      "p95": 0.001636245936761647,
-      "p99": 0.002710883349488644,
-      "max": 0.005716601512125968,
+      "mean": 0.0005083314645295238,
+      "p95": 0.0013439785927092964,
+      "p99": 0.0023548510792798204,
+      "max": 0.005733417198767965,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.7627028734269478,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.0032099319310074305,
+      "p95": 0.0066176116432739365,
+      "p99": 0.00944199523461514,
+      "max": 0.017286659921720293,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.003179805068432991,
+      "p95": 0.006529712588084284,
+      "p99": 0.009197596597455582,
+      "max": 0.015594853336078907,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.7634343333333334,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",

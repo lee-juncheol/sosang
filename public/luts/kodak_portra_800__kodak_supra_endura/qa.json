@@ -24,27 +24,50 @@
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdVsContinuousComposition": {
+  "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0005420440090596609,
-      "p95": 0.0018180968392367762,
-      "p99": 0.003127235838161253,
-      "max": 0.005097621708340355,
+      "mean": 0.0004986909446801815,
+      "p95": 0.0013634307493496291,
+      "p99": 0.002014693313274878,
+      "max": 0.005237197896811874,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0005784398999599809,
-      "p95": 0.001886216692618333,
-      "p99": 0.0031707771736007202,
-      "max": 0.005682460659633126,
+      "mean": 0.0005455223204668876,
+      "p95": 0.0015349779693163855,
+      "p99": 0.0025050166423501944,
+      "max": 0.006935700728236016,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "grayBlackToWhiteDelta": 0.771963208596095,
+  "stdGeneration": "direct-engine-grid",
+  "stdInputGain": 1.0,
+  "stdVsContinuousComposition": {
+    "tetrahedral": {
+      "mean": 0.0036248116959167105,
+      "p95": 0.008393265944942762,
+      "p99": 0.012703172192600117,
+      "max": 0.022429300588584722,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0035996468948893035,
+      "p95": 0.008234766998538132,
+      "p99": 0.012540066818094482,
+      "max": 0.021399358706541305,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
+  "grayBlackToWhiteDelta": 0.7727930000000001,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
