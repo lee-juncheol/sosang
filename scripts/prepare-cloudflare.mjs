@@ -3,25 +3,23 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 
-export const PUBLIC_LOOKS = 152;
-export const PRIVATE_FUJI_LOOKS = 90;
-const officialModes = new Set(['official_direct', 'official_print']);
+export const PUBLIC_LOOKS = 238;
+export const REMOVED_REFERENCE_LOOKS = 4;
 
 // Keep the personal catalog intact; the public distribution is a separate build.
 export function publicCatalog(source) {
   assert.equal(source.schemaVersion, 2, 'Unsupported catalog schema');
   const catalog = structuredClone(source);
-  const officialFilms = new Set(catalog.films.filter(film => film.type === 'official').map(film => film.id));
-  const removed = catalog.combinations.filter(combo => officialFilms.has(combo.film) || officialModes.has(combo.processMode));
+  const referenceIds = new Set((catalog.referenceStudy?.looks || []).map(look => `${look.film}__reference`));
+  const removed = catalog.combinations.filter(combo => combo.processMode === 'reference_interpretation' || referenceIds.has(combo.id) || combo.id.endsWith('__reference'));
   const removedIds = new Set(removed.map(combo => combo.id));
-  assert.equal(removed.length, PRIVATE_FUJI_LOOKS, 'Expected the 90 private FUJIFILM combinations');
+  assert.equal(removed.length, REMOVED_REFERENCE_LOOKS, 'Expected the 4 removed reference interpretations');
   for (const combo of catalog.combinations) assert.match(combo.id, /^[a-z0-9_]+$/, 'Unsafe LUT directory name');
-  catalog.films = catalog.films.filter(film => !officialFilms.has(film.id));
   catalog.combinations = catalog.combinations.filter(combo => !removedIds.has(combo.id));
-  delete catalog.fujiStudy;
+  delete catalog.referenceStudy;
   catalog.counts = Object.fromEntries(Object.keys(source.counts).map(status => [status, 0]));
   for (const combo of catalog.combinations) catalog.counts[combo.status] = (catalog.counts[combo.status] || 0) + 1;
-  assert.equal(catalog.combinations.length, PUBLIC_LOOKS, 'Expected 152 public combinations');
+  assert.equal(catalog.combinations.length, PUBLIC_LOOKS, 'Expected 238 public combinations');
   assert.equal(catalog.counts.ready, PUBLIC_LOOKS, 'All public combinations must be ready');
   assert(catalog.combinations.every(combo => catalog.films.some(film => film.id === combo.film)), 'A public combination references a removed film');
   return { catalog, removedIds };
@@ -49,7 +47,7 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
       const relative = path.relative(source, entry).split(path.sep).join('/');
       const info = await fs.lstat(entry);
       assert(!info.isSymbolicLink(), `Do not publish a symlink: ${relative}`);
-      if (relative === 'research/fujifilm-official.json') return false;
+      if (relative === 'research/reference-looks.json') return false;
       if (relative.startsWith('luts/') && removedIds.has(relative.split('/')[1])) return false;
       assert(!relative.split('/').some(part => part === 'sample-study' || part === '.cache' || part === '.git'), `Private data in input: ${relative}`);
       return true;

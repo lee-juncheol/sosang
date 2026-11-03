@@ -26,6 +26,6 @@ else if (action==='deploy:cloudflare') { buildCloudflare(); run(['node_modules/w
 else if (action==='preview:cloudflare') { run(['node_modules/wrangler/bin/wrangler.js','dev','--config','wrangler.jsonc','--ip','127.0.0.1',...process.argv.slice(3)]); }
 else if (action==='cloudflare:login') { run(['node_modules/wrangler/bin/wrangler.js','login',...process.argv.slice(3)]); }
 else if (action==='verify:assets') { run(['--experimental-strip-types','scripts/verify-assets.mjs',...process.argv.slice(3)]); }
-else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/cloudflare.test.mjs']); }
+else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/cloudflare.test.mjs','tests/geo.test.mjs','tests/i18n.test.ts']); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }

@@ -9,7 +9,7 @@ import { gzipSync } from 'node:zlib';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const destination = path.resolve(root, process.argv[2] || 'dist-cloudflare');
-const directories = ['src', 'tests', 'scripts', 'pipeline', 'licenses', 'docs'];
+const directories = ['src', 'server', 'tests', 'scripts', 'pipeline', 'licenses', 'docs'];
 const requiredFiles = ['index.html', 'tsconfig.json', 'package.json', 'package-lock.json', 'LICENSE', 'README.md'];
 const optionalFiles = ['wrangler.jsonc'];
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.py', '.json', '.jsonc', '.md', '.txt', '.lock', '.html']);
@@ -65,7 +65,7 @@ for (const relative of optionalFiles) {
   await select(relative);
 }
 selected.sort();
-assert(selected.includes('src/main.tsx') && selected.includes('src/lut.worker.ts') && selected.includes('scripts/package-source.mjs'), 'Required editable application sources are missing');
+assert(selected.includes('server/worker.mjs') && selected.includes('src/main.tsx') && selected.includes('src/lut.worker.ts') && selected.includes('scripts/package-source.mjs'), 'Required editable application sources are missing');
 
 const sourceReadme = `Film Lab — corresponding application source
 ==========================================
@@ -95,7 +95,9 @@ Runtime assets are supplied separately by the public deployment from which
 this archive was downloaded. Its /catalog.json lists public sample images,
 preview images, and per-look ZIP assets, with byte sizes and SHA-256 hashes.
 Serve that catalog and its referenced files at the same URL paths alongside
-the compiled app; include the public /favicon.svg and /licenses/ files too.
+the compiled app; include the public /favicon.svg, /fonts/ and /licenses/ files too.
+The /api/locale endpoint runs in server/worker.mjs on Cloudflare; its deployment
+configuration is wrangler.jsonc. Locally the UI falls back to browser language.
 These runtime assets are intentionally not duplicated in this source archive.
 In the packed deployment, std/vlog records refer to entries in their ZIP;
 copy that ZIP once and retain the catalog's encoding and transfer hash fields.
