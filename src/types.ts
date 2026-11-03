@@ -26,4 +26,5 @@ export interface Catalog {
   counts: Record<string, number>; output: string; resolution: number
   referenceStudy?: ReferenceStudy
   fujiStudy?: FujiStudy
+  sourceCode?: { path: string; bytes: number; sha256: string }
 }

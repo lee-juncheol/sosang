@@ -18,8 +18,14 @@ if (!supported(process.version)) {
 }
 const action=process.argv[2] || 'dev';
 function run(args) { const result=spawnSync(runtime,args,{cwd:root,stdio:'inherit'}); if(result.error)throw result.error; if(result.status!==0)process.exit(result.status || 1); }
-if (action==='build') { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build']); run(['scripts/pack-static.mjs']); }
+function build() { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build']); run(['scripts/pack-static.mjs']); }
+function buildCloudflare() { build(); run(['scripts/prepare-cloudflare.mjs']); run(['scripts/package-source.mjs']); run(['scripts/verify-cloudflare.mjs']); }
+if (action==='build') { build(); }
+else if (action==='build:cloudflare') { buildCloudflare(); }
+else if (action==='deploy:cloudflare') { buildCloudflare(); run(['node_modules/wrangler/bin/wrangler.js','deploy','--config','wrangler.jsonc',...process.argv.slice(3)]); }
+else if (action==='preview:cloudflare') { run(['node_modules/wrangler/bin/wrangler.js','dev','--config','wrangler.jsonc','--ip','127.0.0.1',...process.argv.slice(3)]); }
+else if (action==='cloudflare:login') { run(['node_modules/wrangler/bin/wrangler.js','login',...process.argv.slice(3)]); }
 else if (action==='verify:assets') { run(['--experimental-strip-types','scripts/verify-assets.mjs',...process.argv.slice(3)]); }
-else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts']); }
+else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/cloudflare.test.mjs']); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }

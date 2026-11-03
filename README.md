@@ -43,6 +43,19 @@ FUJI 공식 모드의 배포용 샘플 미리보기는 다운로드용 STD LUT�
 
 선택한 다운로드용 STD LUT를 SHA-256/크기로 확인하고 Web Worker에서 사면체 보간을 적용합니다. 필름·인화지 변경 시 진행 중인 작업을 취소하고 마지막 선택을 렌더링합니다. 원본·비교·적용 보기와 키보드 비교 슬라이더를 동일하게 사용할 수 있습니다. 결과는 PNG로 표시해 추가 손실 압축을 하지 않습니다. 이미지 파일 자체의 다운로드 기능은 제공하지 않습니다.
 
+## Cloudflare 공개 배포
+
+Cloudflare Workers Static Assets용 설정은 `wrangler.jsonc`에 있습니다. 기존 Sites용 `dist/`와 별도로 `dist-cloudflare/`를 생성하며, 공개 배포 허가를 확인하지 못한 FUJIFILM 공식 LUT 기반 90개 합성 룩은 공개 산출물에서 제외합니다. 기존 모델과 실사 참고색 152개 룩, 내 사진 미리보기와 LUT 다운로드를 제공합니다. 개인용 원본과 LUT는 변경하지 않습니다.
+
+```bash
+npm run build:cloudflare
+npm run preview:cloudflare
+npm run cloudflare:login
+npm run deploy:cloudflare
+```
+
+계정 가입·이메일 인증 후 공식 Wrangler 연결을 승인해야 배포할 수 있습니다. 기본 주소는 Cloudflare가 반환하는 `workers.dev` 주소이며, 현재 설정은 서버 실행 코드 없이 정적 자산만 제공합니다. 배포 절차·권리 구분·캐시 정책은 [Cloudflare 배포 문서](docs/cloudflare.md)를 참고하세요.
+
 ## Python 환경과 재생성
 
 upstream: https://github.com/andreavolpato/spektrafilm
