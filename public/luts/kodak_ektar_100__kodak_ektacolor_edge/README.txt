@@ -2,16 +2,20 @@ Film Lab / Kodak Ektar 100 + Kodak Ektacolor Edge
 
 Processing mode: negative_print; scan_film=False
 
+
 0052VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
-0052STD.cube: Standard/sRGB analytic working model input -> sRGB output
+0052STD.cube: Standard/sRGB -> colour model -> Film Lab JPG tone protection -> sRGB
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
 S1M2 / S1II physical camera validation: NOT performed.
 Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
 Standard mapping is approximate; clipped highlights cannot be recovered.
-STD grid nodes are evaluated directly through the upstream engine using the
-analytic sRGB -> V-Gamut -> V-Log input mapping. No intermediate VLOG cube
-is interpolated. Native input gain remains 1.0; no exposure boost is added.
-stdVsDirectEngine in qa.json is the end-to-end STD accuracy measurement.
+STD grid nodes are evaluated directly through the colour model and the fixed
+Film Lab JPG tone-protection policy. Neutral tonality is reduced, coloured
+shadow lightness is bounded, neutral casts are removed and chroma is mapped
+into sRGB. No image statistics or automatic exposure are used. This is NOT
+unmodified upstream tonality, a camera inverse, or measured film/print accuracy.
+Native model input gain remains 1.0. VLOG keeps its original rendering.
+stdVsDirectEngine in qa.json compares to the complete protected STD reference.
 stdVsContinuousComposition is only a diagnostic difference from the legacy
 VLOG-cube composition, not the accuracy reference.
 Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
