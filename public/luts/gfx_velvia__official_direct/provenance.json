@@ -1,0 +1,52 @@
+{
+  "methodId": "film-lab-fujifilm-official-paper-v1",
+  "processMode": "official_direct",
+  "film": "gfx_velvia",
+  "paper": null,
+  "source": {
+    "model": "GFX ETERNA 55",
+    "packageVersion": "1.10",
+    "sourceLutVersion": "1.00",
+    "sourceUrl": "https://www.fujifilm-x.com/global/support/download/lut/",
+    "downloadUrl": "https://dl.fujifilm-x.com/support/lut/gfx-eterna-55-3d-lut-v110.zip",
+    "sourceSha256": "febfc7050999620651ca0cf162bf8b499970ef270b4da632765b61b958cf7940",
+    "sourceInput": "F-Log2 / F-Gamut (BT.2020 primaries), full range 0–1; not F-Log2C / F-GamutC",
+    "sourceOutput": "BT.709 primaries, gamma 2.2 display interpretation following official whitepaper p13; converted to sRGB for this application",
+    "rights": "Official LUT data © FUJIFILM Corporation, rights retained; no CC relicensing of FUJIFILM data. spektrafilm paper profiles/code retain their original licenses and attribution."
+  },
+  "sourceLut": {
+    "film": "gfx_velvia",
+    "name": "Velvia",
+    "sourceFile": "FLog2_to_Velvia_65grid_V.1.00.cube",
+    "sourceArchivePath": "gfx-eterna-55-3d-lut-v110/65Grid/F-Log2/FLog2_to_Velvia_65grid_V.1.00.cube",
+    "sourceSha256": "80a9ac219c30e9d1c230bd157d96ab25c2e6052de3bad7dc650823de65a0ac77",
+    "numberStart": 237
+  },
+  "inputAdapter": {
+    "std": "sRGB decode -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Display-linear is used as scene reflection at gain 1.0. NOT an inverse camera photo-style transform.",
+    "vlog": "V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.",
+    "output": "Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding"
+  },
+  "paperBridge": null,
+  "upstream": {
+    "repository": "https://github.com/andreavolpato/spektrafilm",
+    "commit": "3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+    "author": "Andrea Volpato",
+    "filmStagesApplied": false,
+    "paperDevelopScanApplied": false
+  },
+  "officialSourceResolution": 65,
+  "exportResolution": 33,
+  "effects": {
+    "grain": false,
+    "halation": false,
+    "autoExposure": false
+  },
+  "preview": "User Standard digital photo -> exported STD LUT once; not captured on GFX or physical film",
+  "officialSource": true,
+  "officialUnmodifiedProduct": false,
+  "physicalFilmCalibrated": false,
+  "cameraVerified": false,
+  "outputIsRealFilm": false,
+  "outputOrigin": "official_lut_with_film_lab_adapter"
+}
