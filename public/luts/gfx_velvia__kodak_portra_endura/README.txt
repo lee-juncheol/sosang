@@ -6,13 +6,17 @@ Package v1.10; selected 65-grid F-Log2 LUT v1.00.
 Source LUT: FLog2_to_Velvia_65grid_V.1.00.cube
 SHA256: 80a9ac219c30e9d1c230bd157d96ab25c2e6052de3bad7dc650823de65a0ac77
 
-0243STD.cube: Standard/sRGB approximation input -> F-Log2/F-Gamut.
+0243STD.cube: rendered Standard/sRGB -> shared PROVIA neutral-response
+inverse (JPG shadow protection) -> virtual scene RGB -> F-Log2/F-Gamut.
 0243VLOG.cube: Panasonic V-Log/V-Gamut input -> F-Log2/F-Gamut (experimental).
 Both: official LUT -> BT709/gamma2.2 interpretation -> optional virtual printer
 and spektrafilm paper development/scanning -> sRGB. 33 cubed full range 0..1.
 These downloads are Film Lab compositions, NOT unmodified official Fuji LUTs.
 The GFX camera's proprietary rendering cannot be recovered from a LUMIX JPEG.
-The optional digital printer bridge is a Film Lab creative assumption, not
+The optional printer uses fixed per-stock neutral-ramp exposure calibration
+and a smooth target retaining paper black, white and middle gray. This avoids
+a second steep shadow curve without altering spectral dyes or paper profiles.
+The digital printer bridge is a Film Lab creative assumption, not
 an official Fuji recipe or calibrated optical print. See provenance.json.
 No spatial grain, halation, or image-dependent auto exposure is applied.
 
