@@ -6,8 +6,12 @@ import pytest
 
 from pipeline.common import profiles
 from pipeline.fuji_paper import (
-    COMMON_SLOPE, GRAY_ANCHOR, LINEAR_FLOOR, METHOD_ID, STAGE_NAMES, PaperBridge,
+    GRAY_ANCHOR, METHOD_ID, NEUTRAL_SAMPLES, STAGE_NAMES, PaperBridge,
 )
+from pipeline.common import srgb_decode
+from pipeline.research import srgb_encode
+from scipy.interpolate import PchipInterpolator
+from scipy.optimize import brentq
 from spektrafilm.model.develop import develop_print_morph
 from spektrafilm.runtime.topology import Tap
 
@@ -37,13 +41,34 @@ def test_all_print_stocks_calibrate_gray_and_keep_positive_neutral_ramp(bridges,
     ramp = bridge.apply(np.repeat(levels[:, None], 3, axis=1))
     assert np.isfinite(ramp).all()
     assert 0 <= ramp.min() <= ramp.max() <= 1
-    # Do not force neutralization beyond the single gray anchor or force
-    # paper black/white to 0/1.  Small profile spline wiggles are tolerated.
+    # Retain the paper's attainable black/white and gray-axis casts. Do not
+    # normalize them away or allow a new shadow plateau after calibration.
     luminance = ramp @ [.2126, .7152, .0722]
     assert np.min(np.diff(luminance)) > -1e-5
     assert luminance[-1] - luminance[0] > .5
     assert luminance[-1] < .9
     assert_only_print_develop_and_scan_ran(bridge)
+
+
+@pytest.mark.parametrize('paper', PAPERS)
+def test_completed_display_shadows_retain_separation_after_printing(bridges, paper):
+    # Behavioral regression: the original shared .60 slope mapped 64/255 to
+    # 24..40/255 and 32/255 to 1..17/255. It doubled the existing image contrast.
+    # The calibrated printer must preserve meaningful shadow differences in
+    # every stock, without demanding identical stock color or endpoints.
+    encoded = np.array([0., .1, .125, .25, .375, .5, .75, 1.])
+    rgb = np.repeat(srgb_decode(encoded)[:, None], 3, axis=1)
+    result = bridges[paper].apply(rgb)
+    shown = srgb_encode(result) @ [.2126, .7152, .0722]
+    assert shown[1] > .09
+    assert .115 < shown[2] < .18
+    assert .24 < shown[3] < .30
+    assert shown[3] - shown[1] > .12
+    assert .48 < shown[5] < .52
+    assert np.all(np.diff(shown) > 0)
+    # White is a stock limit; the correction must not simply renormalize every
+    # stock to display black/white or blend the paper effect back into input.
+    assert .75 < shown[-1] < .9
 
 
 def test_bridge_skips_film_and_optical_enlarger_nodes(monkeypatch):
@@ -76,11 +101,20 @@ def test_bridge_is_pixel_local_and_preserves_array_shape(bridges):
     np.testing.assert_array_equal(flat, bridge.apply(padded)[:len(flat)])
 
 
-def test_bridge_exposure_formula_and_upstream_development_are_unchanged(bridges):
+def test_calibrated_exposure_matches_independent_inverse_and_original_development(bridges):
     bridge = bridges['kodak_endura_premier']
-    inputs = np.array([[.02, .4, .7], [0, .184, 1.]])
-    exposures = bridge.offset - .60 * np.log10(np.maximum(inputs, 1e-6) / .184)
+    inputs = np.array([[.02, .4, .7], [.01, .184, .85]])
     pipeline = bridge._pipeline
+    info = bridge.metadata()['neutralCalibration']
+    # Independently solve the requested neutral luminance directly against
+    # the spectral pipeline. Do not use the production inverse lookup table.
+    target = PchipInterpolator([0, .184, 1], info['targetOutputLinearY'])(inputs)
+    def luminance(delta):
+        return float(bridge._from_log_exposure(bridge.offset + delta) @ [.2126, .7152, .0722])
+    low, high = info['deltaLogExposureRange']
+    deltas = np.array([brentq(lambda d: luminance(d) - y, low, high, xtol=1e-13)
+                       for y in target.flat]).reshape(inputs.shape)
+    exposures = bridge.offset + deltas
     expected_density = develop_print_morph(
         exposures[None, ...], pipeline.print.data.log_exposure,
         pipeline.print.data.density_curves_model,
@@ -90,7 +124,7 @@ def test_bridge_exposure_formula_and_upstream_development_are_unchanged(bridges)
     actual_density = pipeline.process(exposures[None, ...], inject=Tap.LOG_E_PRINT, collect=Tap.CMY_PRINT)
     np.testing.assert_array_equal(actual_density, expected_density)
     expected_output = pipeline.process(expected_density, inject=Tap.CMY_PRINT)
-    np.testing.assert_array_equal(bridge.apply(inputs), np.clip(expected_output[0], 0, 1))
+    np.testing.assert_allclose(bridge.apply(inputs), np.clip(expected_output[0], 0, 1), atol=2e-7, rtol=0)
     assert not pipeline.print_render.density_curves_morph.active
     assert not pipeline.scanner.white_correction
     assert not pipeline.scanner.black_correction
@@ -101,8 +135,13 @@ def test_common_mapping_keeps_distinct_print_stock_responses(bridges):
     assert len({bridge.apply(colors).tobytes() for bridge in bridges.values()}) == len(PAPERS)
     for bridge in bridges.values():
         info = bridge.metadata()
-        assert info['commonSlope'] == COMMON_SLOPE == .60
-        assert info['linearFloor'] == LINEAR_FLOOR == 1e-6
+        calibration = info['neutralCalibration']
+        assert calibration['baseSampleCount'] == NEUTRAL_SAMPLES == 4097
+        assert calibration['sampleCount'] >= NEUTRAL_SAMPLES
+        assert calibration['targetInputLinearRGB'] == [0., GRAY_ANCHOR, 1.]
+        assert calibration['attainableBlackLinearY'] < GRAY_ANCHOR
+        assert calibration['attainableWhiteLinearY'] > GRAY_ANCHOR
+        assert 'commonSlope' not in info
         assert info['grayLinearAnchor'] == GRAY_ANCHOR
         assert info['method'] == METHOD_ID
         assert info['physicalPrinterCalibrated'] is False

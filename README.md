@@ -100,7 +100,7 @@ Windows의 Python 실행 경로는 `.venv\Scripts\python.exe`입니다. 웹앱�
 
 ## 색 변환 계약
 
-공식 FUJIFILM 모드의 STD는 sRGB 디코딩 → F-Gamut 행렬 변환 → F-Log2 인코딩 → 원본 65³ LUT 사면체 보간을 수행합니다. 공식 출력은 BT.709 원색·감마 2.2 기준으로 해석하며, 직접 출력은 최종 sRGB로 인코딩합니다. 인화지 모드에서는 선형 RGB를 가상 인화 노출로 바꿔 spektrafilm의 인화지 현상·분광 스캔만 실행합니다. 필름 노광·현상을 다시 적용하지 않습니다. 최종 배포 파일은 33³ 합성 LUT이며 원본 FUJIFILM 파일과 구분합니다. 자세한 수식과 한계는 [공식 LUT 문서](docs/fujifilm-official.md)에 있습니다.
+공식 FUJIFILM 모드의 STD v2는 완성된 JPG의 암부가 두 번 눌리지 않도록, PROVIA의 회색 응답을 역으로 계산한 공통 입력 변환을 적용한 뒤 F-Gamut / F-Log2 → 원본 65³ LUT 사면체 보간을 수행합니다. 같은 입력 변환을 10종 모두에 사용해 시뮬레이션별 톤 차이를 유지합니다. V-Log 입력에는 JPG용 변환을 적용하지 않습니다. 공식 출력은 BT.709 원색·감마 2.2 기준으로 해석하며, 직접 출력은 최종 sRGB로 인코딩합니다. 인화지 모드에서는 인화지별 회색 응답 전체로 가상 프린터 노출을 보정하고, 인화지의 검정·흰색과 중간 회색을 잇는 부드러운 밝기 곡선을 사용합니다. spektrafilm의 인화지 현상·분광 스캔만 실행하며 염료·색편향은 유지합니다. 필름 노광·현상을 다시 적용하지 않습니다. 최종 배포 파일은 33³ 합성 LUT이며 원본 FUJIFILM 파일과 구분합니다. 자세한 수식과 한계는 [공식 LUT 문서](docs/fujifilm-official.md)에 있습니다.
 
 아래는 기존 spektrafilm 모델의 계약입니다. 인화 모드의 네거티브는 V-Log/V-Gamut → 필름·인화 시뮬레이션 → sRGB, 슬라이드는 V-Log/V-Gamut → 필름 현상·직접 스캔 → sRGB입니다. 네거티브 디지털 모드는 필름 현상 뒤 인화 단계를 우회하고 D50·공통 Gaussian RGB 센서와 감마 0.60, 고정 회색 0.184, 공통 톤 함수로 양화합니다. 그레인, 할레이션, 블러, 자동 노출은 비활성화했습니다. upstream 입력 gamut compression과 CAM16-UCS 출력 gamut compression, 최종 bounded 출력 규칙을 사용합니다.
 

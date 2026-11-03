@@ -19,7 +19,7 @@ from PIL import Image
 from pipeline.common import ROOT, PUBLIC, UPSTREAM, CONFIG, save_json, sha256, read_cube, metrics, std_to_vlog
 from pipeline.generate import describe, valid_assets
 from pipeline.samples import save_image
-from pipeline.fuji import METHOD_ID, load_study, official_archive, official_table, apply_official
+from pipeline.fuji import METHOD_ID, load_study, official_archive, official_table, apply_official, input_adapter_metadata
 from pipeline.fuji_paper import PaperBridge
 from spektrafilm_lut_creator.formats import Lut
 from spektrafilm_lut_creator.formats.lumix import LumixCubeFormat
@@ -84,18 +84,25 @@ def generate_look(study, look, paper, number, samples, force=False):
     warnings = []
     if fidelity['STD']['tetrahedral']['p99'] > .02: warnings.append('STD 전체 도메인 상위 1% 보간 오차가 0.02를 넘습니다.')
     if fidelity['VLOG']['tetrahedral']['p99'] > .05: warnings.append('V-Log 전체 도메인 상위 1% 보간 오차가 0.05를 넘습니다.')
+    gray_codes = np.array([0, 8, 16, 32, 64, 128, 192, 240, 255])
+    gray_inputs = np.repeat((gray_codes/255.)[:,None],3,axis=1)
+    gray_diagnostic = {'inputCodes':gray_codes.tolist(), 'scale':'encoded sRGB 0–255; RGB triples, not physical luminance',
+        'officialBeforePaper':(apply_official(gray_inputs,film_id,'std')*255).tolist(),
+        'finalOutput':(transform(gray_inputs,'STD')*255).tolist(),
+        'purpose':'Regression diagnostic for double-applied shadow tone, not camera or real-print calibration'}
     qa = {'fileChecks':'passed','cameraVerified':False,'warnings':warnings,'processMode':mode,
           'referenceModel':METHOD_ID,'rowsPerCube':35937,'serializationMaxError':serialization_error,
           'stdVsDirectEngine':fidelity['STD'],'vlogVsDirectEngine':fidelity['VLOG'],
           'vlogWithinSrgbEnvelope':envelope_fidelity,'photoPixelFidelity':photo_fidelity,
           'sampling':'4096 uniform random + 129 gray + 125 grid, fixed seed; 1024 pixels per user photo',
           'metricReference':'Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan; not camera accuracy',
-          'officialLutSha256':look['sourceSha256'],**TRUTH}
+          'officialLutSha256':look['sourceSha256'],'grayResponse':gray_diagnostic,**TRUTH}
     save_json(directory/'qa.json',qa)
     provenance = {'methodId':METHOD_ID,'processMode':mode,'film':film_id,'paper':paper_id,
         'source':{key:study[key] for key in ['model','packageVersion','sourceLutVersion','sourceUrl','downloadUrl','sourceSha256','sourceInput','sourceOutput','rights']},
         'sourceLut':look,'inputAdapter':{
-            'std':'sRGB decode -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Display-linear is used as scene reflection at gain 1.0. NOT an inverse camera photo-style transform.',
+            'std':'sRGB decode -> shared PROVIA neutral-response inverse using a common RGB gain -> virtual scene RGB -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Same mapping for all ten simulations and photos; NOT a measured camera inverse.',
+            'stdCalibration':input_adapter_metadata(),
             'vlog':'V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.',
             'output':'Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding'},
         'paperBridge':bridge.metadata() if bridge else None,
@@ -117,13 +124,17 @@ Package v1.10; selected 65-grid F-Log2 LUT v1.00.
 Source LUT: {look['sourceFile']}
 SHA256: {look['sourceSha256']}
 
-{number:04d}STD.cube: Standard/sRGB approximation input -> F-Log2/F-Gamut.
+{number:04d}STD.cube: rendered Standard/sRGB -> shared PROVIA neutral-response
+inverse (JPG shadow protection) -> virtual scene RGB -> F-Log2/F-Gamut.
 {number:04d}VLOG.cube: Panasonic V-Log/V-Gamut input -> F-Log2/F-Gamut (experimental).
 Both: official LUT -> BT709/gamma2.2 interpretation -> optional virtual printer
 and spektrafilm paper development/scanning -> sRGB. 33 cubed full range 0..1.
 These downloads are Film Lab compositions, NOT unmodified official Fuji LUTs.
 The GFX camera's proprietary rendering cannot be recovered from a LUMIX JPEG.
-The optional digital printer bridge is a Film Lab creative assumption, not
+The optional printer uses fixed per-stock neutral-ramp exposure calibration
+and a smooth target retaining paper black, white and middle gray. This avoids
+a second steep shadow curve without altering spectral dyes or paper profiles.
+The digital printer bridge is a Film Lab creative assumption, not
 an official Fuji recipe or calibrated optical print. See provenance.json.
 No spatial grain, halation, or image-dependent auto exposure is applied.
 
@@ -135,7 +146,7 @@ SPEKTRAFILM_LICENSE.txt applies to upstream components, not to Fuji data.
 User photo copyrights remain with their owner. Not an affiliated product.
 '''
     (directory/'README.txt').write_text(readme)
-    (directory/'CHANGELOG.txt').write_text('Added official Fuji source LUT + explicit input/display adapter and optional virtual paper develop/scan. Existing152 preserved.\n')
+    (directory/'CHANGELOG.txt').write_text('v2: Fix repeated shadow compression on rendered JPGs with one shared PROVIA neutral inverse; calibrate paper exposure across the neutral ramp instead of applying a second S-curve. Official source LUTs and direct V-Log transform unchanged. Existing152 preserved.\n')
     (directory/'FUJIFILM_NOTICE.txt').write_text(study['rights']+'\n'+study['sourceUrl']+'\n')
     shutil.copyfile(UPSTREAM/'SPEKTRAFILM_LICENSE.txt',directory/'SPEKTRAFILM_LICENSE.txt')
     zip_path=directory/f'{number:04d}LUTS.zip'
