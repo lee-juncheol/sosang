@@ -1,0 +1,109 @@
+{
+  "methodId": "film-lab-fujifilm-official-paper-v1",
+  "processMode": "official_print",
+  "film": "gfx_eterna_bb",
+  "paper": "fujifilm_crystal_archive_typeii",
+  "source": {
+    "model": "GFX ETERNA 55",
+    "packageVersion": "1.10",
+    "sourceLutVersion": "1.00",
+    "sourceUrl": "https://www.fujifilm-x.com/global/support/download/lut/",
+    "downloadUrl": "https://dl.fujifilm-x.com/support/lut/gfx-eterna-55-3d-lut-v110.zip",
+    "sourceSha256": "febfc7050999620651ca0cf162bf8b499970ef270b4da632765b61b958cf7940",
+    "sourceInput": "F-Log2 / F-Gamut (BT.2020 primaries), full range 0–1; not F-Log2C / F-GamutC",
+    "sourceOutput": "BT.709 primaries, gamma 2.2 display interpretation following official whitepaper p13; converted to sRGB for this application",
+    "rights": "Official LUT data © FUJIFILM Corporation, rights retained; no CC relicensing of FUJIFILM data. spektrafilm paper profiles/code retain their original licenses and attribution."
+  },
+  "sourceLut": {
+    "film": "gfx_eterna_bb",
+    "name": "ETERNA BLEACH BYPASS",
+    "sourceFile": "FLog2_to_ETERNA-BB_65grid_V.1.00.cube",
+    "sourceArchivePath": "gfx-eterna-55-3d-lut-v110/65Grid/F-Log2/FLog2_to_ETERNA-BB_65grid_V.1.00.cube",
+    "sourceSha256": "367024b32ca0f263e2122febd1b83a024d2ffc232a1770f8e061432468ffd5a6",
+    "numberStart": 273
+  },
+  "inputAdapter": {
+    "std": "sRGB decode -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Display-linear is used as scene reflection at gain 1.0. NOT an inverse camera photo-style transform.",
+    "vlog": "V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.",
+    "output": "Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding"
+  },
+  "paperBridge": {
+    "method": "film-lab-fuji-digital-paper-bridge-v1",
+    "paperProfile": "fujifilm_crystal_archive_typeii",
+    "profileSupport": "paper",
+    "input": "display-linear sRGB / BT.709 primaries, D65, RGB 0..1",
+    "output": "display-linear sRGB, D65, RGB 0..1; encode sRGB after this stage",
+    "formula": "logE = offset - 0.60 * log10(max(linearRGB, 1e-6) / 0.184)",
+    "offset": [
+      -0.010581423967139764,
+      0.01137485029977117,
+      -0.007164227391428504
+    ],
+    "commonSlope": 0.6,
+    "linearFloor": 1e-06,
+    "grayLinearAnchor": 0.184,
+    "calibratedGrayLinearRGB": [
+      0.18400000000000177,
+      0.18400000000000846,
+      0.18399999999999964
+    ],
+    "calibrationMaxAbsLinearRGBError": 8.465450562766819e-15,
+    "calibration": "one fixed three-channel exposure offset per print stock; neutral gray only",
+    "linearEndpointOutputs": {
+      "black": [
+        0.0020619623798770552,
+        0.00406549996985011,
+        0.005423282964924655
+      ],
+      "white": [
+        0.6758075518882845,
+        0.6596902642595311,
+        0.6296710915717014
+      ]
+    },
+    "upstreamStagesApplied": [
+      "printing.develop",
+      "scanning.scan_print"
+    ],
+    "upstreamPaperCurvesModified": false,
+    "upstreamOpticalEnlargerApplied": false,
+    "upstreamFilmStagesApplied": false,
+    "runtimeInitFilm": "kodak_portra_400",
+    "runtimeInitFilmApplied": false,
+    "spectralScannerLUT": false,
+    "outputGamutCompression": "cam16ucs",
+    "perSimulationCalibration": false,
+    "perImageCalibration": false,
+    "physicalPrinterCalibrated": false,
+    "fujifilmOfficialPaperTransform": false,
+    "limitations": [
+      "Virtual digital-printer exposure mapping; not an optical negative-to-paper exposure model.",
+      "The shared 0.60 slope is a Film Lab rendering choice, not measured printer or Fujifilm data.",
+      "Only middle gray is balanced; paper contrast, endpoint compression, and other gray-axis casts remain.",
+      "Paper development, spectral dyes, viewing illuminant, and gamut compression use the pinned upstream model.",
+      "Kodak 2383 and 2393 are motion-picture print films, not photographic paper.",
+      "Fujifilm simulation output plus this bridge is a derived creative result, not an official Fujifilm paper rendering."
+    ]
+  },
+  "upstream": {
+    "repository": "https://github.com/andreavolpato/spektrafilm",
+    "commit": "3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+    "author": "Andrea Volpato",
+    "filmStagesApplied": false,
+    "paperDevelopScanApplied": true
+  },
+  "officialSourceResolution": 65,
+  "exportResolution": 33,
+  "effects": {
+    "grain": false,
+    "halation": false,
+    "autoExposure": false
+  },
+  "preview": "User Standard digital photo -> exported STD LUT once; not captured on GFX or physical film",
+  "officialSource": true,
+  "officialUnmodifiedProduct": false,
+  "physicalFilmCalibrated": false,
+  "cameraVerified": false,
+  "outputIsRealFilm": false,
+  "outputOrigin": "official_lut_with_film_lab_adapter"
+}

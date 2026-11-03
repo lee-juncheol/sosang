@@ -1,0 +1,97 @@
+{
+  "fileChecks": "passed",
+  "cameraVerified": false,
+  "warnings": [
+    "V-Log 전체 도메인 상위 1% 보간 오차가 0.05를 넘습니다."
+  ],
+  "processMode": "official_print",
+  "referenceModel": "film-lab-fujifilm-official-paper-v1",
+  "rowsPerCube": 35937,
+  "serializationMaxError": 4.999997403054568e-07,
+  "stdVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0006460642362797418,
+      "p95": 0.0018056134394209503,
+      "p99": 0.002901583207358093,
+      "max": 0.007425665428512508,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "vlogVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.004209939857326947,
+      "p95": 0.014675207318887076,
+      "p99": 0.06630546825327589,
+      "max": 0.47113054176106567,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "vlogWithinSrgbEnvelope": {
+    "mean": 0.00715271659600266,
+    "p95": 0.019554201011778405,
+    "p99": 0.03377904565610625,
+    "max": 0.06508849588900945,
+    "samples": 4350,
+    "metric": "max absolute RGB channel error",
+    "space": "encoded sRGB 0–1"
+  },
+  "photoPixelFidelity": {
+    "std_playground": {
+      "mean": 0.0007012084589607468,
+      "p95": 0.00205354512976434,
+      "p99": 0.0030737639770550855,
+      "max": 0.005820632651029785,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_playground_panel": {
+      "mean": 0.0007236190722229037,
+      "p95": 0.0025371695312354286,
+      "p99": 0.0037618323133060956,
+      "max": 0.004615596477364144,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_figures": {
+      "mean": 0.0005950886214326615,
+      "p95": 0.0018442655188630414,
+      "p99": 0.0035732690416190377,
+      "max": 0.00585554921486188,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_closeup": {
+      "mean": 0.0006459246616200607,
+      "p95": 0.0014313134906444082,
+      "p99": 0.002986868542521566,
+      "max": 0.005592896444871657,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_shelf": {
+      "mean": 0.0005317288183939367,
+      "p95": 0.00183486492192284,
+      "p99": 0.0030301231411519504,
+      "max": 0.005430854259722569,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "sampling": "4096 uniform random + 129 gray + 125 grid, fixed seed; 1024 pixels per user photo",
+  "metricReference": "Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan; not camera accuracy",
+  "officialLutSha256": "3cf531162720aa31ac09609f3dec5aca7680a4c07887cbc8502468533b434cdc",
+  "officialSource": true,
+  "officialUnmodifiedProduct": false,
+  "physicalFilmCalibrated": false,
+  "outputIsRealFilm": false,
+  "outputOrigin": "official_lut_with_film_lab_adapter"
+}
