@@ -1,5 +1,5 @@
 {
-  "methodId": "film-lab-fujifilm-official-paper-v1",
+  "methodId": "film-lab-fujifilm-official-paper-v2",
   "processMode": "official_direct",
   "film": "gfx_eterna",
   "paper": null,
@@ -23,7 +23,37 @@
     "numberStart": 264
   },
   "inputAdapter": {
-    "std": "sRGB decode -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Display-linear is used as scene reflection at gain 1.0. NOT an inverse camera photo-style transform.",
+    "std": "sRGB decode -> shared PROVIA neutral-response inverse using a common RGB gain -> virtual scene RGB -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Same mapping for all ten simulations and photos; NOT a measured camera inverse.",
+    "stdCalibration": {
+      "method": "film-lab-shared-provia-neutral-inverse-v1",
+      "input": "encoded sRGB / already rendered Standard JPEG, RGB 0..1",
+      "referenceFilm": "gfx_provia",
+      "referenceSourceSha256": "322d1fc83072ebd4ba73287f32b88bf7fc71582ea03da459fa976a3eb6cdc68f",
+      "neutralSamples": 16385,
+      "neutralSamplingDomain": "F-Log2 code from scene-linear 0 to code 1",
+      "referenceDisplayInterpretation": "BT.709 primaries / gamma 2.2",
+      "luminanceWeights": [
+        0.2126,
+        0.7152,
+        0.0722
+      ],
+      "formula": "sceneRGB = linearDisplayRGB * inverse_PROVIA_Y(displayY) / displayY; exact RGB black maps to scene black",
+      "inverse": "piecewise-linear inverse of the monotone accumulated source neutral curve; earliest code for plateaus; bounded to sampled endpoints",
+      "sceneWhiteAtDisplayWhite": 15.557374102763216,
+      "channelRatiosPreservedAtAdapter": true,
+      "sceneRGBClippedAtOne": false,
+      "sharedAcrossSimulations": true,
+      "perImageAdaptation": false,
+      "vlogAdaptationChanged": false,
+      "cameraInverseCalibrated": false,
+      "fujifilmOfficialInputTransform": false,
+      "limitations": [
+        "A shared virtual scene reconstruction for rendered JPEGs, not an inverse of a measured LUMIX or GFX photo style.",
+        "Uses PROVIA as a neutral reference; selected simulations retain their relative official tone and color differences.",
+        "Velvia and other contrasty source looks can still darken shadows relative to PROVIA.",
+        "Camera white balance, local tone mapping, clipping and lost JPEG detail cannot be recovered."
+      ]
+    },
     "vlog": "V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.",
     "output": "Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding"
   },

@@ -1,5 +1,5 @@
 {
-  "methodId": "film-lab-fujifilm-official-paper-v1",
+  "methodId": "film-lab-fujifilm-official-paper-v2",
   "processMode": "official_print",
   "film": "gfx_eterna",
   "paper": "kodak_2393",
@@ -23,24 +23,52 @@
     "numberStart": 264
   },
   "inputAdapter": {
-    "std": "sRGB decode -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Display-linear is used as scene reflection at gain 1.0. NOT an inverse camera photo-style transform.",
+    "std": "sRGB decode -> shared PROVIA neutral-response inverse using a common RGB gain -> virtual scene RGB -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Same mapping for all ten simulations and photos; NOT a measured camera inverse.",
+    "stdCalibration": {
+      "method": "film-lab-shared-provia-neutral-inverse-v1",
+      "input": "encoded sRGB / already rendered Standard JPEG, RGB 0..1",
+      "referenceFilm": "gfx_provia",
+      "referenceSourceSha256": "322d1fc83072ebd4ba73287f32b88bf7fc71582ea03da459fa976a3eb6cdc68f",
+      "neutralSamples": 16385,
+      "neutralSamplingDomain": "F-Log2 code from scene-linear 0 to code 1",
+      "referenceDisplayInterpretation": "BT.709 primaries / gamma 2.2",
+      "luminanceWeights": [
+        0.2126,
+        0.7152,
+        0.0722
+      ],
+      "formula": "sceneRGB = linearDisplayRGB * inverse_PROVIA_Y(displayY) / displayY; exact RGB black maps to scene black",
+      "inverse": "piecewise-linear inverse of the monotone accumulated source neutral curve; earliest code for plateaus; bounded to sampled endpoints",
+      "sceneWhiteAtDisplayWhite": 15.557374102763216,
+      "channelRatiosPreservedAtAdapter": true,
+      "sceneRGBClippedAtOne": false,
+      "sharedAcrossSimulations": true,
+      "perImageAdaptation": false,
+      "vlogAdaptationChanged": false,
+      "cameraInverseCalibrated": false,
+      "fujifilmOfficialInputTransform": false,
+      "limitations": [
+        "A shared virtual scene reconstruction for rendered JPEGs, not an inverse of a measured LUMIX or GFX photo style.",
+        "Uses PROVIA as a neutral reference; selected simulations retain their relative official tone and color differences.",
+        "Velvia and other contrasty source looks can still darken shadows relative to PROVIA.",
+        "Camera white balance, local tone mapping, clipping and lost JPEG detail cannot be recovered."
+      ]
+    },
     "vlog": "V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.",
     "output": "Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding"
   },
   "paperBridge": {
-    "method": "film-lab-fuji-digital-paper-bridge-v1",
+    "method": "film-lab-fuji-digital-paper-bridge-v2",
     "paperProfile": "kodak_2393",
     "profileSupport": "film",
     "input": "display-linear sRGB / BT.709 primaries, D65, RGB 0..1",
     "output": "display-linear sRGB, D65, RGB 0..1; encode sRGB after this stage",
-    "formula": "logE = offset - 0.60 * log10(max(linearRGB, 1e-6) / 0.184)",
+    "formula": "logE_c = offset_c + inverseNeutralY(target(linearRGB_c))",
     "offset": [
       0.04955840992577139,
       -0.0420115267400248,
       -0.07761225496994632
     ],
-    "commonSlope": 0.6,
-    "linearFloor": 1e-06,
     "grayLinearAnchor": 0.184,
     "calibratedGrayLinearRGB": [
       0.1840000000000007,
@@ -48,17 +76,45 @@
       0.18400000000000022
     ],
     "calibrationMaxAbsLinearRGBError": 6.938893903907228e-16,
-    "calibration": "one fixed three-channel exposure offset per print stock; neutral gray only",
+    "calibration": "fixed per-stock neutral-ramp printer calibration; no per-image or per-simulation fit",
+    "neutralCalibration": {
+      "response": "Y(delta) = dot(scanPrint(developPrint(offset + delta)), [0.2126, 0.7152, 0.0722])",
+      "sampleCount": 4098,
+      "baseSampleCount": 4097,
+      "profileLogExposureRange": [
+        -3.0,
+        4.0
+      ],
+      "deltaLogExposureRange": [
+        -3.0495584099257713,
+        4.077612254969947
+      ],
+      "inverseInterpolation": "monotone PCHIP, no extrapolation; equal-Y plateaus removed at 1e-12",
+      "monotonicMaxLinearYAdjustment": 6.661338147750939e-16,
+      "targetInterpolation": "monotone PCHIP, no extrapolation",
+      "targetInputLinearRGB": [
+        0.0,
+        0.184,
+        1.0
+      ],
+      "targetOutputLinearY": [
+        6.634214599820845e-06,
+        0.184,
+        0.7301850509328289
+      ],
+      "attainableBlackLinearY": 6.634214599820845e-06,
+      "attainableWhiteLinearY": 0.7301850509328289
+    },
     "linearEndpointOutputs": {
       "black": [
-        1.238489160514118e-05,
-        5.323323040349901e-06,
-        2.6862327762547605e-06
+        1.2384891604721618e-05,
+        5.323323040009252e-06,
+        2.6862327762106928e-06
       ],
       "white": [
-        0.6615334434587794,
-        0.6521990316557499,
-        0.6118234645976423
+        0.7360756750087237,
+        0.7308244095460792,
+        0.7065061595376505
       ]
     },
     "upstreamStagesApplied": [
@@ -78,8 +134,8 @@
     "fujifilmOfficialPaperTransform": false,
     "limitations": [
       "Virtual digital-printer exposure mapping; not an optical negative-to-paper exposure model.",
-      "The shared 0.60 slope is a Film Lab rendering choice, not measured printer or Fujifilm data.",
-      "Only middle gray is balanced; paper contrast, endpoint compression, and other gray-axis casts remain.",
+      "The neutral-ramp calibration and three-anchor target are Film Lab choices, not measured printer or Fujifilm data.",
+      "Printer calibration avoids a second steep tone curve; stock black/white, gray-axis casts and spectral color interactions remain.",
       "Paper development, spectral dyes, viewing illuminant, and gamut compression use the pinned upstream model.",
       "Kodak 2383 and 2393 are motion-picture print films, not photographic paper.",
       "Fujifilm simulation output plus this bridge is a derived creative result, not an official Fujifilm paper rendering."
