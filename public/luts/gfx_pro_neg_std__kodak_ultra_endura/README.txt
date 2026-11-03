@@ -7,10 +7,14 @@ Source LUT: FLog2_to_PRO-Neg.Std_65grid_V.1.00.cube
 SHA256: 3cf531162720aa31ac09609f3dec5aca7680a4c07887cbc8502468533b434cdc
 
 0263STD.cube: rendered Standard/sRGB -> shared PROVIA neutral-response
-inverse (JPG shadow protection) -> virtual scene RGB -> F-Log2/F-Gamut.
+inverse -> virtual scene RGB -> F-Log2/F-Gamut -> composition below -> JPG tone protection.
 0263VLOG.cube: Panasonic V-Log/V-Gamut input -> F-Log2/F-Gamut (experimental).
 Both: official LUT -> BT709/gamma2.2 interpretation -> optional virtual printer
 and spektrafilm paper development/scanning -> sRGB. 33 cubed full range 0..1.
+STD additionally uses fixed Film Lab neutral-tone compensation, source-lightness
+bounds, neutral-cast removal and chroma gamut mapping. This preserves rendered
+JPG gradation, including coloured shadows, and changes original model contrast.
+No measured GFX JPEG or physical print match is claimed. VLOG is unchanged.
 These downloads are Film Lab compositions, NOT unmodified official Fuji LUTs.
 The GFX camera's proprietary rendering cannot be recovered from a LUMIX JPEG.
 The optional printer uses fixed per-stock neutral-ramp exposure calibration

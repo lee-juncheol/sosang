@@ -5,15 +5,37 @@
     "V-Log 전체 도메인 상위 1% 보간 오차가 0.05를 넘습니다."
   ],
   "processMode": "official_print",
-  "referenceModel": "film-lab-fujifilm-official-paper-v2",
+  "referenceModel": "film-lab-fujifilm-official-paper-v3",
   "rowsPerCube": 35937,
-  "serializationMaxError": 4.999993963861193e-07,
+  "serializationMaxError": 4.999987348597301e-07,
+  "jpgToneProtection": {
+    "method": "film-lab-jpg-tone-protection-v1",
+    "input": "already rendered encoded sRGB / Standard JPEG",
+    "neutralSamples": 4097,
+    "neutralAxis": "uniform encoded sRGB 0..1; interpolate OKLab response at equal input linear Y",
+    "neutralToneRetention": 0.2,
+    "neutralCastRemoval": 1.0,
+    "lightness": "Lraw = Lmodel + (1-retention)*(cuberoot(inputY)-Lneutral); Ltarget = Lsource + limit*tanh((Lraw-Lsource)/limit)",
+    "limit": "min(0.028+0.012*exp(-((Lsource-0.6)/0.2)^2), 0.5*min(Lsource,1-Lsource)) in OKLab L",
+    "chroma": "(ab_model-ab_neutral) * clip(Ltarget/Lmodel, 0, 3)",
+    "gamutMapping": "reduce OKLab chroma at fixed lightness and hue; exact neutral black/white endpoints",
+    "digitalBlackCorrection": false,
+    "perImageAdaptation": false,
+    "vlogModified": false,
+    "cameraInverseCalibrated": false,
+    "physicalFilmOrPrintMatch": false,
+    "limitations": [
+      "An explicit Film Lab JPEG rendering policy; not unmodified upstream tonality or an official Fujifilm JPEG recipe.",
+      "Keeps model colour differences while reducing repeated tonality; gamut-boundary chroma and contrast can change.",
+      "Cannot restore source detail already clipped or lost by the camera."
+    ]
+  },
   "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0005975833719280067,
-      "p95": 0.0017213637419758324,
-      "p99": 0.0027556657623207595,
-      "max": 0.007504729181311065,
+      "mean": 0.0007014293786201176,
+      "p95": 0.0019866092126115294,
+      "p99": 0.004974457054629383,
+      "max": 0.03597872527112242,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
@@ -41,53 +63,53 @@
   },
   "photoPixelFidelity": {
     "std_playground": {
-      "mean": 0.001034925209939014,
-      "p95": 0.002946289560920368,
-      "p99": 0.005967258645365833,
-      "max": 0.011251990829384467,
+      "mean": 0.0009083416183657242,
+      "p95": 0.0023096745728628343,
+      "p99": 0.004636638514407572,
+      "max": 0.007681365641613857,
       "samples": 1024,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "std_playground_panel": {
-      "mean": 0.0012515455774363869,
-      "p95": 0.004403141905896571,
-      "p99": 0.0066432005260530485,
-      "max": 0.008063161807233349,
+      "mean": 0.001185009230734351,
+      "p95": 0.004788897938261221,
+      "p99": 0.006940153154944467,
+      "max": 0.020177087190422868,
       "samples": 1024,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "std_figures": {
-      "mean": 0.0007456323853806415,
-      "p95": 0.0030723694597352413,
-      "p99": 0.005390036943046336,
-      "max": 0.011071478308239131,
+      "mean": 0.0006110559511779906,
+      "p95": 0.0022484613709635236,
+      "p99": 0.0034730275704193416,
+      "max": 0.005607401666338704,
       "samples": 1024,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "std_closeup": {
-      "mean": 0.0008566407942040489,
-      "p95": 0.005548476386405452,
-      "p99": 0.007867760566489176,
-      "max": 0.011589944273039332,
+      "mean": 0.00059650711640497,
+      "p95": 0.002759996997658793,
+      "p99": 0.004638996055039335,
+      "max": 0.011026476402413733,
       "samples": 1024,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "std_shelf": {
-      "mean": 0.0008166069696653343,
-      "p95": 0.002605063604487871,
-      "p99": 0.005367090361475882,
-      "max": 0.010994264488424721,
+      "mean": 0.0007099385268214975,
+      "p95": 0.0022989078559537196,
+      "p99": 0.003556662263617021,
+      "max": 0.005720827951302888,
       "samples": 1024,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
   "sampling": "4096 uniform random + 129 gray + 125 grid, fixed seed; 1024 pixels per user photo",
-  "metricReference": "Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan; not camera accuracy",
+  "metricReference": "Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan + STD-only JPG tone protection; not camera accuracy",
   "officialLutSha256": "322d1fc83072ebd4ba73287f32b88bf7fc71582ea03da459fa976a3eb6cdc68f",
   "grayResponse": {
     "inputCodes": [
@@ -149,7 +171,7 @@
         254.99999999999997
       ]
     ],
-    "finalOutput": [
+    "beforeJpgProtection": [
       [
         6.795133088721316,
         4.215534533856542,
@@ -194,6 +216,53 @@
         200.6891271936127,
         202.6370447424272,
         209.7518582448493
+      ]
+    ],
+    "finalOutput": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        9.090850803981063,
+        9.090097728450548,
+        9.090853040128941
+      ],
+      [
+        16.95738274767943,
+        16.95738274767943,
+        16.95738274767943
+      ],
+      [
+        32.778241430578376,
+        32.778241430578376,
+        32.778241430578376
+      ],
+      [
+        64.80759384977195,
+        64.80759384977195,
+        64.80759384977195
+      ],
+      [
+        127.49552197483222,
+        127.49552197483222,
+        127.49552197483222
+      ],
+      [
+        188.23629963923287,
+        188.23629963923287,
+        188.23629963923287
+      ],
+      [
+        233.99355410975915,
+        233.99355410975915,
+        233.99355410975915
+      ],
+      [
+        255.0,
+        255.0,
+        255.0
       ]
     ],
     "purpose": "Regression diagnostic for double-applied shadow tone, not camera or real-print calibration"
