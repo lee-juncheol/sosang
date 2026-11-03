@@ -16,10 +16,11 @@ from functools import lru_cache
 import numpy as np
 from pipeline.common import ROOT, srgb_decode, VGAMUT_TO_SRGB, sha256
 from pipeline.research import srgb_encode
+from pipeline.jpg import JpgToneProtection
 from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral
 
 CONFIG_PATH = ROOT / 'pipeline/config/fujifilm-official.json'
-METHOD_ID = 'film-lab-fujifilm-official-paper-v2'
+METHOD_ID = 'film-lab-fujifilm-official-paper-v3'
 STD_ADAPTER_ID = 'film-lab-shared-provia-neutral-inverse-v1'
 STD_REFERENCE_FILM = 'gfx_provia'
 STD_NEUTRAL_SAMPLES = 16385
@@ -178,7 +179,7 @@ def input_to_flog2(rgb, input_kind='std'):
     return np.clip(flog2_encode(linear), 0, 1)
 
 
-def apply_official(rgb, film_id, input_kind='std', paper=None):
+def apply_official_native(rgb, film_id, input_kind='std', paper=None):
     x = np.asarray(rgb, dtype=float)
     flog = input_to_flog2(x, input_kind)
     encoded709 = apply_tetrahedral(official_table(film_id), flog.reshape(-1, 3))
@@ -188,3 +189,14 @@ def apply_official(rgb, film_id, input_kind='std', paper=None):
     if paper is not None:
         linear = paper.apply(linear)
     return np.clip(srgb_encode(linear), 0, 1).reshape(x.shape)
+
+
+@lru_cache(maxsize=90)
+def official_jpg_protection(film_id, paper=None):
+    return JpgToneProtection(lambda rgb: apply_official_native(rgb, film_id, 'std', paper))
+
+
+def apply_official(rgb, film_id, input_kind='std', paper=None):
+    if input_kind == 'std':
+        return official_jpg_protection(film_id, paper).apply(rgb)
+    return apply_official_native(rgb, film_id, input_kind, paper)

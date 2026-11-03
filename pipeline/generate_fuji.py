@@ -19,7 +19,7 @@ from PIL import Image
 from pipeline.common import ROOT, PUBLIC, UPSTREAM, CONFIG, save_json, sha256, read_cube, metrics, std_to_vlog
 from pipeline.generate import describe, valid_assets
 from pipeline.samples import save_image
-from pipeline.fuji import METHOD_ID, load_study, official_archive, official_table, apply_official, input_adapter_metadata
+from pipeline.fuji import METHOD_ID, load_study, official_archive, official_table, apply_official, apply_official_native, official_jpg_protection, input_adapter_metadata
 from pipeline.fuji_paper import PaperBridge
 from spektrafilm_lut_creator.formats import Lut
 from spektrafilm_lut_creator.formats.lumix import LumixCubeFormat
@@ -49,7 +49,7 @@ def generate_look(study, look, paper, number, samples, force=False):
     metadata_path = directory / 'metadata.json'
     key = hashlib.sha256(json.dumps({'study': study, 'look': look, 'paper': paper,
           'config': CONFIG,
-          'code': {n: sha256(ROOT / 'pipeline' / n) for n in ['fuji.py','fuji_paper.py','generate_fuji.py','common.py','research.py','samples.py']},
+          'code': {n: sha256(ROOT / 'pipeline' / n) for n in ['fuji.py','fuji_paper.py','jpg.py','generate_fuji.py','common.py','research.py','samples.py']},
           'samples': {s['id']: sha256(PUBLIC / s['path'].lstrip('/')) for s in samples}}, sort_keys=True).encode()).hexdigest()
     if metadata_path.exists() and not force:
         previous = json.loads(metadata_path.read_text())
@@ -87,15 +87,17 @@ def generate_look(study, look, paper, number, samples, force=False):
     gray_codes = np.array([0, 8, 16, 32, 64, 128, 192, 240, 255])
     gray_inputs = np.repeat((gray_codes/255.)[:,None],3,axis=1)
     gray_diagnostic = {'inputCodes':gray_codes.tolist(), 'scale':'encoded sRGB 0–255; RGB triples, not physical luminance',
-        'officialBeforePaper':(apply_official(gray_inputs,film_id,'std')*255).tolist(),
+        'officialBeforePaper':(apply_official_native(gray_inputs,film_id,'std')*255).tolist(),
+        'beforeJpgProtection':(apply_official_native(gray_inputs,film_id,'std',bridge)*255).tolist(),
         'finalOutput':(transform(gray_inputs,'STD')*255).tolist(),
         'purpose':'Regression diagnostic for double-applied shadow tone, not camera or real-print calibration'}
     qa = {'fileChecks':'passed','cameraVerified':False,'warnings':warnings,'processMode':mode,
           'referenceModel':METHOD_ID,'rowsPerCube':35937,'serializationMaxError':serialization_error,
+          'jpgToneProtection':official_jpg_protection(film_id,bridge).metadata(),
           'stdVsDirectEngine':fidelity['STD'],'vlogVsDirectEngine':fidelity['VLOG'],
           'vlogWithinSrgbEnvelope':envelope_fidelity,'photoPixelFidelity':photo_fidelity,
           'sampling':'4096 uniform random + 129 gray + 125 grid, fixed seed; 1024 pixels per user photo',
-          'metricReference':'Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan; not camera accuracy',
+          'metricReference':'Sequential source 65-grid official LUT + analytic adapters + exact paper develop/spectral scan + STD-only JPG tone protection; not camera accuracy',
           'officialLutSha256':look['sourceSha256'],'grayResponse':gray_diagnostic,**TRUTH}
     save_json(directory/'qa.json',qa)
     provenance = {'methodId':METHOD_ID,'processMode':mode,'film':film_id,'paper':paper_id,
@@ -104,7 +106,8 @@ def generate_look(study, look, paper, number, samples, force=False):
             'std':'sRGB decode -> shared PROVIA neutral-response inverse using a common RGB gain -> virtual scene RGB -> BT.2020/F-Gamut -> official F-Log2 encoding, code clamp 0..1. Same mapping for all ten simulations and photos; NOT a measured camera inverse.',
             'stdCalibration':input_adapter_metadata(),
             'vlog':'V-Log decode -> V-Gamut to F-Gamut linear matrix -> official F-Log2 encoding, code clamp 0..1. This bounds negative/out-of-F-Gamut coordinates in code space: code0 corresponds to negative linear reflection, not linear0. No extra display shoulder. Not a measured sensor match.',
-            'output':'Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding'},
+            'output':'Official BT709/gamma2.2 interpretation -> linear -> optional virtual paper -> sRGB encoding -> STD-only Film Lab JPG tone protection'},
+        'jpgToneProtection':official_jpg_protection(film_id,bridge).metadata(),
         'paperBridge':bridge.metadata() if bridge else None,
         'upstream':{'repository':'https://github.com/andreavolpato/spektrafilm','commit':CONFIG['engine_commit'],'author':'Andrea Volpato','filmStagesApplied':False,'paperDevelopScanApplied':bool(bridge)},
         'officialSourceResolution':65,'exportResolution':33,'effects':{'grain':False,'halation':False,'autoExposure':False},
@@ -117,7 +120,7 @@ def generate_look(study, look, paper, number, samples, force=False):
         path = directory/f"{sample['id']}.webp"; save_image(rendered,path)
         previews[sample['id']] = describe(path)
     readme = f'''Film Lab / FUJIFILM GFX ETERNA 55 / {look['name']}
-Paper: {paper['name'] if paper else 'None - official LUT with input/display adaptation only'}
+Paper: {paper['name'] if paper else 'None - official LUT with Film Lab input/display and JPG tone adaptation'}
 
 Official source: {study['sourceUrl']}
 Package v1.10; selected 65-grid F-Log2 LUT v1.00.
@@ -125,10 +128,14 @@ Source LUT: {look['sourceFile']}
 SHA256: {look['sourceSha256']}
 
 {number:04d}STD.cube: rendered Standard/sRGB -> shared PROVIA neutral-response
-inverse (JPG shadow protection) -> virtual scene RGB -> F-Log2/F-Gamut.
+inverse -> virtual scene RGB -> F-Log2/F-Gamut -> composition below -> JPG tone protection.
 {number:04d}VLOG.cube: Panasonic V-Log/V-Gamut input -> F-Log2/F-Gamut (experimental).
 Both: official LUT -> BT709/gamma2.2 interpretation -> optional virtual printer
 and spektrafilm paper development/scanning -> sRGB. 33 cubed full range 0..1.
+STD additionally uses fixed Film Lab neutral-tone compensation, source-lightness
+bounds, neutral-cast removal and chroma gamut mapping. This preserves rendered
+JPG gradation, including coloured shadows, and changes original model contrast.
+No measured GFX JPEG or physical print match is claimed. VLOG is unchanged.
 These downloads are Film Lab compositions, NOT unmodified official Fuji LUTs.
 The GFX camera's proprietary rendering cannot be recovered from a LUMIX JPEG.
 The optional printer uses fixed per-stock neutral-ramp exposure calibration
@@ -146,7 +153,7 @@ SPEKTRAFILM_LICENSE.txt applies to upstream components, not to Fuji data.
 User photo copyrights remain with their owner. Not an affiliated product.
 '''
     (directory/'README.txt').write_text(readme)
-    (directory/'CHANGELOG.txt').write_text('v2: Fix repeated shadow compression on rendered JPGs with one shared PROVIA neutral inverse; calibrate paper exposure across the neutral ramp instead of applying a second S-curve. Official source LUTs and direct V-Log transform unchanged. Existing152 preserved.\n')
+    (directory/'CHANGELOG.txt').write_text('v3: Add explicit STD-only Film Lab JPG tone protection after the official/paper colour composition. Protect coloured shadows as well as neutral tone, remove neutral casts, and map chroma into sRGB. Original official65 source and all VLOG transforms are unchanged. Reference interpretations are preserved.\n')
     (directory/'FUJIFILM_NOTICE.txt').write_text(study['rights']+'\n'+study['sourceUrl']+'\n')
     shutil.copyfile(UPSTREAM/'SPEKTRAFILM_LICENSE.txt',directory/'SPEKTRAFILM_LICENSE.txt')
     zip_path=directory/f'{number:04d}LUTS.zip'

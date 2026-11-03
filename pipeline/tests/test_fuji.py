@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 from pipeline.fuji import (load_study, official_archive, official_table, flog2_encode,
                            flog2_decode, input_to_flog2, apply_official, SRGB_TO_FGAMUT,
-                           std_to_scene_linear, std_neutral_inverse, input_adapter_metadata)
+                           std_to_scene_linear, std_neutral_inverse, input_adapter_metadata,
+                           apply_official_native)
 from pipeline.common import srgb_decode, std_to_vlog, metrics
 from pipeline.research import srgb_encode
 from spektrafilm_lut_creator.grid import cube_grid
@@ -143,4 +144,8 @@ def test_shared_adapter_keeps_relative_simulation_tones():
     output={look['film']:float(np.mean(apply_official(gray,look['film'])))
             for look in load_study()['looks']}
     assert output['gfx_classic_chrome']<output['gfx_provia']<output['gfx_eterna']
-    assert max(output.values())-min(output.values())>.06
+    native={look['film']:float(np.mean(apply_official_native(gray,look['film'])))
+            for look in load_study()['looks']}
+    # Protection deliberately reduces the tonal spread while retaining its
+    # ordering; it must not silently replace all ten looks with one curve.
+    assert .01 < max(output.values())-min(output.values()) < max(native.values())-min(native.values())

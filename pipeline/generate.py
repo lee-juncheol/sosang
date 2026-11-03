@@ -31,7 +31,7 @@ from spektrafilm_lut_creator.qa.reference import run_pipeline_at
 from pipeline.samples import prepare, save_image
 from pipeline.slide import INIT_PRINT_PROFILE, SlideBundleBuilder, run_slide_reference
 from pipeline.digital import DigitalScanBundleBuilder, run_digital_reference, DIGITAL_METHOD_ID, DIGITAL_CONTRACT
-from pipeline.std import bake_std, run_std_reference, STD_GENERATION, STD_INPUT_GAIN, STD_CONTRACT
+from pipeline.std import bake_std, run_std_reference, std_protection, STD_GENERATION, STD_INPUT_GAIN, STD_CONTRACT
 
 
 def combination_choices(stocks):
@@ -120,9 +120,8 @@ def generate_one(job):
         vlog=bundle.luts[0][1].table
         if not np.isfinite(vlog).all():
             raise ValueError('Engine produced non-finite values')
-        # Preserve the native input interpretation, but evaluate the continuous
-        # engine at STD grid nodes instead of interpolating the V-Log cube.
-        std=bake_std(spec,bundle,is_slide=is_slide,is_digital=is_digital)
+        protection=std_protection(spec,bundle,is_slide=is_slide,is_digital=is_digital)
+        std=bake_std(spec,bundle,is_slide=is_slide,is_digital=is_digital,protection=protection)
         if not np.isfinite(std).all():
             raise ValueError('Engine produced non-finite STD values')
         writer=LumixCubeFormat()
@@ -144,7 +143,7 @@ def generate_one(job):
         fidelity={name:metrics(fn(vlog_disk,samples),direct) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
         # Direct engine evaluation at off-grid STD inputs measures end-to-end
         # error, including the analytic adapter. Never use a baked LUT as truth.
-        std_direct=run_std_reference(spec,bundle,samples,is_slide=is_slide,is_digital=is_digital)
+        std_direct=run_std_reference(spec,bundle,samples,is_slide=is_slide,is_digital=is_digital,protection=protection)
         std_fidelity={name:metrics(fn(std_disk,samples),std_direct) for name,fn in [('tetrahedral',apply_tetrahedral),('trilinear',apply_trilinear)]}
         # Retained only to compare against the legacy VLOG-cube composition.
         # This is a diagnostic difference, not the STD accuracy reference.
@@ -161,21 +160,32 @@ def generate_one(job):
         if fidelity['tetrahedral']['p99']>0.05:
             warnings.append('V-Log 전체 도메인의 상위 1% 보간 오차가 0.05를 넘습니다. 고채도·극단 노출를 검토하세요.')
         if std_fidelity['tetrahedral']['p99']>0.02:
-            warnings.append('STD와 직접 엔진 사이의 상위 1% 보간 오차가 0.02를 넘습니다. 색 경계를 검토하세요.')
+            warnings.append('STD와 JPG 보호 기준 계산 사이의 상위 1% 보간 오차가 0.02를 넘습니다. 색 경계를 검토하세요.')
         previews={}
+        photo_fidelity={}
         for sample in json.loads((PUBLIC/'samples/manifest.json').read_text()):
             source=np.asarray(Image.open(PUBLIC/sample['path'].lstrip('/')).convert('RGB'))/255.
             # These are already Standard/sRGB pixels. Apply the downloaded
             # STD cube once, without an extra gamma or V-Log conversion.
             rendered=apply_tetrahedral(std_disk,source.reshape(-1,3)).reshape(source.shape)
+            if sample.get('inputKind')=='camera-std':
+                pixels=source.reshape(-1,3)
+                chosen=np.random.default_rng(20261103).choice(len(pixels),min(1024,len(pixels)),replace=False)
+                picked=pixels[chosen]
+                photo_fidelity[sample['id']]=metrics(apply_tetrahedral(std_disk,picked),protection.apply(picked))
             path=directory/f"{sample['id']}.webp"
             save_image(rendered,path)
             previews[sample['id']]=describe(path)
+        if any(value['p99']>.02 for value in photo_fidelity.values()):
+            warnings.append('일부 샘플 사진의 STD 상위 1% 보간 오차가 0.02를 넘습니다. 색 경계를 검토하세요.')
         qa={"fileChecks":"passed","rowsPerCube":35937,"serializationMaxError":roundtrip,
             "processMode":record['processMode'],"scanFilm":paper is None,
             "referenceModel":DIGITAL_METHOD_ID if is_digital else 'spektrafilm-runtime',
             "vlogVsDirectEngine":fidelity,"stdVsDirectEngine":std_fidelity,
             "stdGeneration":STD_GENERATION,"stdInputGain":STD_INPUT_GAIN,
+            "jpgToneProtection":protection.metadata(),
+            "photoPixelFidelity":photo_fidelity,
+            "stdReferenceDescription":"Continuous colour model followed by Film Lab display-referred JPG tone protection; not the unmodified native engine tone",
             "stdVsContinuousComposition":legacy_std_difference,
             "stdVsContinuousCompositionPurpose":"Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
             "grayBlackToWhiteDelta":tone_delta,"warnings":warnings,"cameraVerified":False,
@@ -189,6 +199,7 @@ def generate_one(job):
                     "processingPath":('film exposure -> film development -> Film Lab virtual RGB scan -> common negative-to-positive conversion' if is_digital else 'film exposure -> film development -> direct film scan' if is_slide else 'film exposure -> film development -> print exposure -> print development -> print scan'),
                     "digitalConversion":({"id":DIGITAL_METHOD_ID,"contract":DIGITAL_CONTRACT,"experimental":True,
                         "limitation":"Film Lab extension, not upstream author output or a measured physical scanner profile."} if is_digital else None),
+                    "jpgToneProtection":protection.metadata(),
                     "runtimeInitPrintProfile":({"id":INIT_PRINT_PROFILE,"sha256":sha256(PROFILES / f'{INIT_PRINT_PROFILE}.json'),
                         "note":"Required only to initialize upstream runtime; printing stages are bypassed and paper is not applied."} if paper is None else None),
                     "adapter":{"id":CONFIG['adapter'],"target":"S1M2 / S1II (camera validation pending)",
@@ -197,7 +208,7 @@ def generate_one(job):
                     "contract":std_contract,
                     "limitation":"Analytic working model; does not invert the camera's proprietary Standard rendering."},
                     "effects":{"grain":False,"halation":False,"blur":False,"autoExposure":False},
-                    "gamutPolicy":("Upstream input RGC; Film Lab shared channel shoulder; upstream CAM16-UCS output compression; encoded [0,1] boundary clamp." if is_digital else "Upstream input RGC + CAM16-UCS output compression; upstream final [0,1] boundary clamp; no extra creative clipping."),
+                    "gamutPolicy":("Native colour model retains upstream compression. STD additionally maps OKLab chroma into sRGB at protected lightness and hue. VLOG is unchanged."),
                     "preview":"Verified LUT-OFF S1M2 Standard JPEGs (resized, color unchanged) and a synthetic sRGB chart -> exported STD LUT directly (tetrahedral) -> sRGB. Not a camera-applied LUT accuracy validation.",
                     "sampleManifestSha256":sha256(PUBLIC/'samples/manifest.json'),
                     "environment":{"python":platform.python_version(),"platform":platform.platform()},
@@ -209,15 +220,18 @@ Processing mode: {record['processMode']}; scan_film={paper is None}
 {('Digital method: ' + DIGITAL_METHOD_ID + '. ' + DIGITAL_CONTRACT + ' Experimental Film Lab extension; not a measured scanner or the upstream authors print rendering.') if is_digital else ''}
 
 {vlog_path.name}: Panasonic V-Log / V-Gamut input -> sRGB output
-{std_path.name}: Standard/sRGB analytic working model input -> sRGB output
+{std_path.name}: Standard/sRGB -> colour model -> Film Lab JPG tone protection -> sRGB
 33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
 S1M2 / S1II physical camera validation: NOT performed.
 Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
 Standard mapping is approximate; clipped highlights cannot be recovered.
-STD grid nodes are evaluated directly through {'upstream film stages plus Film Lab digital conversion' if is_digital else 'the upstream engine'} using the
-analytic sRGB -> V-Gamut -> V-Log input mapping. No intermediate VLOG cube
-is interpolated. Native input gain remains 1.0; no exposure boost is added.
-stdVsDirectEngine in qa.json is the end-to-end STD accuracy measurement.
+STD grid nodes are evaluated directly through the colour model and the fixed
+Film Lab JPG tone-protection policy. Neutral tonality is reduced, coloured
+shadow lightness is bounded, neutral casts are removed and chroma is mapped
+into sRGB. No image statistics or automatic exposure are used. This is NOT
+unmodified upstream tonality, a camera inverse, or measured film/print accuracy.
+Native model input gain remains 1.0. VLOG keeps its original rendering.
+stdVsDirectEngine in qa.json compares to the complete protected STD reference.
 stdVsContinuousComposition is only a diagnostic difference from the legacy
 VLOG-cube composition, not the accuracy reference.
 Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
@@ -233,7 +247,7 @@ Settings and provenance: provenance.json
 '''
         (directory/'README.txt').write_text(readme)
         changelog=('Added Film Lab experimental common digital negative conversion: upstream film exposure/development, fixed virtual RGB scanner and common positive tone; no paper. Both VLOG and STD LUTs use this extension. All coefficients and per-film gray offsets are disclosed in provenance.json. ' if is_digital else '')
-        changelog+='Generated from unmodified spektrafilm profiles. STD v2 evaluates analytic sRGB -> V-Gamut -> V-Log coordinates directly through the selected continuous model, removing intermediate VLOG cube interpolation. Native input gain remains 1.0. Off-grid QA measures LUT interpolation, not physical film or scanner fidelity. Short camera filenames. Changes and derived LUTs remain CC BY-SA 4.0.\n'
+        changelog+='STD v3 adds explicit Film Lab JPG tone protection after the continuous colour model: fixed neutral-response compensation, source-lightness bounds, neutral-cast removal and chroma gamut mapping. Digital STD removes the brown black floor; VLOG and upstream profiles remain unchanged. No image-dependent exposure. Off-grid QA measures the complete protected transform, not physical film/scanner accuracy. Changes and derived LUTs remain CC BY-SA 4.0.\n'
         (directory/'CHANGELOG.txt').write_text(changelog)
         shutil.copyfile(UPSTREAM/'SPEKTRAFILM_LICENSE.txt',directory/'SPEKTRAFILM_LICENSE.txt')
         zip_path=directory/f'{number:04d}LUTS.zip'
@@ -252,7 +266,7 @@ Settings and provenance: provenance.json
     return record
 
 
-def catalog(records, stocks):
+def catalog(records, stocks, previous=None):
     combos=[]
     films=[s for s in stocks if s['stage']=='filming']
     papers=[s for s in stocks if s['stage']=='printing']
@@ -265,6 +279,13 @@ def catalog(records, stocks):
             "engineVersion":CONFIG['engine_version'],"adapter":CONFIG['adapter'],"output":"sRGB","resolution":33,
             "films":films,"papers":papers,"samples":json.loads((PUBLIC/'samples/manifest.json').read_text()),
             "combinations":combos,"counts":{s:sum(c['status']==s for c in combos) for s in ['ready','failed','unsupported','not-generated']}}
+    if previous:
+        model_ids={c['id'] for c in combos}
+        result['combinations'] += [c for c in previous['combinations'] if c['id'] not in model_ids]
+        result['films'] += [f for f in previous['films'] if f['type']=='official']
+        for key in ['referenceStudy','fujiStudy']:
+            if key in previous: result[key]=previous[key]
+        result['counts']={s:sum(c['status']==s for c in result['combinations']) for s in ['ready','failed','unsupported','not-generated']}
     save_json(PUBLIC/'catalog.json',result)
     return result
 
@@ -283,12 +304,18 @@ def main():
         raise SystemExit('Upstream has modifications; pin and document them before generation')
     # Reuse the exact source samples in append-only digital builds. Recreating
     # the chart would rewrite its ICC creation timestamp despite equal pixels.
-    if not args.digital_only:
+    previous=json.loads((PUBLIC/'catalog.json').read_text()) if (PUBLIC/'catalog.json').exists() else None
+    if not previous:
         prepare()
+    else:
+        for sample in previous['samples']:
+            path=PUBLIC/sample['path'].lstrip('/')
+            if not path.is_file() or (sample.get('preparedSha256') and sha256(path)!=sample['preparedSha256']):
+                raise SystemExit('Existing source sample changed; review it before regenerating looks')
     stocks=profiles()
     records={}
     if args.digital_only:
-        previous=json.loads((PUBLIC/'catalog.json').read_text())
+        if previous is None: raise SystemExit('Digital-only requires an existing catalog')
         if previous['engineCommit']!=CONFIG['engine_commit'] or previous['adapter']!=CONFIG['adapter']:
             raise SystemExit('Digital-only requires the same engine and STD adapter')
         for old in previous['combinations']:
@@ -310,15 +337,15 @@ def main():
             jobs.append((f,p,number,args.force))
     if args.only and not jobs:
         raise SystemExit('Unknown or unsupported combination')
-    catalog(records,stocks)
+    catalog(records,stocks,previous)
     started=time.perf_counter()
     with ProcessPoolExecutor(max_workers=max(1,args.jobs)) as pool:
         for completed,future in enumerate(as_completed([pool.submit(generate_one,j) for j in jobs]),1):
             record=future.result()
             records[record['id']]=record
-            catalog(records,stocks)
+            catalog(records,stocks,previous)
             print(f"[{completed}/{len(jobs)}] {record['status']} {record['id']} ({record.get('seconds',0)}s)",flush=True)
-    result=catalog(records,stocks)
+    result=catalog(records,stocks,previous)
     save_json(ROOT/'artifacts/build-report.json',{"counts":result['counts'],"wallSeconds":round(time.perf_counter()-started,2)})
     print(json.dumps(result['counts']),flush=True)
     if any(r['status']=='failed' for r in records.values()):
