@@ -19,7 +19,14 @@ for(const sample of catalog.samples){
 for (const combo of catalog.combinations) {
   assert(!seenIds.has(combo.id)); seenIds.add(combo.id);
   const film=catalog.films.find(f=>f.id===combo.film); assert(film);
-  if(film.type==='positive'){
+  if(film.type==='official'){
+    const source=catalog.fujiStudy?.looks.find(look=>look.film===film.id); assert(source);
+    assert.equal(combo.officialSource,true); assert.equal(combo.officialUnmodifiedProduct,false);
+    assert.equal(combo.qa.officialLutSha256,source.sourceSha256);
+    assert.equal(combo.qa.referenceModel,'film-lab-fujifilm-official-paper-v1');
+    if(combo.processMode==='official_direct') assert.equal(combo.paper,null);
+    else {assert.equal(combo.processMode,'official_print');assert(catalog.papers.some(p=>p.id===combo.paper));}
+  }else if(film.type==='positive'){
     assert.equal(combo.paper,null); assert.equal(combo.processMode,'positive_direct');
   }else if(combo.processMode==='negative_digital'){
     assert.equal(combo.paper,null); assert(combo.id.endsWith('__digital_scan'));

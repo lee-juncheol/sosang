@@ -39,6 +39,10 @@ def test_camera_samples_are_verified_lut_off_and_color_unchanged():
     'kodak_gold_200__reference',
     'fujifilm_pro_400h__reference',
     'fujifilm_c200__reference',
+    'gfx_classic_chrome__official_direct',
+    'gfx_classic_chrome__fujifilm_crystal_archive_typeii',
+    'gfx_classic_neg__kodak_portra_endura',
+    'gfx_acros__kodak_2383',
 ])
 @pytest.mark.parametrize('sample_id', ['std_playground', 'std_playground_panel', 'std_figures', 'std_closeup', 'std_shelf'])
 def test_preview_matches_independently_read_exported_std_cube(combo_id, sample_id):
@@ -65,12 +69,14 @@ def test_preview_matches_independently_read_exported_std_cube(combo_id, sample_i
 def test_every_film_paper_choice_has_a_distinct_std_preview():
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
     ready = [combo for combo in catalog['combinations'] if combo['status'] == 'ready']
-    models = [combo for combo in ready if combo['processMode'] != 'reference_interpretation']
+    models = [combo for combo in ready if combo['processMode'] not in ['reference_interpretation','official_direct','official_print']]
+    official = [combo for combo in ready if combo['processMode'] in ['official_direct','official_print']]
     references = [combo for combo in ready if combo['processMode'] == 'reference_interpretation']
     assert len(models) == 148
     assert {combo['id'] for combo in references} == {
         'kodak_portra_400__reference', 'kodak_gold_200__reference',
         'fujifilm_pro_400h__reference', 'fujifilm_c200__reference'}
-    assert len(ready) == 152
+    assert len(official) == 90
+    assert len(ready) == 242
     for sample in catalog['samples']:
         assert len({combo['previews'][sample['id']]['sha256'] for combo in ready}) == len(ready)

@@ -50,3 +50,18 @@
 @media(max-width:650px) { .reference-evidence { padding:15px; } }
 
 .reference-export-note { color:#d0b384; font-size:10px; line-height:1.8; margin:0 0 14px; }
+
+.studio-switch { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin:0 0 18px; }
+.studio-switch button { text-align:left; border:1px solid #3e4735; border-radius:7px; padding:14px 17px; background:#20251c; color:#b7c3ab; min-height:65px; }
+.studio-switch button.selected { border-color:#93b278; background:#303d26; color:#e0f1cf; }
+.studio-switch button>span { display:block; font-size:12px; line-height:1.7; }
+.studio-switch button>small { display:block; font-size:9px; color:#91a080; margin-top:4px; line-height:1.6; }
+.studio-switch button.selected>small { color:#b2c69f; }
+.official-mark { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; width:35px; height:47px; flex-shrink:0; border:1px solid #648d74; border-radius:4px; color:#a2c6ac; background:#284133; font-family:var(--mono); }
+.official-mark>span { font-size:7px; letter-spacing:1px; }
+.official-mark>b { font-size:12px; font-weight:500; }
+.official-mark>small { font-size:6px; letter-spacing:1px; }
+.film-library:has(.official-mark) .film-list { margin-top:12px; }
+.official-evidence>p+p { margin-top:10px; }
+.official-evidence code { font-size:9px; word-break:break-all; }
+@media(max-width:650px) { .studio-switch { gap:5px; margin-bottom:12px; } .studio-switch button { padding:11px 9px; min-height:78px; } .studio-switch button>span { font-size:10px; } .studio-switch button>small { font-size:8px; } }
