@@ -23,7 +23,7 @@ for (const combo of catalog.combinations) {
     const source=catalog.fujiStudy?.looks.find(look=>look.film===film.id); assert(source);
     assert.equal(combo.officialSource,true); assert.equal(combo.officialUnmodifiedProduct,false);
     assert.equal(combo.qa.officialLutSha256,source.sourceSha256);
-    assert.equal(combo.qa.referenceModel,'film-lab-fujifilm-official-paper-v2');
+    assert.equal(combo.qa.referenceModel,'film-lab-fujifilm-official-paper-v3');
     assert.equal(combo.qa.referenceModel,catalog.fujiStudy.methodId);
     assert.deepEqual(combo.qa.grayResponse.inputCodes,[0,8,16,32,64,128,192,240,255]);
     if(combo.processMode==='official_direct') assert.equal(combo.paper,null);
@@ -46,6 +46,11 @@ for (const combo of catalog.combinations) {
     assert(catalog.papers.some(p=>p.id===combo.paper)); assert.equal(combo.processMode,'negative_print');
   }
   if (combo.status !== 'ready') { assert(!combo.files); assert(combo.reason); continue; }
+  if(combo.processMode!=='reference_interpretation'){
+    assert.equal(combo.qa.jpgToneProtection.method,'film-lab-jpg-tone-protection-v1');
+    assert.equal(combo.qa.jpgToneProtection.perImageAdaptation,false);
+    assert.equal(combo.qa.jpgToneProtection.vlogModified,false);
+  }
   if(combo.previewMode==='runtime-std'){
     assert.equal(film.type,'official');
     assert.deepEqual(Object.keys(combo.previews),[]);
