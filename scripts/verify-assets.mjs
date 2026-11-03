@@ -44,7 +44,11 @@ for (const combo of catalog.combinations) {
     assert(catalog.papers.some(p=>p.id===combo.paper)); assert.equal(combo.processMode,'negative_print');
   }
   if (combo.status !== 'ready') { assert(!combo.files); assert(combo.reason); continue; }
-  assert.deepEqual(Object.keys(combo.previews).sort(),sampleIds);
+  if(combo.previewMode==='runtime-std'){
+    assert.equal(film.type,'official');
+    assert.deepEqual(Object.keys(combo.previews),[]);
+    assert.equal(combo.files.std.encoding,'zip-entry');
+  }else assert.deepEqual(Object.keys(combo.previews).sort(),sampleIds);
   for (const asset of [...Object.values(combo.files),...Object.values(combo.previews)]) {
     const local = path.join(root,asset.path);
     assert(local.startsWith(root+path.sep));

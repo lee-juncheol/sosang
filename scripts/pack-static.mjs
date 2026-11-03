@@ -22,6 +22,20 @@ for(const combo of catalog.combinations){
   removedTotal+=raw.length;count++;
   Object.assign(asset,{path:zip.path,encoding:'zip-entry',transferBytes:zip.bytes,transferSha256:zip.sha256});
  }
+ // The official family uses the same verified STD worker for built-in photos
+ // and uploads. Keep its source previews in public for reproducible QA, but
+ // avoid shipping 540 redundant images in the hosting archive.
+ if(combo.processMode==='official_direct'||combo.processMode==='official_print'){
+  for(const asset of Object.values(combo.previews)){
+   const file=path.resolve(root,'.'+asset.path);
+   if(!file.startsWith(path.join(root,'luts',combo.id)+path.sep))throw new Error('Invalid preview path');
+   const bytes=await fs.readFile(file);
+   if(bytes.length!==asset.bytes||hash(bytes)!==asset.sha256)throw new Error('Preview source hash mismatch');
+   await fs.unlink(file);
+  }
+  combo.previews={};
+  combo.previewMode='runtime-std';
+ }
  const metadata=path.join(root,'luts',combo.id,'metadata.json');
  await fs.writeFile(metadata,JSON.stringify(combo,null,2)+'\n');
 }

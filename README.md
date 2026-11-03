@@ -29,6 +29,8 @@ npm run build
 npm run preview
 ```
 
+FUJI 공식 모드의 배포용 샘플 미리보기는 다운로드용 STD LUT로 브라우저에서 직접 계산합니다. 생성·QA용 WebP는 로컬 `public/`에 보존하고, 배포에서는 중복 이미지 540개를 생략합니다. 이미지 해상도나 LUT 수치는 줄이지 않으며, 업로드 사진과 같은 처리 경로를 사용합니다.
+
 개발용 preview server는 127.0.0.1에만 바인딩됩니다. LUT를 JS 번들에 포함하지 않고 선택한 파일을 요청할 때 가져옵니다. 프로덕션 빌드는 기존 조합별 ZIP 한 벌을 LUT 전송에도 사용해, 개별 `.cube`의 별도 전송 사본을 배포하지 않습니다. manifest의 `encoding: "zip-entry"`에 따라 브라우저가 ZIP의 크기/SHA-256을 확인한 뒤 선택한 `.cube`를 무손실 압축 해제하고, 원본 LUT의 크기/SHA-256을 다시 확인합니다. 이 파일을 미리보기와 개별 LUT 다운로드에 사용하며 ZIP 다운로드도 지원합니다. 로컬 `public/`의 원본 `.cube`·ZIP은 그대로 유지하고, 전송 방식 변경으로 LUT 바이트나 이미지 품질은 달라지지 않습니다. HTTPS 또는 localhost의 Web Crypto와 현대 브라우저의 DecompressionStream을 사용합니다.
 
 ## 내 사진으로 미리보기

@@ -55,6 +55,49 @@ export function usePhotoUpload(onSelected: () => void) {
   return { photo, loading, error, upload, clear }
 }
 
+export function useSamplePhoto(sample: Sample | null) {
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState<{ key: string; photo?: Photo; error?: string }>({ key: '' })
+  const cache = useRef(new Map<string, Photo>())
+  const sampleKey = sample ? `${sample.id}:${sample.path}:${sample.width}x${sample.height}` : ''
+  const key = sampleKey ? `${sampleKey}:${attempt}` : ''
+  useEffect(() => {
+    if (!sample) return
+    const controller = new AbortController()
+    let active = true
+    const cached = cache.current.get(sampleKey)
+    if (cached) {
+      cache.current.delete(sampleKey); cache.current.set(sampleKey, cached)
+      setState({ key, photo: cached })
+      return () => { active = false }
+    }
+    setState({ key })
+    void (async () => {
+      let bitmap: ImageBitmap | undefined
+      try {
+        const response = await fetch(sample.path, { signal: controller.signal })
+        if (!response.ok) throw new Error(`샘플 사진을 불러오지 못했습니다 (${response.status}).`)
+        const blob = await response.blob()
+        if (!blob.size || blob.size > MAX_BYTES) throw new Error('샘플 이미지의 크기를 확인해 주세요.')
+        bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
+        if (!active) return
+        if (bitmap.width !== sample.width || bitmap.height !== sample.height || bitmap.width * bitmap.height > 80_000_000) throw new Error('샘플 이미지의 해상도가 카탈로그와 다릅니다.')
+        const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height
+        const context = canvas.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true })
+        if (!context) throw new Error('이 브라우저에서 사진 미리보기를 지원하지 않습니다.')
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+        const photo: Photo = { sample, pixels: context.getImageData(0, 0, canvas.width, canvas.height).data, originalWidth: bitmap.width, originalHeight: bitmap.height }
+        cache.current.set(sampleKey, photo)
+        while (cache.current.size > 3 || [...cache.current.values()].reduce((sum, item) => sum + item.pixels.byteLength, 0) > 32 * 1024 * 1024) cache.current.delete(cache.current.keys().next().value!)
+        setState({ key, photo })
+      } catch (e) { if (active) setState({ key, error: e instanceof Error ? e.message : '샘플 사진을 읽지 못했습니다.' }) }
+      finally { bitmap?.close() }
+    })()
+    return () => { active = false; controller.abort() }
+  }, [sample, sampleKey, key])
+  return { photo: key && state.key === key ? state.photo || null : null, error: key && state.key === key ? state.error : undefined, retry: () => { cache.current.delete(sampleKey); setAttempt(n => n + 1) } }
+}
+
 export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<{ request: object | null; path?: string; error?: string }>({ request: null })

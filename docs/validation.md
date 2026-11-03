@@ -221,3 +221,5 @@ upstream 코드 `LICENSE`는 GPLv3, 별도 `SPEKTRAFILM_LICENSE.txt`는 프로�
 - 독립 LUT reader를 사용한 놀이터·실내 비교표: `artifacts/fuji-comparison/`. 공식 단독, Crystal Archive, Portra Endura를 같은 STD 원본에서 비교한다.
 
 상세 계약과 출처는 [공식 FUJIFILM LUT 기록](fujifilm-official.md)에 있다. 공식 LUT 출처와 Film Lab의 입력 근사·가상 프린터 계수를 구분하며, 실물 인화나 GFX 카메라 색의 계측 일치를 주장하지 않는다.
+
+배포 크기 조정: 최초 아카이브 258.99 MiB가 256 MiB 제한에 걸려 새 후지 샘플 미리보기 540개를 브라우저 직접 렌더링으로 전환했다. 로컬 생성/QA 자산은 유지하며, 배포 카탈로그에 `previewMode: runtime-std`를 명시한다. 공식 90개 조합은 검증된 STD LUT와 기존 원본 샘플에서 PNG 미리보기를 만들고, 기존 152개 조합은 정적 미리보기를 유지한다. 최종 자산 검사 대상은 484개 LUT, 2122개 파일 참조다.
