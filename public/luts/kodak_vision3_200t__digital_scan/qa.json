@@ -27,48 +27,118 @@
   },
   "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0002538006077525273,
-      "p95": 0.0007098769471349357,
-      "p99": 0.001158606198676735,
-      "max": 0.003231697957519264,
+      "mean": 0.00027827383018452485,
+      "p95": 0.0007121695518554797,
+      "p99": 0.0010610983409756862,
+      "max": 0.05562379397859818,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.00029898197106044443,
-      "p95": 0.0008453602302177665,
-      "p99": 0.001474313493705379,
-      "max": 0.00410429537087012,
+      "mean": 0.00032563325234671983,
+      "p95": 0.0008145560171576334,
+      "p99": 0.0012488781455819444,
+      "max": 0.04742460588649566,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdGeneration": "direct-engine-grid",
+  "stdGeneration": "direct-engine-grid-jpg-tone-v3",
   "stdInputGain": 1.0,
+  "jpgToneProtection": {
+    "method": "film-lab-jpg-tone-protection-v1",
+    "input": "already rendered encoded sRGB / Standard JPEG",
+    "neutralSamples": 4097,
+    "neutralAxis": "uniform encoded sRGB 0..1; interpolate OKLab response at equal input linear Y",
+    "neutralToneRetention": 0.0,
+    "neutralCastRemoval": 1.0,
+    "lightness": "Lraw = Lmodel + (1-retention)*(cuberoot(inputY)-Lneutral); Ltarget = Lsource + limit*tanh((Lraw-Lsource)/limit)",
+    "limit": "min(0.028+0.012*exp(-((Lsource-0.6)/0.2)^2), 0.5*min(Lsource,1-Lsource)) in OKLab L",
+    "chroma": "(ab_model-ab_neutral) * clip(Ltarget/Lmodel, 0, 3)",
+    "gamutMapping": "reduce OKLab chroma at fixed lightness and hue; exact neutral black/white endpoints",
+    "digitalBlackCorrection": true,
+    "perImageAdaptation": false,
+    "vlogModified": false,
+    "cameraInverseCalibrated": false,
+    "physicalFilmOrPrintMatch": false,
+    "limitations": [
+      "An explicit Film Lab JPEG rendering policy; not unmodified upstream tonality or an official Fujifilm JPEG recipe.",
+      "Keeps model colour differences while reducing repeated tonality; gamut-boundary chroma and contrast can change.",
+      "Cannot restore source detail already clipped or lost by the camera."
+    ]
+  },
+  "photoPixelFidelity": {
+    "std_playground": {
+      "mean": 0.0003842672440613211,
+      "p95": 0.0010059634913032565,
+      "p99": 0.0013327993329837874,
+      "max": 0.0017086260976911377,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_playground_panel": {
+      "mean": 0.0005333015283412821,
+      "p95": 0.0012769314447236533,
+      "p99": 0.0014724580161020137,
+      "max": 0.0017342872326652908,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_figures": {
+      "mean": 0.00022606787274078067,
+      "p95": 0.0007309706711765356,
+      "p99": 0.001018371016856465,
+      "max": 0.0014363015451636513,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_closeup": {
+      "mean": 0.00025990011822117246,
+      "p95": 0.0007838682236586403,
+      "p99": 0.00126737690755944,
+      "max": 0.0016136856757769935,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "std_shelf": {
+      "mean": 0.0003082841838302688,
+      "p95": 0.000945773801254502,
+      "p99": 0.0012004522513283241,
+      "max": 0.001584179627452803,
+      "samples": 1024,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdReferenceDescription": "Continuous colour model followed by Film Lab display-referred JPG tone protection; not the unmodified native engine tone",
   "stdVsContinuousComposition": {
     "tetrahedral": {
-      "mean": 0.001276729424261836,
-      "p95": 0.0027548661892808778,
-      "p99": 0.0036934727762345425,
-      "max": 0.013326273700375812,
+      "mean": 0.09793974063792031,
+      "p95": 0.22399159152423662,
+      "p99": 0.27474538689425687,
+      "max": 0.31935715082069793,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0012561915644300724,
-      "p95": 0.0026914199020588283,
-      "p99": 0.003657212701552979,
-      "max": 0.012453676287024956,
+      "mean": 0.09793802595541899,
+      "p95": 0.22395825308256193,
+      "p99": 0.2747560694456823,
+      "max": 0.31935715082069793,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
   "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
-  "grayBlackToWhiteDelta": 0.5987706666666667,
+  "grayBlackToWhiteDelta": 1.0,
   "warnings": [],
   "cameraVerified": false,
   "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
