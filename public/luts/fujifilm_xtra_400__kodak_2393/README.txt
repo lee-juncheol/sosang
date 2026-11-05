@@ -1,30 +1,32 @@
-Film Lab / Fujifilm X-Tra 400 + Kodak Vision Premier 2393
+Film Lab / fujifilm_xtra_400 / kodak_2393
+Camera: LUMIX S1II (S1II, DC-S1M2)
 
-Processing mode: negative_print; scan_film=False
+0035STD.cube: S1II Standard -> V-Log Alchemy adapter -> original creative VLOG.
+0035VLOG.cube: unchanged Panasonic V-Log / V-Gamut -> sRGB renderer.
+Both are 33 x 33 x 33, full range 0..1. Apply only one creative cube.
+STD: select this exact camera model, unadjusted Standard base, LUT opacity 100%.
+VLOG: supply real Panasonic V-Log/V-Gamut. Do not add a second display conversion.
+GH6 Standard output is post-processing only. DC-L10 does not mean DMC-L10.
 
+The merged STD uses adapter trilinear -> serialized creative tetrahedral, then
+nine-decimal 33-grid export. It contains no Film Lab B precurve, chroma gain,
+automatic exposure or added colour correction. Browser previews use the same
+merged cube. QA compares the serialized cube against the sequential transform;
+it does not establish physical film accuracy or a camera-specific match.
 
-0035VLOG.cube: Panasonic V-Log / V-Gamut input -> sRGB output
-0035STD.cube: Standard/sRGB -> colour model -> Film Lab JPG tone protection -> sRGB
-33 x 33 x 33, full range 0..1. Both files produce sRGB, NOT Rec.709.
-S1M2 / S1II physical camera validation: NOT performed.
-Do not apply the VLOG file to an already normalized Rec.709/sRGB picture.
-Standard mapping is approximate; clipped highlights cannot be recovered.
-STD grid nodes are evaluated directly through the colour model and the fixed
-Film Lab JPG tone-protection policy. Neutral tonality is reduced, coloured
-shadow lightness is bounded, neutral casts are removed and chroma is mapped
-into sRGB. No image statistics or automatic exposure are used. This is NOT
-unmodified upstream tonality, a camera inverse, or measured film/print accuracy.
-Native model input gain remains 1.0. VLOG keeps its original rendering.
-stdVsDirectEngine in qa.json compares to the complete protected STD reference.
-stdVsContinuousComposition is only a diagnostic difference from the legacy
-VLOG-cube composition, not the accuracy reference.
-Previews apply this exported STD file directly to LUT-OFF S1M2 Standard
-captures or a synthetic sRGB chart. No extra V-Log/gamma transform is used.
-They are not a validation against camera-applied LUT captures.
+Source adapter: https://github.com/shenmintao/V-Log-Alchemy/blob/e51ba9a23458ff5c316f630b860eb0201139d126/Luts/Panasonic-Standard/Conversion/S1IIS2V.cube
+Adapter SHA256: 7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e
+Creative VLOG SHA256: 4c9fea37ab7e00d27a0d4cb5f7b92750be424c957e879e358b2efd339a767417
+Upstream camera calibration status: pending.
 
-Derived from spektrafilm by Andrea Volpato
-https://github.com/andreavolpato/spektrafilm
-Licensed CC BY-SA 4.0. See SPEKTRAFILM_LICENSE.txt and CHANGELOG.txt.
-Engine commit: 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc
-File checks and measured interpolation errors: qa.json
-Settings and provenance: provenance.json
+Modified by Film Lab: merged camera Standard adapter and creative VLOG renderer.
+V-Log Alchemy by shenmintao, Apache-2.0; license included.
+spektrafilm by Andrea Volpato, https://github.com/andreavolpato/spektrafilm
+SPEKTRAFILM_LICENSE.txt and spektrafilm-LICENSE.txt preserve upstream terms.
+FUJIFILM source rights remain separate where FUJIFILM_NOTICE.txt is included.
+
+- Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.
+- Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.
+- Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.
+- Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.
+- Matched controlled capture validation is pending for this camera model.
