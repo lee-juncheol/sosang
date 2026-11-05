@@ -47,6 +47,13 @@ def prepare():
             if metadata['PhotoStyle'] != 'Standard or Custom' or metadata['LUT1Opacity'] != 0 or metadata['LUT2Opacity'] != 0:
                 raise ValueError('Sample must be Standard with both camera LUTs disabled')
             shutil.copyfile(source, destination)
+            if sample.get('thumbnailPath'):
+                thumbnail_source = SAMPLE_ROOT / 'thumbs' / f"{sample['id']}.webp"
+                if sha256(thumbnail_source) != sample['thumbnailSha256']:
+                    raise ValueError(f"Prepared thumbnail hash mismatch: {sample['id']}")
+                thumbnail_destination = PUBLIC / sample['thumbnailPath'].lstrip('/')
+                thumbnail_destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(thumbnail_source, thumbnail_destination)
         else:
             save_image(chart()/255., destination)
         with Image.open(destination) as im:

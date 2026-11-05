@@ -12,7 +12,7 @@ def test_every_bundle_contains_exact_downloads_and_attribution():
         files=combo['files']
         with zipfile.ZipFile(PUBLIC/files['zip']['path'].lstrip('/')) as archive:
             assert archive.testzip() is None
-            for key in ['vlog','std','qa','provenance']:
+            for key in ['vlog','std','qa','provenance'] + (['stdB'] if 'stdB' in files else []):
                 asset=files[key]
                 assert hashlib.sha256(archive.read(asset['name'])).hexdigest()==asset['sha256']
             for name in ['README.txt','CHANGELOG.txt','SPEKTRAFILM_LICENSE.txt']:

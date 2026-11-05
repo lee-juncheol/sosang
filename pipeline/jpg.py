@@ -103,10 +103,14 @@ class JpgToneProtection:
         chroma = lab[:, 1:] - neutral[:, 1:]
         gain = np.divide(target_l, lab[:, 0], out=np.ones_like(target_l), where=lab[:, 0] > 1e-12)
         protected = np.column_stack([target_l, chroma * np.clip(gain, 0., 3.)[:, None]])
-        encoded = np.clip(srgb_encode(gamut_map(protected)), 0., 1.)
+        encoded = np.clip(srgb_encode(self.map_gamut(protected)), 0., 1.)
         encoded[np.all(source == 0., axis=1)] = 0.
         encoded[np.all(source == 1., axis=1)] = 1.
         return encoded.reshape(shape)
+
+    def map_gamut(self, lab):
+        """Original v3 boundary mapping; subclasses can opt into another mapper."""
+        return gamut_map(lab)
 
     def metadata(self):
         return {

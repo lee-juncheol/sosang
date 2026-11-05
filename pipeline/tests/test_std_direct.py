@@ -1,5 +1,10 @@
-"""Independent runtime controls for direct STD baking at unchanged exposure."""
+"""Historical v3 controls; production camera STD is checked in test_camera_std.
+
+Retains the independent native engine and retired JPG adapter comparisons for
+auditing earlier output. None of these legacy functions is a production path.
+"""
 from dataclasses import replace
+import json
 
 import colour
 import numpy as np
@@ -8,7 +13,8 @@ from PIL import Image
 
 from pipeline.common import CONFIG, PUBLIC, std_to_vlog
 from pipeline.slide import SlideBundleBuilder
-from pipeline.std import bake_std, run_std_native, run_std_reference
+from pipeline.std import (legacy_bake_std as bake_std, run_std_native,
+                          legacy_run_std_reference as run_std_reference)
 from pipeline.jpg import JpgToneProtection
 from spektrafilm_lut_creator.grid import cube_grid
 from spektrafilm.runtime.params_builder import init_params, digest_params
@@ -56,8 +62,9 @@ def test_direct_std_preserves_native_engine_and_improves_photo_accuracy(film,pap
     # Include actual source-domain colors, off-grid random colors and gray.
     rng=np.random.default_rng(20261102)
     photo=[]
-    for name in ['std_playground','std_figures']:
-        pixels=np.asarray(Image.open(PUBLIC/f'samples/{name}.webp').convert('RGB')).reshape(-1,3)/255.
+    camera_samples = [s for s in json.loads((PUBLIC/'samples/manifest.json').read_text()) if s['inputKind']=='camera-std']
+    for sample in camera_samples[:2]:
+        pixels=np.asarray(Image.open(PUBLIC/sample['path'].lstrip('/')).convert('RGB')).reshape(-1,3)/255.
         photo.append(pixels[rng.choice(len(pixels),1024,replace=False)])
     samples=np.concatenate(photo+[rng.random((2048,3)),np.repeat(np.linspace(0,1,257)[:,None],3,axis=1)])
     truth=independent_native_runtime(spec,samples,slide=slide)

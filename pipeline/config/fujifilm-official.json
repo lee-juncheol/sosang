@@ -13,7 +13,7 @@
   "sourceOutput": "BT.709 primaries, gamma 2.2 display interpretation following official whitepaper p13; converted to sRGB for this application",
   "sourceResolution": 65,
   "exportResolution": 33,
-  "stdAdapter": "Shared PROVIA neutral-response inverse for completed sRGB photos; fixed for all ten simulations and all images. This avoids applying a second display toe/shoulder. It is not an inverse camera profile. V-Log bypasses this adapter.",
+  "stdAdapter": "One identical scalar target and inverse neutral-luminance curve per RGB input channel, followed by the serialized exported VLOG cube with tetrahedral interpolation. A spans the reachable native black/white range in linear light; B retains identity through 18% linear gray and rolls highlights to reachable white. B saturates below the native black floor. Renderer output RGB is unchanged; no neutral subtraction, chroma gain, OKLab bounds or new output gamut mapping. Fixed per LUT, not per image and not a measured camera inverse.",
   "paperBridge": "Fixed per-stock neutral-ramp digital printer calibration -> original spektrafilm paper development + spectral scanner; bounded smooth tone retains stock black, white and middle gray. Film exposure, film development and enlarger stages bypassed. Not a measured printer or FUJIFILM official recipe.",
   "limitation": "공식 LUT 값을 사용하지만 JPG 입력 변환과 인화지 연결은 Film Lab의 근사입니다. 실제 GFX 촬영색·실물 필름·실제 인화와의 계측 일치를 의미하지 않습니다.",
   "rights": "Official LUT data © FUJIFILM Corporation, rights retained; no CC relicensing of FUJIFILM data. spektrafilm paper profiles/code retain their original licenses and attribution.",
@@ -98,5 +98,11 @@
       "sourceSha256": "1e7b6c1b05924c5bdb9f2e922e962dcb608f2df15f38e628a9aac3a646293da4",
       "numberStart": 282
     }
-  ]
+  ],
+  "stdGeneration": "exported-vlog-single-tone-precurve-v4",
+  "stdMethod": "film-lab-single-tone-precurve-v1",
+  "legacyVlogSource": {
+    "method": "film-lab-fujifilm-official-paper-v3",
+    "meaning": "Historical source-composition identifier retained for unchanged VLOG exports and their QA referenceModel. This is not the current STD rendering method."
+  }
 }

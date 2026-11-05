@@ -1,6 +1,9 @@
 # FUJIFILM 공식 GFX LUT와 인화지 조합
 
-## 현재 STD v3 · JPG 톤 보호 — 2026-11-03
+> 현재 STD 입력은 [카메라별 STD→V-Log 변환](camera-std.md)을 사용합니다. 아래 B·JPG 톤 보호 설명은 변경 이력이며, V-Log 룩과 인화 모델 설명은 그대로 적용됩니다.
+
+
+## 이전 STD v3 · JPG 톤 보호 — 2026-11-03
 
 후지 90개 합성 룩의 STD는 아래 **v2 입력·인화 연결을 기반으로 계산한 뒤** `pipeline/jpg.py`의 `film-lab-jpg-tone-protection-v1`을 적용한다. 인화지를 끈 STD에도 적용한다. 원본 FUJIFILM LUT 파일과 해시는 보존하지만, **배포 STD의 대비·중성 색조는 공식 원본 그대로가 아니다.** Film Lab의 추가 JPG 렌더링 정책이다.
 

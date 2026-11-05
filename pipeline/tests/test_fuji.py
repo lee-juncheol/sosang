@@ -1,4 +1,8 @@
-"""Independent checks for official source identity, transfer and cube order."""
+"""Official source identity plus historical v3 input-adapter regressions.
+
+Production camera Standard export is checked in test_camera_std and test_precurve_exports. The
+explicit legacy adapter here preserves the old PROVIA/JPG audit baseline.
+"""
 import hashlib
 import io
 import zipfile
@@ -6,7 +10,7 @@ import colour
 import numpy as np
 import pytest
 from pipeline.fuji import (load_study, official_archive, official_table, flog2_encode,
-                           flog2_decode, input_to_flog2, apply_official, SRGB_TO_FGAMUT,
+                           flog2_decode, input_to_flog2, apply_official_legacy as apply_official, SRGB_TO_FGAMUT,
                            std_to_scene_linear, std_neutral_inverse, input_adapter_metadata,
                            apply_official_native)
 from pipeline.common import srgb_decode, std_to_vlog, metrics

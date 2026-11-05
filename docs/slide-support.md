@@ -1,6 +1,9 @@
 # 슬라이드 직접 스캔 — 2026-11-02
 
-## 현재 STD v3 · JPG 톤 보호 — 2026-11-03
+> 현재 STD 입력은 [카메라별 STD→V-Log 변환](camera-std.md)을 사용합니다. 아래 B·JPG 톤 보호 설명은 변경 이력이며, V-Log 룩과 인화 모델 설명은 그대로 적용됩니다.
+
+
+## 이전 STD v3 · JPG 톤 보호 — 2026-11-03
 
 Provia 100F·Velvia 100·Ektachrome 100·Kodachrome 64의 STD는 아래 v2 직접 스캔 계산 뒤에 `pipeline/jpg.py`의 `film-lab-jpg-tone-protection-v1`을 적용한다. 인화지를 추가하지 않으며, 슬라이드 모델의 강한 암부 응답이 이미 완성된 JPG에 다시 겹치는 것을 줄인다.
 

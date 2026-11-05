@@ -1,9 +1,9 @@
-"""Official FUJIFILM LUT composition with explicit Film Lab input adaptation.
+"""Official FUJIFILM source composition and historical input-adapter audits.
 
-The downloaded 65-grid F-Log2 LUT values are never regraded. Standard JPEGs
-already have a display tone scale, so their input adapter removes one shared
-PROVIA neutral rendering curve before the selected official LUT is applied.
-This is a declared virtual scene reconstruction, not a camera inverse.
+The downloaded 65-grid F-Log2 LUT values and exported VLOG path are unchanged.
+Production Standard A/B uses the shared single-tone precurve over a serialized
+VLOG export. The older PROVIA inverse/JPG output corrections remain only for
+explicit historical audits and are not called by production generators.
 """
 from __future__ import annotations
 
@@ -196,7 +196,19 @@ def official_jpg_protection(film_id, paper=None):
     return JpgToneProtection(lambda rgb: apply_official_native(rgb, film_id, 'std', paper))
 
 
-def apply_official(rgb, film_id, input_kind='std', paper=None):
+def apply_official_legacy(rgb, film_id, input_kind='std', paper=None):
+    """Historical v3 adapter for regression/audit only, never production STD."""
     if input_kind == 'std':
         return official_jpg_protection(film_id, paper).apply(rgb)
+    return apply_official_native(rgb, film_id, input_kind, paper)
+
+
+def apply_official(rgb, film_id, input_kind='std', paper=None, *, source_vlog_path=None, camera_id='S1II'):
+    if input_kind == 'std':
+        if source_vlog_path is None:
+            raise ValueError('Production STD requires the serialized source_vlog_path')
+        from pipeline.camera_std import compose
+        from pipeline.common import read_cube
+        values = np.asarray(rgb, dtype=np.float64)
+        return compose(read_cube(source_vlog_path, 'VLOG'), camera_id, values.reshape(-1, 3)).reshape(values.shape)
     return apply_official_native(rgb, film_id, input_kind, paper)

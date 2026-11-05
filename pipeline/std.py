@@ -1,23 +1,59 @@
-"""Bake Standard JPEGs through the colour model and explicit JPG tone protection."""
+"""Historical camera-agnostic Standard adapters for reproducible audit evidence.
+
+Production Standard generation is in pipeline.camera_std. The precurve A/B
+and legacy JpgToneProtection functions below remain for historical tests only;
+production generate.py/generate_fuji.py do not import them.
+"""
 import numpy as np
 
-from pipeline.common import std_to_vlog
+from pipeline.common import std_to_vlog, read_cube, sha256, PUBLIC
 from pipeline.slide import run_slide_reference
 from pipeline.digital import run_digital_reference
 from pipeline.jpg import JpgToneProtection
+from pipeline.precurve import SingleTonePrecurve, GENERATION
 from spektrafilm_lut_creator.grid import cube_grid
+from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral
 from spektrafilm_lut_creator.qa.reference import run_pipeline_at
 
-STD_GENERATION = 'direct-engine-grid-jpg-tone-v3'
+STD_GENERATION = GENERATION
 STD_INPUT_GAIN = 1.0
 STD_CONTRACT = (
-    'L_STD grid(x) = JpgToneProtection(x, F_VLOG(VLogEncode(sRGBDecode(x) @ sRGB_to_VGamut.T))); '
-    'F_VLOG is the continuous upstream engine, not the exported VLOG cube. '
-    'Native linear input gain = 1.0; no intermediate VLOG LUT interpolation. '
-    'The display-referred Film Lab protection reduces repeated model tonality, '
-    'removes neutral casts, bounds coloured-shadow lightness changes and maps chroma into sRGB. '
-    'This is not an inverse camera profile or unmodified upstream tonality.'
+    'R(x)=L_VLOG(VLogEncode(sRGBDecode(x) @ sRGB_to_VGamut.T)); '
+    'L_VLOG is the serialized, exported 33-grid VLOG cube evaluated tetrahedrally. '
+    'L_STD(x)=R(P(T(x))); P is the scalar inverse of R neutral encoded luminance; '
+    'the identical scalar target T and inverse P are applied to each RGB channel. '
+    'The renderer output RGB is returned unchanged, with no output tone, neutral '
+    'subtraction, chroma gain or new gamut mapping. This is not a measured camera inverse.'
 )
+
+
+def precurve_from_exported_vlog(path):
+    """Use file values as truth, including the writer's six-decimal precision."""
+    path = path.resolve()
+    table = read_cube(path, 'VLOG')
+    table.setflags(write=False)
+    try:
+        public_path = '/' + path.relative_to(PUBLIC).as_posix()
+    except ValueError:
+        public_path = str(path)
+    source = {'kind': 'exported-vlog-cube', 'sourceLutPath': public_path,
+              'name': path.name, 'sha256': sha256(path),
+              'interpolation': 'tetrahedral', 'resolution': table.shape[0]}
+    return SingleTonePrecurve(
+        lambda samples: apply_tetrahedral(table, std_to_vlog(np.asarray(samples).reshape(-1, 3))),
+        source_metadata=source,
+    )
+
+
+def run_std_reference(vlog_path, samples, *, variant='A', precurve=None):
+    """Exact precurve plus exported-source composition, before STD regridding."""
+    precurve = precurve or precurve_from_exported_vlog(vlog_path)
+    return precurve.apply(samples, variant=variant)
+
+
+def bake_std(vlog_path, *, variant='A', precurve=None):
+    return run_std_reference(vlog_path, cube_grid(33), variant=variant,
+                             precurve=precurve).reshape(33, 33, 33, 3)
 
 
 def run_std_native(spec, bundle, samples, *, is_slide=False, is_digital=False):
@@ -38,20 +74,20 @@ def run_std_native(spec, bundle, samples, *, is_slide=False, is_digital=False):
     return run_pipeline_at(spec, bundle, 0, coordinates)
 
 
-def std_protection(spec, bundle, *, is_slide=False, is_digital=False):
+def legacy_std_protection(spec, bundle, *, is_slide=False, is_digital=False):
     return JpgToneProtection(
         lambda samples: run_std_native(spec, bundle, samples, is_slide=is_slide, is_digital=is_digital),
         digital=is_digital,
     )
 
 
-def run_std_reference(spec, bundle, samples, *, is_slide=False, is_digital=False, protection=None):
-    protection = protection or std_protection(spec, bundle, is_slide=is_slide, is_digital=is_digital)
+def legacy_run_std_reference(spec, bundle, samples, *, is_slide=False, is_digital=False, protection=None):
+    protection = protection or legacy_std_protection(spec, bundle, is_slide=is_slide, is_digital=is_digital)
     return protection.apply(samples)
 
 
-def bake_std(spec, bundle, *, is_slide=False, is_digital=False, protection=None):
+def legacy_bake_std(spec, bundle, *, is_slide=False, is_digital=False, protection=None):
     """One engine evaluation per STD grid node; final cube uses R-fastest order."""
     n = spec.resolution
-    return run_std_reference(spec, bundle, cube_grid(n), is_slide=is_slide, is_digital=is_digital,
+    return legacy_run_std_reference(spec, bundle, cube_grid(n), is_slide=is_slide, is_digital=is_digital,
                              protection=protection).reshape(n, n, n, 3)

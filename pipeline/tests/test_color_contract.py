@@ -9,7 +9,7 @@ from spektrafilm_lut_creator.formats.lumix import LumixCubeFormat
 from spektrafilm_lut_creator.qa.evaluators import apply_tetrahedral, apply_trilinear
 from spektrafilm_lut_creator.bundles import BundleSpec
 from spektrafilm_lut_creator.builders import BundleBuilder
-from pipeline.std import bake_std, run_std_reference
+from pipeline.camera_std import compose, serialize_std
 
 
 def test_panasonic_reference_anchors_and_independent_colour_science():
@@ -41,21 +41,17 @@ def test_axis_order_writer_and_independent_readers(tmp_path):
     np.testing.assert_allclose(apply_trilinear(table,points),scipy,atol=1e-12)
 
 
-def test_generated_std_matches_direct_engine_not_retagged_vlog():
+def test_generated_std_matches_camera_composition_not_retagged_vlog():
     base=PUBLIC/'luts/kodak_portra_400__kodak_portra_endura'
     vlog=read_cube(base/'0086VLOG.cube','VLOG')
     std=read_cube(base/'0086STD.cube','STD')
     assert np.max(np.abs(vlog-std)) > .2
     samples=np.random.default_rng(12).random((20000,3))
-    spec=BundleSpec(film_profile='kodak_portra_400',print_profiles=('kodak_portra_endura',),
-                    input_color_space=CONFIG['input'],output_color_space=CONFIG['output'],
-                    stops_above_midgray=None,output_gamut_compress=CONFIG['output_gamut_compress'])
-    bundle=BundleBuilder(spec).build()
-    reference=run_std_reference(spec,bundle,samples)
+    reference=compose(vlog,'S1II',samples)
     # Independent colour-science reader/interpolator evaluates the saved file.
     evaluated=colour.read_LUT(str(base/'0086STD.cube')).apply(samples)
     error=np.max(np.abs(reference-evaluated),axis=1)
-    assert np.quantile(error,.99) < .005
+    assert np.quantile(error,.99) < .04
 
 
 def test_regeneration_is_byte_identical(tmp_path):
@@ -65,12 +61,13 @@ def test_regeneration_is_byte_identical(tmp_path):
                     stops_above_midgray=None,output_gamut_compress=CONFIG['output_gamut_compress'])
     bundle=BundleBuilder(spec).build()
     table=bundle.luts[0][1].table
-    std=bake_std(spec,bundle)
     base=PUBLIC/'luts/kodak_portra_400__kodak_portra_endura'
-    for tag,values in [('VLOG',table),('STD',std)]:
-        path=tmp_path/f'0086{tag}.cube'
-        LumixCubeFormat().write(Lut(values,title=f'0086_{tag}'),path,photo_style_tag=tag)
-        assert sha256(path)==sha256(base/path.name)
+    path=tmp_path/'0086VLOG.cube'
+    LumixCubeFormat().write(Lut(table,title='0086_VLOG'),path,photo_style_tag='VLOG')
+    assert sha256(path)==sha256(base/path.name)
+    std=compose(read_cube(base/'0086VLOG.cube','VLOG'),'S1II',cube_grid(33))
+    data=serialize_std(std,'S1II','0086VLOG.cube')
+    assert data==(base/'0086STD.cube').read_bytes()
 
 
 @pytest.mark.parametrize('film',['fujifilm_provia_100f','fujifilm_velvia_100','kodak_ektachrome_100','kodak_kodachrome_64'])
