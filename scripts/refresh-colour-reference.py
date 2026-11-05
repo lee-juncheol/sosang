@@ -1,8 +1,7 @@
-"""Refresh JS fixtures with independent colour-science parsing/interpolation.
+"""Refresh camera and supplied STD fixtures with independent colour interpolation.
 
 Run: .venv/bin/python scripts/refresh-colour-reference.py
-Preserves the stored RGBA input pixels and alpha. It imports no application
-parser, evaluator or pipeline code and verifies source cubes against catalog.
+Preserves stored RGBA inputs and alpha; imports no application pipeline code.
 """
 import hashlib
 import json
@@ -19,6 +18,26 @@ pixels = np.asarray(original_pixels, dtype=np.uint8).reshape(-1, 4)
 catalog = json.loads((ROOT / 'public/catalog.json').read_text())
 assets = {asset['path'].lstrip('/'): asset for combo in catalog['combinations']
           for asset in combo['files'].values()}
+assets.update({look['std']['path'].lstrip('/'): look['std'] for look in catalog['suppliedFuji']['looks']})
+# Preserve retained engine coverage; the retired official/paper fixtures are
+# replaced by all nine supplied STD cubes, read by colour-science independently.
+ids = {case['path'].split('/')[1] for case in fixture['fixtures']
+       if case['path'].startswith('luts/') and not case['path'].split('/')[1].startswith('gfx_')}
+assert ids and ids.issubset({combo['id'] for combo in catalog['combinations']})
+fixture['fixtures'] = []
+for combo in catalog['combinations']:
+    if combo['id'] not in ids:
+        continue
+    if combo.get('stdMethod') != 'camera-vlog-alchemy-v1':
+        raise ValueError('Refresh fixtures only after camera STD generation')
+    camera = catalog['cameraAdapters']['defaultCamera']
+    if combo['files']['std'] != combo['stdByCamera'][camera]['std']:
+        raise ValueError('Default camera STD alias differs')
+    fixture['fixtures'].append({'path': combo['files']['std']['path'].lstrip('/')})
+assert len(fixture['fixtures']) == len(ids)
+assert catalog['suppliedFuji']['methodId'] == 'supplied-fuji-std-v1'
+assert len(catalog['suppliedFuji']['looks']) == 9
+fixture['fixtures'].extend({'path': look['std']['path'].lstrip('/')} for look in catalog['suppliedFuji']['looks'])
 for case in fixture['fixtures']:
     path = ROOT / 'public' / case['path']
     digest = hashlib.sha256(path.read_bytes()).hexdigest()

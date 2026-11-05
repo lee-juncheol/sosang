@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Asset, Sample } from './types'
+import type { Cube } from './lut'
+
+/** A catalog asset, or a cube baked in the page with a stable identity key. */
+export type LookSource = Asset | { key: string; cube: Cube }
+const sourceKey = (source: LookSource) => 'cube' in source ? source.key : source.sha256
 
 export interface Photo { sample: Sample; pixels: Uint8ClampedArray<ArrayBuffer>; originalWidth: number; originalHeight: number }
 export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
@@ -47,7 +52,7 @@ export function usePhotoUpload(onSelected: () => void) {
       if (request !== sequence.current) return
       const path = URL.createObjectURL(blob)
       URL.revokeObjectURL(liveUrl.current); liveUrl.current = path
-      setPhoto({ sample: { id: `upload-${request}`, name: file.name, category: '내 사진 · Standard / sRGB', credit: '내 기기에서 처리한 사진 · 서버 전송 없음', source: null, path, width: canvas.width, height: canvas.height, inputKind: 'uploaded-srgb', previewLut: 'std' }, pixels, originalWidth, originalHeight })
+      setPhoto({ sample: { id: `upload-${request}`, name: file.name, category: '내 사진 · STD 미리보기', credit: '내 기기에서 처리한 사진 · 서버 전송 없음', source: null, path, width: canvas.width, height: canvas.height, inputKind: 'uploaded-srgb', previewLut: 'std' }, pixels, originalWidth, originalHeight })
       onSelected()
     } catch (e) { if (request === sequence.current) setError(e instanceof Error ? e.message : '사진을 불러오지 못했습니다.') }
     finally { bitmap?.close(); if (request === sequence.current) setLoading(false) }
@@ -98,10 +103,10 @@ export function useSamplePhoto(sample: Sample | null) {
   return { photo: key && state.key === key ? state.photo || null : null, error: key && state.key === key ? state.error : undefined, retry: () => { cache.current.delete(sampleKey); setAttempt(n => n + 1) } }
 }
 
-export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
+export function usePhotoLook(photo: Photo | null, asset: LookSource | undefined) {
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<{ request: object | null; path?: string; error?: string }>({ request: null })
-  const key = photo && asset ? `${photo.sample.id}-${asset.sha256}-${attempt}` : ''
+  const key = photo && asset ? `${photo.sample.id}-${sourceKey(asset)}-${attempt}` : ''
   // A → B → A must start a new request: the first A's object URL was revoked
   // when B started, even if A's photo/LUT key is identical on the return trip.
   const request = useMemo(() => ({ key }), [photo, asset, key])
@@ -127,7 +132,7 @@ export function usePhotoLook(photo: Photo | null, asset: Asset | undefined) {
       }
       worker.onerror = () => fail('LUT 처리 중 문제가 생겼습니다. 다시 시도해 주세요.')
       const pixels = photo.pixels.slice()
-      worker.postMessage({ pixels, asset }, [pixels.buffer])
+      worker.postMessage('cube' in asset ? { pixels, cube: asset.cube } : { pixels, asset }, [pixels.buffer])
     } catch { fail('이 브라우저에서 LUT 처리를 시작하지 못했습니다.') }
     return () => { active = false; worker?.terminate(); URL.revokeObjectURL(resultUrl) }
   }, [photo, asset, request])

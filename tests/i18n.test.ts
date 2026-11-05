@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { browserLocale, createLocalePreference, LOCALE_STORAGE_KEY, readSavedLocale, runtimeMessage, sampleText, translate } from '../src/i18n.ts'
 import type { Sample } from '../src/types.ts'
+import { english } from '../src/translations/en.ts'
 
 test('saved choices are validated and take priority without a location request', async () => {
   let requests = 0
@@ -59,6 +61,10 @@ test('sample display metadata changes without mutating input records or filename
   assert.equal(sampleText(sample, 'credit', 'en'), 'User photograph · LUMIX S1M2 · P1458403.JPG · Standard / LUT OFF')
   assert.equal(sampleText(sample, 'name', 'ko'), '놀이터 전경')
   assert.equal(sampleText({ ...sample, inputKind: 'uploaded-srgb' }, 'name', 'en'), '놀이터 전경')
+  const review: Sample = { ...sample, inputKind: 'review-jpeg', nameEn: 'Sunlit street', categoryEn: 'Outdoors · sunshine', credit: 'DPReview' }
+  assert.equal(sampleText(review, 'name', 'en'), 'Sunlit street')
+  assert.equal(sampleText(review, 'category', 'en'), 'Outdoors · sunshine')
+  assert.equal(sampleText(review, 'credit', 'en'), 'DPReview')
   assert.equal(JSON.stringify(sample), before)
 })
 
@@ -67,4 +73,29 @@ test('dynamic request errors and network errors are translated at display time',
   assert.equal(runtimeMessage('en', '샘플 사진을 불러오지 못했습니다 (404).'), 'Could not load the sample photo (404).')
   assert.equal(runtimeMessage('en', 'LUT 파일 검증에 실패했습니다. 페이지를 새로고침해 주세요.'), 'LUT verification failed. Please refresh the page.')
   assert.equal(runtimeMessage('ko', 'Failed to fetch'), '네트워크 연결을 확인한 뒤 다시 시도해 주세요.')
+})
+
+test('active Korean interface copy has English translations', () => {
+  for (const file of ['main.tsx', 'ReviewSamples.tsx', 'FilmGallery.tsx', 'LutUsageGuide.tsx', 'WhiteBalanceGuide.tsx']) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+    for (const match of source.matchAll(/\bt\(("(?:[^"\\]|\\.)*")/g)) {
+      const key = JSON.parse(match[1]) as string
+      if (!/[가-힣]/.test(key)) continue
+      assert.ok(english[key], `${file}: missing translation for ${key}`)
+      assert.doesNotMatch(translate('en', key), /[가-힣]/, `${file}: untranslated text in ${key}`)
+    }
+  }
+})
+
+test('camera-specific catalog errors and unified film attribution translate', () => {
+  assert.equal(runtimeMessage('en', '카메라별 STD LUT 파일 정보를 확인하지 못했습니다. 다시 불러와 주세요.'), 'Could not verify the camera-specific STD files. Please reload.')
+  assert.equal(translate('en', '필름 프로파일과 FUJIFILM 공식 LUT'), 'Film profiles and official FUJIFILM LUTs')
+  assert.equal(translate('en', 'FUJIFILM 공식 LUT'), 'Official FUJIFILM LUT')
+})
+
+test('camera adapter warnings translate into Korean without changing the English report', () => {
+  const source = 'For DC-L10 only. This adapter is not compatible with the older DMC-L10.'
+  assert.equal(runtimeMessage('ko', source), 'DC-L10 전용입니다. 구형 DMC-L10과 호환되지 않습니다.')
+  assert.equal(runtimeMessage('en', source), source)
+  assert.match(runtimeMessage('ko', 'Matched controlled capture validation is pending for this camera model.'), /통제 촬영 검증 전/)
 })

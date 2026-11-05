@@ -41,8 +41,20 @@ export function translate(locale: Locale, message: string | undefined, values: r
 
 // Rendering translations here keeps worker requests, pixel buffers, filenames,
 // and the original catalog independent of the selected interface language.
+const cameraWarningMessages: Record<string, string> = {
+  "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.": "Standard의 클리핑과 색역 압축은 완전히 역변환할 수 없습니다. 잘린 하이라이트와 색은 복원하지 못합니다.",
+  "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.": "정확한 카메라 모델과 조정하지 않은 Standard 포토스타일을 사용해 주세요. 자동 노출이나 이미지 통계는 사용하지 않습니다.",
+  "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.": "카메라의 LUT 보간 방식은 공개되지 않았습니다. 사면체와 삼선형 보간의 합성 오차를 모두 제공합니다.",
+  "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.": "출력 LUT로 실제 V-Log 촬영의 센서 게인, 노이즈, 하이라이트 여유를 재현할 수 없습니다.",
+  "Matched controlled capture validation is pending for this camera model.": "이 카메라 모델은 조건을 맞춘 통제 촬영 검증 전입니다.",
+  "Upstream support is qualitative field feedback, not controlled quantitative camera validation.": "원본 제작자의 지원 근거는 실촬영 육안 평가이며, 통제된 정량 카메라 검증은 아닙니다.",
+  "GH6: post-processing only; Standard capture cannot bake this LUT in camera.": "GH6는 편집용입니다. Standard 촬영 시 이 LUT를 카메라 안에서 적용할 수 없습니다.",
+  "For DC-L10 only. This adapter is not compatible with the older DMC-L10.": "DC-L10 전용입니다. 구형 DMC-L10과 호환되지 않습니다."
+}
+
 export function runtimeMessage(locale: Locale, message: string | undefined): string {
   if (!message) return ''
+  if (cameraWarningMessages[message]) return translate(locale, cameraWarningMessages[message])
   if (['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.', 'The network connection was lost.'].includes(message)) return translate(locale, '네트워크 연결을 확인한 뒤 다시 시도해 주세요.')
   if (message === 'Film Lab · generated technical test pattern · CC0') return translate(locale, 'Film Lab · 생성된 기술 테스트 패턴 · CC0')
   const exact = translate(locale, message)
@@ -53,6 +65,8 @@ export function runtimeMessage(locale: Locale, message: string | undefined): str
   if (sample) return translate(locale, '샘플 사진을 불러오지 못했습니다 ({0}).', [sample[1]])
   const download = message.match(/^([\s\S]+) · 검증된 파일을 다운로드했습니다\.$/)
   if (download) return translate(locale, '{0} · 검증된 파일을 다운로드했습니다.', [download[1]])
+  const timed = message.match(/^([\s\S]+) · 인화 필터 조정값으로 만든 파일을 다운로드했습니다\.$/)
+  if (timed) return translate(locale, '{0} · 인화 필터 조정값으로 만든 파일을 다운로드했습니다.', [timed[1]])
   const credit = message.match(/^사용자 촬영 · ([\s\S]+)$/)
   if (credit) return translate(locale, '사용자 촬영 · {0}', [credit[1]])
   return exact
@@ -60,6 +74,8 @@ export function runtimeMessage(locale: Locale, message: string | undefined): str
 
 export function sampleText(sample: Sample, field: 'name' | 'category' | 'credit', locale: Locale): string {
   if (field === 'name' && sample.inputKind === 'uploaded-srgb') return sample.name
+  if (locale === 'en' && field === 'name' && sample.nameEn) return sample.nameEn
+  if (locale === 'en' && field === 'category' && sample.categoryEn) return sample.categoryEn
   return runtimeMessage(locale, sample[field])
 }
 
@@ -95,7 +111,7 @@ export function useLocale() {
   useEffect(() => {
     if (!ready) return
     document.documentElement.lang = locale
-    document.title = locale === 'ko' ? 'Film Lab — 당신의 다음 색' : 'Film Lab — Find your next color'
+    document.title = locale === 'ko' ? 'sosang — LUT 스튜디오' : 'sosang — LUT Studio'
     document.querySelector('meta[name="description"]')?.setAttribute('content', locale === 'ko'
       ? '필름과 인화지를 조합하고, 내 사진으로 비교하고, V-Log·Standard용 LUT를 다운로드하세요.'
       : 'Combine film looks and print materials, compare them on your photos, and download V-Log or Standard LUTs.')

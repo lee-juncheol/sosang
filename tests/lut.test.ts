@@ -11,6 +11,7 @@ const reference = JSON.parse(await readFile(new URL('./fixtures/colour-reference
 for (const fixture of reference.fixtures) {
   test(`matches independent colour-science tetrahedral output: ${fixture.path}`, async () => {
     const text = await readFile(new URL(`../public/${fixture.path}`, import.meta.url), 'utf8')
+    assert.equal(createHash('sha256').update(text).digest('hex'), fixture.sourceSha256, 'independent reference is tied to this cube')
     const pixels = new Uint8ClampedArray(reference.pixels)
     const result = applyStdLut(pixels, parseStdCube(text))
     assert.deepEqual([...result], fixture.expected)
@@ -19,7 +20,7 @@ for (const fixture of reference.fixtures) {
 }
 const text = await readFile(new URL(`../public/${reference.fixtures[0].path}`, import.meta.url), 'utf8')
 test('rejects V-Log, malformed dimensions, rows, domain and non-finite data', () => {
-  for (const invalid of [text.replace('PHOTOSTYLE STD', 'PHOTOSTYLE VLOG'), text.replace('LUT_3D_SIZE 33', 'LUT_3D_SIZE 32'), text.replace('DOMAIN_MAX 1.000000', 'DOMAIN_MAX 2.000000'), `${text}\nNaN 0 0`, text.split('\n').slice(0, -3).join('\n')]) assert.throws(() => parseStdCube(invalid))
+  for (const invalid of [text.replace('PHOTOSTYLE STD', 'PHOTOSTYLE VLOG'), text.replace('LUT_3D_SIZE 33', 'LUT_3D_SIZE 32'), `${text.replace(/^DOMAIN_MAX .*$/m, '')}\nDOMAIN_MAX 2 2 2`, `${text}\nNaN 0 0`, text.split('\n').slice(0, -3).join('\n')]) assert.throws(() => parseStdCube(invalid))
 })
 test('identity cube preserves channels, alpha and endpoints', () => {
   const table = new Float64Array(33 ** 3 * 3)
@@ -51,14 +52,36 @@ const asArrayBuffer = (bytes: Uint8Array): ArrayBuffer => new Uint8Array(bytes).
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 const zipAsset = (kind: 'std' | 'vlog', bytes = zipBytes): Asset => ({ ...zipCombo.files[kind], path: zipCombo.files.zip.path, encoding: 'zip-entry', transferBytes: bytes.length, transferSha256: digest(bytes) })
 
-test('ZIP-entry transport extracts actual VLOG and STD cubes byte-for-byte', async () => {
+test('ZIP-entry transport extracts the selected camera STD and unchanged VLOG byte-for-byte', async () => {
   const originalFetch = globalThis.fetch
   try {
     globalThis.fetch = async () => new Response(zipBytes)
-    for (const kind of ['std', 'vlog'] as const) {
+    const kinds: ('std' | 'vlog')[] = ['std', 'vlog'];
+    assert.equal(zipCombo.stdMethod, 'camera-vlog-alchemy-v1');
+    assert.deepEqual(zipCombo.stdByCamera[catalog.cameraAdapters.defaultCamera].std, zipCombo.files.std);
+    assert.equal(zipCombo.files.stdB, undefined);
+    for (const kind of kinds) {
       const original = await readFile(new URL(`../public${zipCombo.files[kind].path}`, import.meta.url))
       assert.deepEqual(new Uint8Array(await fetchVerifiedAsset(zipAsset(kind))), new Uint8Array(original))
+      if(kind!=='vlog') assert.equal(parseStdCube(original.toString('utf8')).size,33)
     }
+  } finally { globalThis.fetch = originalFetch }
+})
+
+test('non-default camera downloads use their own archive despite sharing the cube entry name', async () => {
+  const originalFetch = globalThis.fetch
+  const selected = zipCombo.stdByCamera.S5II
+  assert.equal(selected.std.name, zipCombo.files.std.name)
+  assert.notEqual(selected.std.sha256, zipCombo.files.std.sha256)
+  assert.notEqual(selected.zip.path, zipCombo.files.zip.path)
+  const bytes = await readFile(new URL(`../public${selected.zip.path}`, import.meta.url))
+  try {
+    globalThis.fetch = async input => { assert.equal(input, selected.zip.path); return new Response(bytes) }
+    const cube = await fetchVerifiedAsset(selected.std)
+    assert.equal(digest(new Uint8Array(cube)), selected.std.sha256)
+    assert.equal(parseStdCube(new TextDecoder().decode(cube)).size, 33)
+    globalThis.fetch = async () => new Response(zipBytes)
+    await assert.rejects(fetchVerifiedAsset(selected.std), /검증/)
   } finally { globalThis.fetch = originalFetch }
 })
 

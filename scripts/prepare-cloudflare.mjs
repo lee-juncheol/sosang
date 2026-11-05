@@ -2,9 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { assertLookInventory, publicLookCount } from './look-inventory.mjs';
 
-export const PUBLIC_LOOKS = 238;
+export { PUBLIC_LOOKS } from './look-inventory.mjs';
 export const REMOVED_REFERENCE_LOOKS = 4;
+export const EXTERNAL_SAMPLE_MANIFEST = 'samples/external/manifest.json';
+export const EMPTY_EXTERNAL_SAMPLES = { schemaVersion: 1, localOnly: true, samples: [], models: [], scenes: [], missing: [] };
 
 // Keep the personal catalog intact; the public distribution is a separate build.
 export function publicCatalog(source) {
@@ -13,14 +16,19 @@ export function publicCatalog(source) {
   const referenceIds = new Set((catalog.referenceStudy?.looks || []).map(look => `${look.film}__reference`));
   const removed = catalog.combinations.filter(combo => combo.processMode === 'reference_interpretation' || referenceIds.has(combo.id) || combo.id.endsWith('__reference'));
   const removedIds = new Set(removed.map(combo => combo.id));
-  assert.equal(removed.length, REMOVED_REFERENCE_LOOKS, 'Expected the 4 removed reference interpretations');
+  assert([0, REMOVED_REFERENCE_LOOKS].includes(removed.length), 'Expected 0 or 4 removed reference interpretations');
   for (const combo of catalog.combinations) assert.match(combo.id, /^[a-z0-9_]+$/, 'Unsafe LUT directory name');
   catalog.combinations = catalog.combinations.filter(combo => !removedIds.has(combo.id));
   delete catalog.referenceStudy;
+  assert(!catalog.fujiStudy, 'Retired official FUJIFILM catalog remains');
+  assert(catalog.films.every(film => film.type !== 'official'), 'Retired official FUJIFILM film remains');
+  assert(catalog.combinations.every(combo => !combo.officialSource && !['official_direct', 'official_print'].includes(combo.processMode)), 'Retired official FUJIFILM combination remains');
+  assert.equal(catalog.suppliedFuji?.methodId, 'supplied-fuji-std-v1', 'Supplied FUJIFILM STD catalog is missing');
+  assert.equal(catalog.suppliedFuji.looks.length, 9, 'Expected nine supplied FUJIFILM STD looks');
   catalog.counts = Object.fromEntries(Object.keys(source.counts).map(status => [status, 0]));
   for (const combo of catalog.combinations) catalog.counts[combo.status] = (catalog.counts[combo.status] || 0) + 1;
-  assert.equal(catalog.combinations.length, PUBLIC_LOOKS, 'Expected 238 public combinations');
-  assert.equal(catalog.counts.ready, PUBLIC_LOOKS, 'All public combinations must be ready');
+  assertLookInventory(catalog);
+  assert.equal(catalog.counts.ready, publicLookCount(catalog), 'All public combinations must be ready');
   assert(catalog.combinations.every(combo => catalog.films.some(film => film.id === combo.film)), 'A public combination references a removed film');
   return { catalog, removedIds };
 }
@@ -47,12 +55,19 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
       const relative = path.relative(source, entry).split(path.sep).join('/');
       const info = await fs.lstat(entry);
       assert(!info.isSymbolicLink(), `Do not publish a symlink: ${relative}`);
-      if (relative === 'research/reference-looks.json') return false;
+      if (relative === 'samples/external' || relative.startsWith('samples/external/')) return false;
+      if (['research/reference-looks.json', 'research/fujifilm-official.json'].includes(relative)) return false;
+      if (['legacy-v3', 'refined-v3', 'audit'].some(name => relative === name || relative.startsWith(name + '/'))) return false;
       if (relative.startsWith('luts/') && removedIds.has(relative.split('/')[1])) return false;
       assert(!relative.split('/').some(part => part === 'sample-study' || part === '.cache' || part === '.git'), `Private data in input: ${relative}`);
       return true;
     },
   });
+  // Review samples stay in the personal build. A valid empty response lets the
+  // shared frontend hide its local-only sample tab without an SPA HTML fallback.
+  const externalManifest = path.join(output, EXTERNAL_SAMPLE_MANIFEST);
+  await fs.mkdir(path.dirname(externalManifest), { recursive: true });
+  await fs.writeFile(externalManifest, JSON.stringify(EMPTY_EXTERNAL_SAMPLES, null, 2) + '\n');
   await fs.writeFile(path.join(output, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
   return { output, combinations: catalog.combinations.length, excluded: removedIds.size, counts: catalog.counts };
 }

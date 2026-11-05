@@ -1,4 +1,5 @@
-// Publish the editable application source, never the photo/LUT data tree.
+// Publish editable source and the pinned, Apache-licensed camera input adapters.
+// Private photographs and creative/output LUT bundles remain excluded.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -9,9 +10,9 @@ import { gzipSync } from 'node:zlib';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const destination = path.resolve(root, process.argv[2] || 'dist-cloudflare');
-const directories = ['src', 'server', 'tests', 'scripts', 'pipeline', 'licenses', 'docs'];
+const directories = ['src', 'server', 'tests', 'scripts', 'pipeline', 'licenses', 'docs', 'public/camera-adapters'];
 const requiredFiles = ['index.html', 'tsconfig.json', 'package.json', 'package-lock.json', 'LICENSE', 'README.md'];
-const optionalFiles = ['wrangler.jsonc'];
+const optionalFiles = ['wrangler.jsonc', 'wrangler.legacy.jsonc'];
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.py', '.json', '.jsonc', '.md', '.txt', '.lock', '.html']);
 const excludedDirectories = new Set(['vendor', 'vendors', 'cache', 'caches', '__pycache__', 'node_modules', 'public', 'dist', 'dist-cloudflare', 'assets', 'samples', 'originals', 'artifacts', 'coverage', 'credentials', 'secrets']);
 const excludedFiles = /(?:^|[._-])(?:credentials?|secrets?|id_rsa|id_ed25519)(?:[._-]|$)|\.(?:pyc|pyo|pem|key|p12|pfx)$/i;
@@ -54,7 +55,7 @@ async function select(relative) {
     return;
   }
   assert(stat.isFile(), `Not a regular source file: ${relative}`);
-  assert(requiredFiles.includes(relative) || optionalFiles.includes(relative) || extensions.has(path.extname(name).toLowerCase()) || /^LICEN[CS]E(?:[._-].*)?$/.test(name), `Unexpected non-source file: ${relative}`);
+  assert(requiredFiles.includes(relative) || optionalFiles.includes(relative) || extensions.has(path.extname(name).toLowerCase()) || (relative.startsWith('public/camera-adapters/') && name.endsWith('.cube')) || /^LICEN[CS]E(?:[._-].*)?$/.test(name), `Unexpected non-source file: ${relative}`);
   assert(stat.size <= 5 * 1024 * 1024, `Unexpectedly large source file: ${relative}`);
   selected.push(relative);
 }
@@ -67,12 +68,17 @@ for (const relative of optionalFiles) {
 selected.sort();
 assert(selected.includes('server/worker.mjs') && selected.includes('src/main.tsx') && selected.includes('src/lut.worker.ts') && selected.includes('scripts/package-source.mjs'), 'Required editable application sources are missing');
 
-const sourceReadme = `Film Lab — corresponding application source
+for (const required of ['pipeline/camera_std.py', 'pipeline/import_supplied_fuji.py', 'docs/supplied-fuji.md', 'scripts/migrate-camera-std.py', 'scripts/verify-camera-std.mjs', 'scripts/verify-gallery.mjs', 'scripts/verify-supplied-fuji.mjs', 'public/camera-adapters/source.json', 'public/camera-adapters/manifest.json', 'public/camera-adapters/V-Log-Alchemy-LICENSE.txt']) assert(selected.includes(required), `Required LUT source is missing: ${required}`);
+assert(selected.filter(name => name.startsWith('public/camera-adapters/') && name.endsWith('.cube')).length === 10, 'Exactly ten pinned camera input adapters must be included');
+
+const sourceReadme = `sosang — corresponding application source
 ==========================================
 
 This archive contains the editable TypeScript/React application and Web Worker,
 build and verification scripts, Python color-processing code/configuration,
 tests, dependency lock files, documentation, and applicable code licenses.
+The ten pinned V-Log Alchemy camera input adapters, manifest, calibration
+reports, and Apache-2.0 license are included in public/camera-adapters/.
 Read LICENSE and licenses/ for the licensing terms. Third-party data retains
 its own rights; this source archive does not grant rights to photographs or
 FUJIFILM's original LUT data.
@@ -94,12 +100,19 @@ assets before it can display the available looks.
 Runtime assets are supplied separately by the public deployment from which
 this archive was downloaded. Its /catalog.json lists public sample images,
 preview images, and per-look ZIP assets, with byte sizes and SHA-256 hashes.
+The gallery uses /gallery/manifest.json and its image/thumbnail paths; include
+those prepared derivatives as well. Camera gallery photos are already rendered
+and must never be fed through another LUT as Standard sample inputs.
 Serve that catalog and its referenced files at the same URL paths alongside
 the compiled app; include the public /favicon.svg, /fonts/ and /licenses/ files too.
 The /api/locale endpoint runs in server/worker.mjs on Cloudflare; its deployment
 configuration is wrangler.jsonc. Locally the UI falls back to browser language.
-These runtime assets are intentionally not duplicated in this source archive.
-In the packed deployment, std/vlog records refer to entries in their ZIP;
+Creative output LUTs and photographs are intentionally not duplicated in this
+source archive. Only the ten reusable camera input adapters are included.
+Each look has a stdByCamera map: select the explicit camera entry; never
+substitute the default camera for an unsupported model. Its ZIP contains that
+camera's merged STD and the unchanged creative VLOG cube. In the packed
+deployment, std/vlog records refer to entries in their selected camera ZIP;
 copy that ZIP once and retain the catalog's encoding and transfer hash fields.
 Do not treat the ZIP as a raw .cube file or run pack-static.mjs on an already
 packed deployment. The public source download is /source/film-lab-source.tar.gz.
@@ -121,11 +134,17 @@ Optional Python regeneration
 See README.md and pipeline/requirements.lock. scripts/bootstrap.py obtains the
 upstream spektrafilm repository at the commit pinned in pipeline/config/default.json
 and installs the pinned Python dependencies. The vendor checkout and virtual
-environment are not bundled. Color configuration and all Film Lab processing
+environment are not bundled. Color configuration and all sosang processing
 code are included; sample images and original FUJIFILM LUT archives are not.
+pipeline/camera_std.py composes the selected input adapter with each existing
+creative VLOG. scripts/migrate-camera-std.py regenerates all camera variants
+and preserves VLOG bytes. It requires the unpacked public look catalog and
+VLOG assets in addition to the included input adapters.
 Photo-based preview regeneration requires separately supplied sample inputs.
-FUJIFILM-based regeneration requires obtaining the official package according
-to its own terms and the source/hash records in pipeline/config/fujifilm-official.json.
+The supplied FUJIFILM STD looks are imported separately without color changes
+or paper processing. Their source files and output hashes are recorded in
+the runtime /supplied-fuji/provenance.json; source LUT files are not bundled
+in this application-source archive. See docs/supplied-fuji.md.
 No credentials are needed to compile the browser application. Hosting account
 credentials, local caches, user originals, and build outputs are excluded.
 `;
