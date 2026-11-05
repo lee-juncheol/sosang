@@ -8,8 +8,8 @@
   "status": "ready",
   "filmCast": {
     "method": "spektrafilm-print-reference-blend-v1",
-    "amount": 0.9,
-    "percent": 90,
+    "amount": 1.0,
+    "percent": 100,
     "experimental": true,
     "film": "fujifilm_xtra_400",
     "paper": "kodak_endura_premier",
@@ -34,10 +34,10 @@
     ],
     "appliedCC": [
       0.0,
-      79.14272627345356,
-      91.6430449795925
+      85.60757186375037,
+      96.61636078745556
     ],
-    "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+    "formula": "appliedCC = filmCC + hueShiftCC",
     "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
     "databaseReload": false,
     "normalizePrintExposure": true,
@@ -51,14 +51,21 @@
       "Experimental Film Lab variant, not an upstream spektrafilm preset.",
       "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
       "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
-      "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+      "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
       "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
       "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
     ],
+    "directionPolicy": "editorial-hue",
+    "targetHue": 160.0,
+    "hueShiftCC": [
+      0.0,
+      3.8,
+      1.0
+    ],
     "amountPolicy": "chroma-target",
     "targetChroma": 6.0,
-    "grayChroma": 5.735416860209813,
-    "grayHue": 55.088445453420164,
+    "grayChroma": 5.984594078342199,
+    "grayHue": 159.32765720532552,
     "calibrationGray": {
       "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
       "outputSpace": "sRGB, 8-bit scale (unrounded)",
@@ -68,34 +75,34 @@
         116.53982288089763
       ],
       "filmCast": [
-        126.80133487276994,
-        115.61789155294196,
-        109.93784653698204
+        110.30951680810762,
+        121.71869022886864,
+        115.21516073925984
       ]
     }
   },
   "qa": {
     "fileChecks": "passed",
     "rowsPerCube": 35937,
-    "serializationMaxError": 4.999972144092979e-07,
+    "serializationMaxError": 4.999986485954011e-07,
     "processMode": "negative_print",
     "scanFilm": false,
     "referenceModel": "spektrafilm-print-reference-blend-v1",
     "vlogVsDirectEngine": {
       "tetrahedral": {
-        "mean": 0.0035877356431139565,
-        "p95": 0.01369917423272643,
-        "p99": 0.026512758021737536,
-        "max": 0.06629515953505422,
+        "mean": 0.0035475960960159167,
+        "p95": 0.013005535380846684,
+        "p99": 0.02628062157317102,
+        "max": 0.05495066242056362,
         "samples": 4350,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       },
       "trilinear": {
-        "mean": 0.004679767735740687,
-        "p95": 0.01845755406698804,
-        "p99": 0.034787344610295874,
-        "max": 0.06478017888855014,
+        "mean": 0.00463828569200356,
+        "p95": 0.017895394028121285,
+        "p99": 0.034605887195492624,
+        "max": 0.06294157013893387,
         "samples": 4350,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
@@ -104,8 +111,8 @@
     "cameraVerified": false,
     "filmCast": {
       "method": "spektrafilm-print-reference-blend-v1",
-      "amount": 0.9,
-      "percent": 90,
+      "amount": 1.0,
+      "percent": 100,
       "experimental": true,
       "film": "fujifilm_xtra_400",
       "paper": "kodak_endura_premier",
@@ -130,10 +137,10 @@
       ],
       "appliedCC": [
         0.0,
-        79.14272627345356,
-        91.6430449795925
+        85.60757186375037,
+        96.61636078745556
       ],
-      "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+      "formula": "appliedCC = filmCC + hueShiftCC",
       "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
       "databaseReload": false,
       "normalizePrintExposure": true,
@@ -147,14 +154,21 @@
         "Experimental Film Lab variant, not an upstream spektrafilm preset.",
         "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
         "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
-        "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+        "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
         "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
         "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
       ],
+      "directionPolicy": "editorial-hue",
+      "targetHue": 160.0,
+      "hueShiftCC": [
+        0.0,
+        3.8,
+        1.0
+      ],
       "amountPolicy": "chroma-target",
       "targetChroma": 6.0,
-      "grayChroma": 5.735416860209813,
-      "grayHue": 55.088445453420164,
+      "grayChroma": 5.984594078342199,
+      "grayHue": 159.32765720532552,
       "calibrationGray": {
         "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
         "outputSpace": "sRGB, 8-bit scale (unrounded)",
@@ -164,9 +178,9 @@
           116.53982288089763
         ],
         "filmCast": [
-          126.80133487276994,
-          115.61789155294196,
-          109.93784653698204
+          110.30951680810762,
+          121.71869022886864,
+          115.21516073925984
         ]
       }
     },
@@ -177,26 +191,26 @@
     "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
     "stdVsDirectEngine": {
       "tetrahedral": {
-        "mean": 0.002001364083839991,
-        "p95": 0.006313314244080185,
-        "p99": 0.012408684929268912,
-        "max": 0.03237073595253104,
+        "mean": 0.001980252042226541,
+        "p95": 0.006197049140227448,
+        "p99": 0.011816253852205786,
+        "max": 0.035177159019653015,
         "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       },
       "trilinear": {
-        "mean": 0.001955900140229066,
-        "p95": 0.006022773825259793,
-        "p99": 0.010444849510402596,
-        "max": 0.02623533673844078,
+        "mean": 0.0019409736183595562,
+        "p95": 0.00603899027096619,
+        "p99": 0.010458572719136314,
+        "max": 0.0249890257690209,
         "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       }
     },
-    "stdSerializationMaxError": 4.99999930347883e-10,
-    "sourceVlogSha256": "dadf4b714ed53c52e807452de3610592d52fa4ddab7c38657ff9ba78f6e41fb6",
+    "stdSerializationMaxError": 4.999968078456263e-10,
+    "sourceVlogSha256": "9162d02ee9a843b2b5dd125899cdbfe694d397b825f324ff079066cd87ec601d",
     "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
     "vlogUnchanged": true,
     "warnings": [
@@ -219,31 +233,31 @@
       "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037STD.cube",
       "name": "1037STD.cube",
       "bytes": 1293941,
-      "sha256": "a75917f9bfc09218e3b88bc4606eb17b898350f12dcc7dc6ed05409035d93afb"
+      "sha256": "ce81f2f13ce886de30fcc3fdf921a1396e9da83eaa60b294ad66015796e0491e"
     },
     "vlog": {
       "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037VLOG.cube",
       "name": "1037VLOG.cube",
       "bytes": 970431,
-      "sha256": "dadf4b714ed53c52e807452de3610592d52fa4ddab7c38657ff9ba78f6e41fb6"
+      "sha256": "9162d02ee9a843b2b5dd125899cdbfe694d397b825f324ff079066cd87ec601d"
     },
     "zip": {
       "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037LUTS.zip",
       "name": "1037LUTS.zip",
-      "bytes": 960521,
-      "sha256": "bd31cf320bd5fc4586ead553c5ba07ec45a720b4bc3485aa086191ebb5efeca8"
+      "bytes": 961957,
+      "sha256": "bb553954fa0f081a0ca1773d2823b792fae2678b0c878eca56c80699f0e622c9"
     },
     "qa": {
       "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/qa.json",
       "name": "qa.json",
-      "bytes": 5559,
-      "sha256": "05e89ffad691f71aa72f15606185fe3e620de7b8102c0ea350cb632963bb2bb3"
+      "bytes": 5705,
+      "sha256": "35feb32e12c2d95479d6f9c3ebc433d53453f616c7f46a0f34f2066848759a0a"
     },
     "provenance": {
       "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/provenance.json",
       "name": "provenance.json",
-      "bytes": 11456,
-      "sha256": "92f818ba88cd05305cb0eae7b392b06c5055dce2214f98b5071567640039355d"
+      "bytes": 11815,
+      "sha256": "35d0bd3fb6e834768b748c51177673c071b1af4c90f9f0d1c0ed282e1b9a2d42"
     }
   },
   "stdMethod": "camera-vlog-alchemy-v1",
@@ -253,29 +267,29 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037STD.cube",
         "name": "1037STD.cube",
         "bytes": 1293941,
-        "sha256": "a75917f9bfc09218e3b88bc4606eb17b898350f12dcc7dc6ed05409035d93afb"
+        "sha256": "ce81f2f13ce886de30fcc3fdf921a1396e9da83eaa60b294ad66015796e0491e"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037LUTS.zip",
         "name": "1037LUTS.zip",
-        "bytes": 960521,
-        "sha256": "bd31cf320bd5fc4586ead553c5ba07ec45a720b4bc3485aa086191ebb5efeca8"
+        "bytes": 961957,
+        "sha256": "bb553954fa0f081a0ca1773d2823b792fae2678b0c878eca56c80699f0e622c9"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.002001364083839991,
-          "p95": 0.006313314244080185,
-          "p99": 0.012408684929268912,
-          "max": 0.03237073595253104,
+          "mean": 0.001980252042226541,
+          "p95": 0.006197049140227448,
+          "p99": 0.011816253852205786,
+          "max": 0.035177159019653015,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.001955900140229066,
-          "p95": 0.006022773825259793,
-          "p99": 0.010444849510402596,
-          "max": 0.02623533673844078,
+          "mean": 0.0019409736183595562,
+          "p95": 0.00603899027096619,
+          "p99": 0.010458572719136314,
+          "max": 0.0249890257690209,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -294,32 +308,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037DC-L10.zip",
         "name": "1037STD.cube",
         "bytes": 1293943,
-        "sha256": "20dd96568f2a03c86e1b9e08d0b2fdb12f2db75f9fcf68f27a1dcce9cd874d2f",
+        "sha256": "55fdbc698b3a8af917715b02b595b95c6328b35474d25de04f20745a6fd657ab",
         "encoding": "zip-entry",
-        "transferBytes": 960817,
-        "transferSha256": "22d220543014c54a57f3a5879c18e69725b11baabccb319bb4a5223481f9c1d6"
+        "transferBytes": 961900,
+        "transferSha256": "f4a352211552121755f8e9891eb5e9dee6a39383f521d700e723fc630900fd00"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037DC-L10.zip",
         "name": "1037DC-L10.zip",
-        "bytes": 960817,
-        "sha256": "22d220543014c54a57f3a5879c18e69725b11baabccb319bb4a5223481f9c1d6"
+        "bytes": 961900,
+        "sha256": "f4a352211552121755f8e9891eb5e9dee6a39383f521d700e723fc630900fd00"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0022213113164669435,
-          "p95": 0.007078241071812729,
-          "p99": 0.016993788665185843,
-          "max": 0.08535343065900697,
+          "mean": 0.0021985520143012528,
+          "p95": 0.006860755572517235,
+          "p99": 0.016520541898530337,
+          "max": 0.08589375435061458,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0022204845937824733,
-          "p95": 0.0067658817314949025,
-          "p99": 0.01630726762820602,
-          "max": 0.046803330308070545,
+          "mean": 0.002206603089461368,
+          "p95": 0.007055719096024523,
+          "p99": 0.015832862348231846,
+          "max": 0.04621896683053417,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -339,32 +353,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037G9II.zip",
         "name": "1037STD.cube",
         "bytes": 1293941,
-        "sha256": "6b022aa051bc472cdfa2c4bfaa8233071822873f248e522bf6243959b980ff9c",
+        "sha256": "a00357a849dfaa9395894cd10b04df8fbee69324511429669cf1e62e33e48317",
         "encoding": "zip-entry",
-        "transferBytes": 960251,
-        "transferSha256": "596d708484c00566beed04f196ad4c4ec93209094f23dd8f938fc8183c226b7d"
+        "transferBytes": 961445,
+        "transferSha256": "4602ab6696d3543561b4d1f984fa2283fe12458f970a5ca963edc5db4ba50cdd"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037G9II.zip",
         "name": "1037G9II.zip",
-        "bytes": 960251,
-        "sha256": "596d708484c00566beed04f196ad4c4ec93209094f23dd8f938fc8183c226b7d"
+        "bytes": 961445,
+        "sha256": "4602ab6696d3543561b4d1f984fa2283fe12458f970a5ca963edc5db4ba50cdd"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0023249315944164585,
-          "p95": 0.007712783445981251,
-          "p99": 0.01694308903573048,
-          "max": 0.064027680970773,
+          "mean": 0.0023057205855766217,
+          "p95": 0.007512847584954981,
+          "p99": 0.016868070409574266,
+          "max": 0.06371268071526615,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.002365758724979963,
-          "p95": 0.007359563709112782,
-          "p99": 0.015785553108105428,
-          "max": 0.07414408007243922,
+          "mean": 0.002357588356181415,
+          "p95": 0.00740067990736602,
+          "p99": 0.01621765392702333,
+          "max": 0.07566094386880509,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -383,32 +397,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037GH6.zip",
         "name": "1037STD.cube",
         "bytes": 1293940,
-        "sha256": "feff430da28d277ca9227610d133c2ab0782b894a2fd740ea05c642426a8f089",
+        "sha256": "ab8e0d511eb1c3caf0da902c2bac96dc10c20cfee4b1d53b7cfe5c105d9e4738",
         "encoding": "zip-entry",
-        "transferBytes": 960551,
-        "transferSha256": "0ffa6def529835182990b58c3e169c81ddedb3f3bc2f73f733cc28cc2eb4ba22"
+        "transferBytes": 961758,
+        "transferSha256": "8921f7d42836b0d8120298336f7c7b82b447df06f5666d36d4009d1e62d85282"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037GH6.zip",
         "name": "1037GH6.zip",
-        "bytes": 960551,
-        "sha256": "0ffa6def529835182990b58c3e169c81ddedb3f3bc2f73f733cc28cc2eb4ba22"
+        "bytes": 961758,
+        "sha256": "8921f7d42836b0d8120298336f7c7b82b447df06f5666d36d4009d1e62d85282"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.002409303997824592,
-          "p95": 0.008124421518947773,
-          "p99": 0.01758376057018589,
-          "max": 0.04094658943379359,
+          "mean": 0.0024016926548791457,
+          "p95": 0.008223342479978532,
+          "p99": 0.01866051576116634,
+          "max": 0.04271108272179794,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.00241000898507413,
-          "p95": 0.007863584541272662,
-          "p99": 0.01644735196575392,
-          "max": 0.03789603157812976,
+          "mean": 0.002410771612982904,
+          "p95": 0.008017629087388737,
+          "p99": 0.017083402341530683,
+          "max": 0.03733072114134628,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -428,32 +442,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037GH7.zip",
         "name": "1037STD.cube",
         "bytes": 1293940,
-        "sha256": "fcefad97c639feb3e4e5caa3da6ae87f70a5762899bd4a13d3c22c7e6e8e5f49",
+        "sha256": "4a37772c99c054d7d16271e8c8abdff76b5fd1ae7bf16e8556a0702dbd03f98b",
         "encoding": "zip-entry",
-        "transferBytes": 960242,
-        "transferSha256": "b45f899d89c78b03a125092ea17c415918f25c4a6609677604263f45b94e0307"
+        "transferBytes": 961443,
+        "transferSha256": "b1dda2b2df79abe6e425e4fcb623cc070065b76a2fc0428d6f7016ea077dc00d"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037GH7.zip",
         "name": "1037GH7.zip",
-        "bytes": 960242,
-        "sha256": "b45f899d89c78b03a125092ea17c415918f25c4a6609677604263f45b94e0307"
+        "bytes": 961443,
+        "sha256": "b1dda2b2df79abe6e425e4fcb623cc070065b76a2fc0428d6f7016ea077dc00d"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0023249315944164585,
-          "p95": 0.007712783445981251,
-          "p99": 0.01694308903573048,
-          "max": 0.064027680970773,
+          "mean": 0.0023057205855766217,
+          "p95": 0.007512847584954981,
+          "p99": 0.016868070409574266,
+          "max": 0.06371268071526615,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.002365758724979963,
-          "p95": 0.007359563709112782,
-          "p99": 0.015785553108105428,
-          "max": 0.07414408007243922,
+          "mean": 0.002357588356181415,
+          "p95": 0.00740067990736602,
+          "p99": 0.01621765392702333,
+          "max": 0.07566094386880509,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -472,32 +486,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S1IIE.zip",
         "name": "1037STD.cube",
         "bytes": 1293942,
-        "sha256": "bef277e449fdb1303f0a2462a1fd96a4aa559ce2ae795704d73305f144880680",
+        "sha256": "163fe85f23d0416535639f5f09d800be61ad5e47229ca061cb100c80a5fa46c0",
         "encoding": "zip-entry",
-        "transferBytes": 960004,
-        "transferSha256": "ddbc7e44970eabc118d2ee875a81e4037165b21cd92aa9cb30e2e76b28161669"
+        "transferBytes": 961184,
+        "transferSha256": "fa4bf497bbef6146052bbd9602cf59b0392a4b9679d014cc72f49370f176a275"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S1IIE.zip",
         "name": "1037S1IIE.zip",
-        "bytes": 960004,
-        "sha256": "ddbc7e44970eabc118d2ee875a81e4037165b21cd92aa9cb30e2e76b28161669"
+        "bytes": 961184,
+        "sha256": "fa4bf497bbef6146052bbd9602cf59b0392a4b9679d014cc72f49370f176a275"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0022215868593356237,
-          "p95": 0.0073343448898974565,
-          "p99": 0.013882413408611268,
-          "max": 0.05432089188130085,
+          "mean": 0.002220577630203779,
+          "p95": 0.007430694315345405,
+          "p99": 0.013864314481938355,
+          "max": 0.05566551704718786,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.002238973067663259,
-          "p95": 0.0072428505583750835,
-          "p99": 0.013948389348758054,
-          "max": 0.06319448668299593,
+          "mean": 0.002243769154479402,
+          "p95": 0.0072898442970614815,
+          "p99": 0.013761768126419605,
+          "max": 0.06890943217997123,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -516,32 +530,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S1RII.zip",
         "name": "1037STD.cube",
         "bytes": 1293942,
-        "sha256": "e3097f23db2ce48fa344284971b1aabd623efa5c4b32cda5a3fa780ff37e0703",
+        "sha256": "86f2fd675cc1784dcf2912aa2b134b4f27d67dc54e6a943378a2120997a044a6",
         "encoding": "zip-entry",
-        "transferBytes": 960724,
-        "transferSha256": "2f77c21443687d8dd59fb1f4819324f5e68cbcfe8555ac7871f70037682bf87a"
+        "transferBytes": 962194,
+        "transferSha256": "2dbf8977ce537aef29080417f5e490006681d91d52c7c98989a6c77e875ee6b9"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S1RII.zip",
         "name": "1037S1RII.zip",
-        "bytes": 960724,
-        "sha256": "2f77c21443687d8dd59fb1f4819324f5e68cbcfe8555ac7871f70037682bf87a"
+        "bytes": 962194,
+        "sha256": "2dbf8977ce537aef29080417f5e490006681d91d52c7c98989a6c77e875ee6b9"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0020019925972836177,
-          "p95": 0.006468258493818446,
-          "p99": 0.011464508626345347,
-          "max": 0.06600844041806694,
+          "mean": 0.001982878651799522,
+          "p95": 0.006598211625283798,
+          "p99": 0.011311418241133724,
+          "max": 0.05922935544500513,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0019535319149094287,
-          "p95": 0.00596225908140232,
-          "p99": 0.010614153487429724,
-          "max": 0.04095670909507704,
+          "mean": 0.0019430546037765824,
+          "p95": 0.006064918733790341,
+          "p99": 0.010912607076918643,
+          "max": 0.03673156905874078,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -559,32 +573,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S5II.zip",
         "name": "1037STD.cube",
         "bytes": 1293941,
-        "sha256": "7ef21871542c454ea4e2ea480cd54512fe49db697dca4b8ed1fb591a98db5463",
+        "sha256": "046ac255b631377710ba22163797e1cd606162e6e07a2858ca8b158389d6a000",
         "encoding": "zip-entry",
-        "transferBytes": 959619,
-        "transferSha256": "1b4f7fe2f7f8ea210a5f87f81dbc96c51fae59ceab13da5d93e08b3d8541ef64"
+        "transferBytes": 960657,
+        "transferSha256": "abc05486b2cc87f6b32a37fe3e1bb11322a228f8d053a1609ae41fbe89baeea8"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S5II.zip",
         "name": "1037S5II.zip",
-        "bytes": 959619,
-        "sha256": "1b4f7fe2f7f8ea210a5f87f81dbc96c51fae59ceab13da5d93e08b3d8541ef64"
+        "bytes": 960657,
+        "sha256": "abc05486b2cc87f6b32a37fe3e1bb11322a228f8d053a1609ae41fbe89baeea8"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.002178028021261594,
-          "p95": 0.007062179133933586,
-          "p99": 0.013781367143406536,
-          "max": 0.06273521558879566,
+          "mean": 0.0021681208550211038,
+          "p95": 0.007103434969916608,
+          "p99": 0.014188631235415682,
+          "max": 0.059760982583130645,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0021580870820163602,
-          "p95": 0.006783781200147715,
-          "p99": 0.01332871284868211,
-          "max": 0.03883758097615017,
+          "mean": 0.0021574584063337467,
+          "p95": 0.006954186593894345,
+          "p99": 0.013869919685550321,
+          "max": 0.03924623173979902,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -603,32 +617,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S5IIX.zip",
         "name": "1037STD.cube",
         "bytes": 1293942,
-        "sha256": "52d48aceea8add9b90bab7b7ab41dd8bb87c02b6c639ccdd8c0e1bbcf4e018d2",
+        "sha256": "1aa0d51c082b886e10e3c321cf9f12648dcffa051ce9cb2b745218b7f2e4a395",
         "encoding": "zip-entry",
-        "transferBytes": 959634,
-        "transferSha256": "eaae7749a4973aca2139b0597933364c587c1aea9b2c0d6b1750f680fef2669d"
+        "transferBytes": 960668,
+        "transferSha256": "08d4fcc81072cfec0534a555043fb7c5025f41344e114c650ed1502407a9f42e"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S5IIX.zip",
         "name": "1037S5IIX.zip",
-        "bytes": 959634,
-        "sha256": "eaae7749a4973aca2139b0597933364c587c1aea9b2c0d6b1750f680fef2669d"
+        "bytes": 960668,
+        "sha256": "08d4fcc81072cfec0534a555043fb7c5025f41344e114c650ed1502407a9f42e"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.002178028021261594,
-          "p95": 0.007062179133933586,
-          "p99": 0.013781367143406536,
-          "max": 0.06273521558879566,
+          "mean": 0.0021681208550211038,
+          "p95": 0.007103434969916608,
+          "p99": 0.014188631235415682,
+          "max": 0.059760982583130645,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0021580870820163602,
-          "p95": 0.006783781200147715,
-          "p99": 0.01332871284868211,
-          "max": 0.03883758097615017,
+          "mean": 0.0021574584063337467,
+          "p95": 0.006954186593894345,
+          "p99": 0.013869919685550321,
+          "max": 0.03924623173979902,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -647,32 +661,32 @@
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S9.zip",
         "name": "1037STD.cube",
         "bytes": 1293939,
-        "sha256": "6ff650e183995536240d701ff2b5c1ce7fff3026e0d1f9ab20a0c022041e21e4",
+        "sha256": "d263ef914877a5767f454983e4ce3c694f9531bbee1539edb1f82eddf9579d4c",
         "encoding": "zip-entry",
-        "transferBytes": 959581,
-        "transferSha256": "8ab216197b5ea2f46c24f8355e8b97a7f368fba512c071f81d0c30aba88903c4"
+        "transferBytes": 961018,
+        "transferSha256": "7c7deb5fb336e1390fe9cfcd9ef65863bf217673542daedfa2dc3abc97cf46d9"
       },
       "zip": {
         "path": "/luts/fujifilm_xtra_400__kodak_endura_premier__filmcast/1037S9.zip",
         "name": "1037S9.zip",
-        "bytes": 959581,
-        "sha256": "8ab216197b5ea2f46c24f8355e8b97a7f368fba512c071f81d0c30aba88903c4"
+        "bytes": 961018,
+        "sha256": "7c7deb5fb336e1390fe9cfcd9ef65863bf217673542daedfa2dc3abc97cf46d9"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0021781820581959527,
-          "p95": 0.007062202320218595,
-          "p99": 0.01389140651021136,
-          "max": 0.06271056997060945,
+          "mean": 0.002168422103846991,
+          "p95": 0.007051770491242381,
+          "p99": 0.014173790379840713,
+          "max": 0.05974743574435884,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.002158235717264567,
-          "p95": 0.006765859673992076,
-          "p99": 0.013325380307979733,
-          "max": 0.03872915136840796,
+          "mean": 0.002157677557721954,
+          "p95": 0.006927936520161897,
+          "p99": 0.013863303823546442,
+          "max": 0.03912952323609187,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -689,6 +703,6 @@
   },
   "previews": {},
   "previewMode": "runtime-std",
-  "generatedAt": "2026-11-05T14:31:19.715081+00:00",
-  "seconds": 1.682
+  "generatedAt": "2026-11-05T15:18:37.891094+00:00",
+  "seconds": 1.729
 }

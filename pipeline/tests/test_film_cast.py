@@ -45,7 +45,7 @@ def test_amount_one_reproduces_the_base_look_exactly():
     assert np.array_equal(run_blend_reference(s, points, 1.), run_pipeline_at(s, BundleBuilder(s).build(), 0, points))
 
 
-@pytest.mark.parametrize('film', ['fujifilm_xtra_400', 'kodak_portra_800', 'kodak_vision3_500t'])
+@pytest.mark.parametrize('film', ['kodak_portra_800', 'kodak_verita_200d', 'kodak_vision3_50d'])
 def test_amount_is_solved_to_the_gray_chroma_target(film):
     s = spec(film)
     amount, chroma, hue = solve_amount(s)
@@ -81,9 +81,8 @@ def test_reference_film_thirty_percent_is_exactly_the_base_look(paper):
 
 @pytest.mark.parametrize('film,paper', [
     (film, paper)
-    for film in (REFERENCE_FILM, 'kodak_ektar_100', 'kodak_portra_160', 'kodak_gold_200')
+    for film in (REFERENCE_FILM, 'kodak_ektar_100', 'kodak_portra_160')
     for paper in PAPERS
-    if not (film == 'kodak_gold_200' and paper == PAPER)
 ])
 def test_previous_thirty_one_exclusions_are_available(film, paper):
     amount, chroma, hue, shift = plan({'film': film, 'paper': paper})
@@ -117,7 +116,7 @@ def test_hue_shift_needs_the_films_own_filters():
     with pytest.raises(ValueError):
         blend_settings('fujifilm_c200', PAPER, 1., (40., 0.))
     with pytest.raises(ValueError):
-        solve_hue_shift(spec('kodak_gold_200'))
+        solve_hue_shift(spec('kodak_portra_800'))
 
 
 def test_shifted_cube_matches_the_independent_reference():
@@ -129,3 +128,18 @@ def test_shifted_cube_matches_the_independent_reference():
     points = np.random.default_rng(3).random((256, 3))
     direct = run_blend_reference(s, points, 1., shift)
     assert np.max(np.abs(apply_tetrahedral(cube, points) - direct)) < 0.02
+
+
+@pytest.mark.parametrize('film', ['fujifilm_xtra_400', 'kodak_gold_200', 'kodak_ultramax_400', 'kodak_vision3_200t', 'kodak_vision3_500t'])
+def test_other_editorial_hue_films_reach_their_hue(film):
+    amount, chroma, hue, shift = plan({'film': film, 'paper': PAPER})
+    assert amount == 1. and shift != (0., 0.) and all(abs(v) <= 30. for v in shift)
+    assert abs(chroma - target_chroma(film)) < 0.3
+    assert _hue_distance(hue, target_hue(film)) < 2.
+
+
+@pytest.mark.parametrize('film', ['kodak_portra_160', 'kodak_vision3_50d', 'kodak_vision3_250d'])
+def test_neutral_known_films_keep_only_a_hint_of_cast(film):
+    amount, chroma, _, shift = plan({'film': film, 'paper': PAPER})
+    assert shift == (0., 0.) and MIN_AMOUNT <= amount < 1
+    assert target_chroma(film) == 2. and abs(chroma - 2.) < 0.6

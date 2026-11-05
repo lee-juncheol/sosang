@@ -27,9 +27,10 @@
 - 추천 인화지: Gold 200·Ultramax 400을 Portra Endura → Ektacolor Edge로 변경(`pipeline/common.py`의 `RECOMMENDED_PRINT`). 갤러리 Gold 200 사진은 촬영 당시 조합(Portra Endura) 유지.
 - `~/Downloads/sosang 추천 현상 LUT (S1II STD)/`에 16종 추천 LUT와 `목록.txt`를 새로 만듦.
 
+- 추천 현상 실제 필름 비교(2026-11-06): X-Tra 400·Gold 200·Ultramax 400·Vision3 200T/500T 색 방향 지정, Portra 160·Vision3 50D/250D 세기 C* 2로 낮춤. Ektar 100·Verita 200D는 채도가 알려진 특징보다 낮지만 엔진 데이터라 그대로(`docs/film-cast.md`).
+
 ## 남은 일
 
-- X-Tra 400(주황), Gold 200·Ultramax 400(분홍)도 알려진 색과 방향이 다름. 필요하면 `TARGET_HUE`에 추가.
 - 구주소(`film-lab.film-lab-jc.workers.dev`) Worker는 이번에 다시 배포하지 않음.
 
 ## 참고

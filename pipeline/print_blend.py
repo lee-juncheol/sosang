@@ -55,12 +55,18 @@ DATABASE_PATH = UPSTREAM / 'src/spektrafilm/data/filters/neutral_print_filters.j
 # with every variant and shown in the UI.
 AMOUNT_POLICY = 'chroma-target'
 TARGET_CHROMA_DEFAULT = 6.0
-TARGET_CHROMA = {'kodak_vision3_200t': 10.0, 'kodak_vision3_500t': 10.0}
+TARGET_CHROMA = {'kodak_vision3_200t': 10.0, 'kodak_vision3_500t': 10.0,
+                 # Known as the most neutral Portra / daylight-balanced cine stocks: keep only a hint.
+                 'kodak_portra_160': 2.0, 'kodak_vision3_50d': 2.0, 'kodak_vision3_250d': 2.0}
 MIN_AMOUNT = 0.2
 # Editorial cast direction (CIELAB hue, degrees) for films whose database
-# direction is the opposite of their known look. C200 would otherwise print
-# orange-yellow (hue 51-63); it is remembered as green/cyan.
-TARGET_HUE = {'fujifilm_c200': 180.0}
+# direction is the opposite of their known look (database hue in brackets):
+#   C200 green-cyan (orange-yellow 51-63), X-Tra 400 green (orange 50-64),
+#   Gold 200 warm golden yellow and Ultramax 400 warm orange-yellow (pink-red),
+#   Vision3 tungsten stocks in daylight cyan-blue (green-cyan 168-202).
+TARGET_HUE = {'fujifilm_c200': 180.0, 'fujifilm_xtra_400': 160.0,
+              'kodak_gold_200': 75.0, 'kodak_ultramax_400': 60.0,
+              'kodak_vision3_200t': 215.0, 'kodak_vision3_500t': 215.0}
 DIRECTION_POLICY_DATA = 'film-data'
 DIRECTION_POLICY_HUE = 'editorial-hue'
 HUE_FORMULA = 'appliedCC = filmCC + hueShiftCC'
@@ -69,7 +75,7 @@ LIMITATIONS = [
     'Experimental Film Lab variant, not an upstream spektrafilm preset.',
     'The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.',
     'The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.',
-    'Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.',
+    'Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.',
     'Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.',
     'Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized.',
 ]
