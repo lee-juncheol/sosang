@@ -7,7 +7,7 @@
 | EXIF의 LUT1 이름 | 사진 수 | 필름 | 앱의 추천 출력 |
 |---|---:|---|---|
 | Fujifilm C200 Alchemy TEST.cube | 22 | Fujifilm C200 | Fujifilm Crystal Archive Type II |
-| Kodak Gold 200.cube | 23 | Kodak Gold 200 | Kodak Portra Endura |
+| Kodak Gold 200.cube | 23 | Kodak Gold 200 | Kodak Portra Endura (촬영 당시 추천) |
 | Kodak Ektar 100 .cube | 21 | Kodak Ektar 100 | Kodak Portra Endura |
 | Kodak Vision3 200T.cube | 21 | Kodak Vision3 200T | Kodak Vision 2383 |
 | Fujifilm Velvia 100.cube | 21 | Fujifilm Velvia 100 | 슬라이드 직접 스캔 · 인화지 없음 |
@@ -15,7 +15,7 @@
 
 갤러리 108장은 LUT1 강도 100%, LUT2 강도 0%입니다. STD 입력 13장은 두 LUT의 이름이 비어 있고 강도가 모두 0이며, EXIF의 Contrast/Saturation/Sharpness는 Normal입니다.
 
-필름은 EXIF에 기록된 LUT 파일명으로 식별했습니다. EXIF에 인화지명이나 LUT 전체 데이터가 들어 있는 것은 아닙니다. 인화지 연결은 “웹앱 추천 인화지로 촬영했다”는 사용자 설명과 현재 카탈로그의 `recommendedPrint`를 근거로 합니다. Velvia 100은 슬라이드이므로 카탈로그의 직접 스캔 조합을 연결합니다. 파일명만으로 카메라에 들어간 LUT의 바이트가 현재 다운로드와 같다는 점까지 검증할 수는 없습니다.
+필름은 EXIF에 기록된 LUT 파일명으로 식별했습니다. EXIF에 인화지명이나 LUT 전체 데이터가 들어 있는 것은 아닙니다. 인화지 연결은 “웹앱 추천 인화지로 촬영했다”는 사용자 설명과 현재 카탈로그의 `recommendedPrint`를 근거로 합니다. 이후 Gold 200의 추천 인화지는 Ektacolor Edge로 바뀌었지만, 갤러리는 실제 촬영한 Portra Endura 조합을 그대로 유지합니다(`recommendedAtCapture`). Velvia 100은 슬라이드이므로 카탈로그의 직접 스캔 조합을 연결합니다. 파일명만으로 카메라에 들어간 LUT의 바이트가 현재 다운로드와 같다는 점까지 검증할 수는 없습니다.
 
 ## 화면 동작
 

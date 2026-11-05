@@ -59,6 +59,11 @@ export function inspectWebp(bytes) {
   return dimensions;
 }
 
+// The 2026-11-04 photographs were shot with the paper recommended at that
+// time. Gold 200 was later re-recommended on Ektacolor Edge; the gallery keeps
+// the pairing it was actually shot with.
+export const recommendedAtCapture = { kodak_gold_200: 'kodak_portra_endura' };
+
 export function assertPhotoContract(gallery, catalog) {
   assert.equal(gallery.schemaVersion, 1);
   assert.equal(gallery.source, 'user-provided');
@@ -74,7 +79,7 @@ export function assertPhotoContract(gallery, catalog) {
     const combo = catalog.combinations.find(combo => combo.id === item.combinationId);
     assert(film && combo, 'Unknown gallery film or combination');
     assert.equal(combo.film, film.id, 'Gallery combination uses another film');
-    assert.equal(item.paperId, film.recommendedPrint, 'Gallery paper differs from the user-confirmed recommended setting');
+    assert.equal(item.paperId, recommendedAtCapture[film.id] ?? film.recommendedPrint, 'Gallery paper differs from the user-confirmed recommended setting');
     assert.equal(combo.paper, item.paperId, 'Gallery combination uses another paper');
     if (film.type === 'positive') {
       assert.equal(item.paperId, null, 'Slide gallery photographs must not claim a paper');

@@ -30,13 +30,23 @@ def save_json(path: Path, value) -> None:
     tmp.replace(path)
 
 
+# Recommended print overrides on top of spektrafilm's `target_print`.
+# Kodak's consumer films (Gold, MAX/Ultramax) are minilab films; Kodak's
+# EKTACOLOR EDGE Generations data names them as the films that paper was tuned
+# for, while upstream pairs them with the professional portrait paper.
+RECOMMENDED_PRINT = {
+    "kodak_gold_200": "kodak_ektacolor_edge",
+    "kodak_ultramax_400": "kodak_ektacolor_edge",
+}
+
+
 def profiles():
     result = []
     for path in sorted(PROFILES.glob("*.json")):
         info = json.loads(path.read_text())["info"]
         result.append({"id": path.stem, "name": info["name"], "type": info["type"],
                        "stage": info["stage"], "brand": info["name"].split()[0],
-                       "use": info.get("use"), "recommendedPrint": info.get("target_print"),
+                       "use": info.get("use"), "recommendedPrint": RECOMMENDED_PRINT.get(path.stem, info.get("target_print")),
                        "sha256": sha256(path)})
     return result
 

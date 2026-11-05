@@ -24,6 +24,8 @@
 - C200 추천 현상: 필름 데이터대로면 주황·노랑으로 남아 알려진 색과 반대여서, C200만 색상각 180°(초록~청록)로 방향을 지정함(`TARGET_HUE`, `docs/film-cast.md`). 다른 15종은 그대로.
 - 오래된 Python 테스트 정리(은퇴한 FUJI 공식 룩·이전 개수), 루트 `pytest.ini`로 napari 플러그인의 numba 충돌 해결. Python 327 통과·2 건너뜀, 웹 테스트 통과.
 - 커밋: 브랜치 `film-cast-print-timing` (main 병합·push 안 함).
+- 추천 인화지: Gold 200·Ultramax 400을 Portra Endura → Ektacolor Edge로 변경(`pipeline/common.py`의 `RECOMMENDED_PRINT`). 갤러리 Gold 200 사진은 촬영 당시 조합(Portra Endura) 유지.
+- `~/Downloads/sosang 추천 현상 LUT (S1II STD)/`에 16종 추천 LUT와 `목록.txt`를 새로 만듦.
 
 ## 남은 일
 

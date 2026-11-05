@@ -64,6 +64,9 @@ SAMPLE_NAMES = {
 LICENSE = 'User photograph; all rights reserved. Not covered by the LUT or source-code license.'
 
 
+# Gold 200 was re-recommended on Ektacolor Edge after this collection was shot.
+RECOMMENDED_AT_CAPTURE = {'kodak_gold_200': 'kodak_portra_endura'}
+
 def srgb_profile_bytes() -> bytes:
     """Fixed ICC timestamp keeps repeated imports byte reproducible."""
     profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
@@ -167,7 +170,8 @@ def prepare_photo(row: dict, films: dict, combinations: list[dict], staging: Pat
             'license': LICENSE, 'width': width, 'height': height,
             'preparation': 'EXIF orientation applied; resized to max 1920px with Lanczos; WebP quality 95 with sRGB ICC; source ICC honoured; no LUT, tone or saturation edit; EXIF and XMP removed.',
         }
-    paper_id = films[film_id]['recommendedPrint']
+    # Keep the paper that was recommended when the photographs were taken.
+    paper_id = RECOMMENDED_AT_CAPTURE.get(film_id, films[film_id]['recommendedPrint'])
     matches = [c for c in combinations if c['film'] == film_id and c['paper'] == paper_id]
     if len(matches) != 1:
         raise ValueError(f'Expected one recommended combination for {film_id}, found {len(matches)}')
