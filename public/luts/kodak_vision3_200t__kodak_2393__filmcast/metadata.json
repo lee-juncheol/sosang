@@ -1,0 +1,694 @@
+{
+  "id": "kodak_vision3_200t__kodak_2393__filmcast",
+  "film": "kodak_vision3_200t",
+  "paper": "kodak_2393",
+  "number": 1131,
+  "processMode": "negative_print",
+  "castBaseId": "kodak_vision3_200t__kodak_2393",
+  "status": "ready",
+  "filmCast": {
+    "method": "spektrafilm-print-reference-blend-v1",
+    "amount": 0.2,
+    "percent": 20,
+    "experimental": true,
+    "film": "kodak_vision3_200t",
+    "paper": "kodak_2393",
+    "illuminant": "TH-KG3",
+    "channelOrder": [
+      "C",
+      "M",
+      "Y"
+    ],
+    "units": "Kodak CC; 100 CC = 1.0 filter optical density",
+    "referenceFilm": "kodak_portra_400",
+    "baseline": "Reference film neutral filters on the same paper (fixed lab pack)",
+    "filmCC": [
+      0.0,
+      54.32385084848879,
+      68.21451403644409
+    ],
+    "referenceCC": [
+      0.0,
+      65.1566496976183,
+      75.53371406317152
+    ],
+    "appliedCC": [
+      0.0,
+      62.990089927792404,
+      74.06987405782603
+    ],
+    "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+    "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
+    "databaseReload": false,
+    "normalizePrintExposure": true,
+    "filterShifts": {
+      "M": 0,
+      "Y": 0
+    },
+    "imageStatistics": false,
+    "outputRgbMixing": false,
+    "notes": [
+      "Experimental Film Lab variant, not an upstream spektrafilm preset.",
+      "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
+      "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
+      "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+      "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
+      "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
+    ],
+    "amountPolicy": "chroma-target",
+    "targetChroma": 10.0,
+    "grayChroma": 9.067987829018834,
+    "grayHue": 186.29732197166345,
+    "calibrationGray": {
+      "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
+      "outputSpace": "sRGB, 8-bit scale (unrounded)",
+      "base": [
+        111.06526244729952,
+        111.82547631558349,
+        112.03931781386459
+      ],
+      "filmCast": [
+        95.11176111290328,
+        117.83647218629808,
+        114.63246759320182
+      ]
+    }
+  },
+  "qa": {
+    "fileChecks": "passed",
+    "rowsPerCube": 35937,
+    "serializationMaxError": 4.999956710258213e-07,
+    "processMode": "negative_print",
+    "scanFilm": false,
+    "referenceModel": "spektrafilm-print-reference-blend-v1",
+    "vlogVsDirectEngine": {
+      "tetrahedral": {
+        "mean": 0.0019266777564322514,
+        "p95": 0.005793681941211972,
+        "p99": 0.013812856635440865,
+        "max": 0.04675939154130217,
+        "samples": 4350,
+        "metric": "max absolute RGB channel error",
+        "space": "encoded sRGB 0–1"
+      },
+      "trilinear": {
+        "mean": 0.002561858538659261,
+        "p95": 0.007981519188497772,
+        "p99": 0.018592533152999934,
+        "max": 0.04224708153121248,
+        "samples": 4350,
+        "metric": "max absolute RGB channel error",
+        "space": "encoded sRGB 0–1"
+      }
+    },
+    "cameraVerified": false,
+    "filmCast": {
+      "method": "spektrafilm-print-reference-blend-v1",
+      "amount": 0.2,
+      "percent": 20,
+      "experimental": true,
+      "film": "kodak_vision3_200t",
+      "paper": "kodak_2393",
+      "illuminant": "TH-KG3",
+      "channelOrder": [
+        "C",
+        "M",
+        "Y"
+      ],
+      "units": "Kodak CC; 100 CC = 1.0 filter optical density",
+      "referenceFilm": "kodak_portra_400",
+      "baseline": "Reference film neutral filters on the same paper (fixed lab pack)",
+      "filmCC": [
+        0.0,
+        54.32385084848879,
+        68.21451403644409
+      ],
+      "referenceCC": [
+        0.0,
+        65.1566496976183,
+        75.53371406317152
+      ],
+      "appliedCC": [
+        0.0,
+        62.990089927792404,
+        74.06987405782603
+      ],
+      "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+      "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
+      "databaseReload": false,
+      "normalizePrintExposure": true,
+      "filterShifts": {
+        "M": 0,
+        "Y": 0
+      },
+      "imageStatistics": false,
+      "outputRgbMixing": false,
+      "notes": [
+        "Experimental Film Lab variant, not an upstream spektrafilm preset.",
+        "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
+        "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
+        "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+        "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
+        "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
+      ],
+      "amountPolicy": "chroma-target",
+      "targetChroma": 10.0,
+      "grayChroma": 9.067987829018834,
+      "grayHue": 186.29732197166345,
+      "calibrationGray": {
+        "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
+        "outputSpace": "sRGB, 8-bit scale (unrounded)",
+        "base": [
+          111.06526244729952,
+          111.82547631558349,
+          112.03931781386459
+        ],
+        "filmCast": [
+          95.11176111290328,
+          117.83647218629808,
+          114.63246759320182
+        ]
+      }
+    },
+    "stdMethod": "camera-vlog-alchemy-v1",
+    "stdGeneration": "camera-vlog-alchemy-v1",
+    "camera": "S1II",
+    "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+    "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+    "stdVsDirectEngine": {
+      "tetrahedral": {
+        "mean": 0.0014573748769670818,
+        "p95": 0.005064463713762984,
+        "p99": 0.009717893549495689,
+        "max": 0.026542116150338246,
+        "samples": 4478,
+        "metric": "max absolute RGB channel error",
+        "space": "encoded sRGB 0–1"
+      },
+      "trilinear": {
+        "mean": 0.0013275884350653717,
+        "p95": 0.004726371362961235,
+        "p99": 0.009364581626304323,
+        "max": 0.02633084782409016,
+        "samples": 4478,
+        "metric": "max absolute RGB channel error",
+        "space": "encoded sRGB 0–1"
+      }
+    },
+    "stdSerializationMaxError": 4.999968217234141e-10,
+    "sourceVlogSha256": "012a4d0d0d8241edf9e3e4779576dc5d4e87a23727df5f7f2a7cd575b1b7f7b3",
+    "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
+    "vlogUnchanged": true,
+    "warnings": [
+      "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+      "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+      "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+      "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+      "Matched controlled capture validation is pending for this camera model."
+    ],
+    "cameraInterpolation": "Undocumented. Both tetrahedral and trilinear output evaluation are measured.",
+    "sampling": {
+      "randomRgb": 4096,
+      "neutralRamp": 257,
+      "grid": 125,
+      "seed": 20261102
+    }
+  },
+  "files": {
+    "std": {
+      "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131STD.cube",
+      "name": "1131STD.cube",
+      "bytes": 1293941,
+      "sha256": "d41b504a1d4b1058955e84f1b877e22cc241cf7d7418e02387547e215f2d9128"
+    },
+    "vlog": {
+      "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131VLOG.cube",
+      "name": "1131VLOG.cube",
+      "bytes": 970431,
+      "sha256": "012a4d0d0d8241edf9e3e4779576dc5d4e87a23727df5f7f2a7cd575b1b7f7b3"
+    },
+    "zip": {
+      "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131LUTS.zip",
+      "name": "1131LUTS.zip",
+      "bytes": 982798,
+      "sha256": "b9e7860a6763cbfdef66b8f61d56df29194456c35b20e252f19bb0867941a09f"
+    },
+    "qa": {
+      "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/qa.json",
+      "name": "qa.json",
+      "bytes": 5556,
+      "sha256": "32056834453e5b9fa405f386696aec6b7ae6813fd4d1babbb95c4ce20c181384"
+    },
+    "provenance": {
+      "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/provenance.json",
+      "name": "provenance.json",
+      "bytes": 11372,
+      "sha256": "5a7cbdc9b5e90b58cc1850a1d4d2c39aa2ca4c5ab7ff873972be225f5b17b515"
+    }
+  },
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdByCamera": {
+    "S1II": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131STD.cube",
+        "name": "1131STD.cube",
+        "bytes": 1293941,
+        "sha256": "d41b504a1d4b1058955e84f1b877e22cc241cf7d7418e02387547e215f2d9128"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131LUTS.zip",
+        "name": "1131LUTS.zip",
+        "bytes": 982798,
+        "sha256": "b9e7860a6763cbfdef66b8f61d56df29194456c35b20e252f19bb0867941a09f"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0014573748769670818,
+          "p95": 0.005064463713762984,
+          "p99": 0.009717893549495689,
+          "max": 0.026542116150338246,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0013275884350653717,
+          "p95": 0.004726371362961235,
+          "p99": 0.009364581626304323,
+          "max": 0.02633084782409016,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "DC-L10": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131DC-L10.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293943,
+        "sha256": "4a85acb04419306bd6371ab0dd08d46bbfb3c723707c6b4cb9da8c8c9f9c7b2c",
+        "encoding": "zip-entry",
+        "transferBytes": 982778,
+        "transferSha256": "4ba53b0bfaeb714772cdd5fa84a189af730ce1cbd36f64b1aaebf025168e4834"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131DC-L10.zip",
+        "name": "1131DC-L10.zip",
+        "bytes": 982778,
+        "sha256": "4ba53b0bfaeb714772cdd5fa84a189af730ce1cbd36f64b1aaebf025168e4834"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0015852177730889395,
+          "p95": 0.0058313119368220675,
+          "p99": 0.013028040966758575,
+          "max": 0.030546055620897516,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0014486959258438038,
+          "p95": 0.00546250692745808,
+          "p99": 0.01190730849217254,
+          "max": 0.034245647461022766,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model.",
+        "For DC-L10 only. This adapter is not compatible with the older DMC-L10."
+      ]
+    },
+    "G9II": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131G9II.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293941,
+        "sha256": "3fdf3cc42253b3e6ea4a2a0b82b6a3db8e1a2f8abd7f40eff988b1fa231d3464",
+        "encoding": "zip-entry",
+        "transferBytes": 983056,
+        "transferSha256": "e60b014ea3294abcfb6f4ce09c2893cd474ddff6af23deadcea9e0932a4aa8bd"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131G9II.zip",
+        "name": "1131G9II.zip",
+        "bytes": 983056,
+        "sha256": "e60b014ea3294abcfb6f4ce09c2893cd474ddff6af23deadcea9e0932a4aa8bd"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0016803934569727813,
+          "p95": 0.005735507702965402,
+          "p99": 0.014123165283472816,
+          "max": 0.041493188180341756,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001516193371855634,
+          "p95": 0.005275441764964683,
+          "p99": 0.013400832473358259,
+          "max": 0.033872857262369716,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "GH6": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131GH6.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293940,
+        "sha256": "03afe1473f9f5fca5e2cb899160ee3e30d61b53c0d91bbb70aaac6c161bdba5f",
+        "encoding": "zip-entry",
+        "transferBytes": 983134,
+        "transferSha256": "cbfb236f652df42dd246260a4f7425cb074ed932d9daa2ea782d65eb18565049"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131GH6.zip",
+        "name": "1131GH6.zip",
+        "bytes": 983134,
+        "sha256": "cbfb236f652df42dd246260a4f7425cb074ed932d9daa2ea782d65eb18565049"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001838141604700731,
+          "p95": 0.006876856400612943,
+          "p99": 0.015713449162687843,
+          "max": 0.048689517832759266,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001668663901059807,
+          "p95": 0.0061929152329907,
+          "p99": 0.01539152346150581,
+          "max": 0.05358079012881645,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model.",
+        "GH6: post-processing only; Standard capture cannot bake this LUT in camera."
+      ]
+    },
+    "GH7": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131GH7.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293940,
+        "sha256": "87f965b4e9d3517f122c10f9142e51a034667b58c8ad851daa073f099956a81d",
+        "encoding": "zip-entry",
+        "transferBytes": 983044,
+        "transferSha256": "4e6988abca131ea4b51896882e830a0c7f10825cc1f6565e8ab41f006c9f661a"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131GH7.zip",
+        "name": "1131GH7.zip",
+        "bytes": 983044,
+        "sha256": "4e6988abca131ea4b51896882e830a0c7f10825cc1f6565e8ab41f006c9f661a"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0016803934569727813,
+          "p95": 0.005735507702965402,
+          "p99": 0.014123165283472816,
+          "max": 0.041493188180341756,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001516193371855634,
+          "p95": 0.005275441764964683,
+          "p99": 0.013400832473358259,
+          "max": 0.033872857262369716,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S1IIE": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S1IIE.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293942,
+        "sha256": "b4eacbe0d147cbbba5663ad7d0a02eb714e2aa3c1989bcff3f2c4f373ecbaa94",
+        "encoding": "zip-entry",
+        "transferBytes": 983347,
+        "transferSha256": "5abd7b00cf3bca7985a9b6114895b7f7189db96731d23567c3351d67641523e0"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S1IIE.zip",
+        "name": "1131S1IIE.zip",
+        "bytes": 983347,
+        "sha256": "5abd7b00cf3bca7985a9b6114895b7f7189db96731d23567c3351d67641523e0"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0016174871884668568,
+          "p95": 0.005713162187835225,
+          "p99": 0.011369825103744511,
+          "max": 0.04043512905283518,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.00153774029470244,
+          "p95": 0.005580729977812151,
+          "p99": 0.012301352662111485,
+          "max": 0.03760789725316033,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S1RII": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S1RII.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293942,
+        "sha256": "d70416c904f68ca4ceac29c5766c49c04794a9a4bedf6ccc2758b3fabbd987a3",
+        "encoding": "zip-entry",
+        "transferBytes": 982331,
+        "transferSha256": "a7dc12185dd7c6d6ee27a111aaf9b0ae660534e627c5270cf957f1ef48a773b0"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S1RII.zip",
+        "name": "1131S1RII.zip",
+        "bytes": 982331,
+        "sha256": "a7dc12185dd7c6d6ee27a111aaf9b0ae660534e627c5270cf957f1ef48a773b0"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0014890394343298136,
+          "p95": 0.0049724030576183955,
+          "p99": 0.012060297093306598,
+          "max": 0.03738567218147118,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0013335606602395548,
+          "p95": 0.004523970534806274,
+          "p99": 0.011650554140498382,
+          "max": 0.032883211971492715,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT."
+      ]
+    },
+    "S5II": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S5II.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293941,
+        "sha256": "a917be322bac9cb6a7acc3699d5d76f87b7ae6c6f08e93100ddb9cc7efa0e1a3",
+        "encoding": "zip-entry",
+        "transferBytes": 982703,
+        "transferSha256": "4a8b3a319651ae2d38752731a5cf96a1e6eb0708c500024cfa21650b5efee74d"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S5II.zip",
+        "name": "1131S5II.zip",
+        "bytes": 982703,
+        "sha256": "4a8b3a319651ae2d38752731a5cf96a1e6eb0708c500024cfa21650b5efee74d"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001578973646245292,
+          "p95": 0.005426237405416819,
+          "p99": 0.011676063608628542,
+          "max": 0.032041845644274966,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0014732902522491475,
+          "p95": 0.005318745228347665,
+          "p99": 0.012230178907437892,
+          "max": 0.027187483961184422,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S5IIX": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S5IIX.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293942,
+        "sha256": "8b0616984577e88796c26ecd51670673a0a71cb0062d7d2190091e50b245e86d",
+        "encoding": "zip-entry",
+        "transferBytes": 982712,
+        "transferSha256": "096205d81dbb7b4168b2a3e6c570ceb7364870a8dd2ae9d3546fb4d0cd74a7b2"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S5IIX.zip",
+        "name": "1131S5IIX.zip",
+        "bytes": 982712,
+        "sha256": "096205d81dbb7b4168b2a3e6c570ceb7364870a8dd2ae9d3546fb4d0cd74a7b2"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001578973646245292,
+          "p95": 0.005426237405416819,
+          "p99": 0.011676063608628542,
+          "max": 0.032041845644274966,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0014732902522491475,
+          "p95": 0.005318745228347665,
+          "p99": 0.012230178907437892,
+          "max": 0.027187483961184422,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S9": {
+      "std": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S9.zip",
+        "name": "1131STD.cube",
+        "bytes": 1293939,
+        "sha256": "a6cce5694ca04b696cb5a46b995015f043ab15af3ebabb60f19bcdb99b1ca60a",
+        "encoding": "zip-entry",
+        "transferBytes": 982766,
+        "transferSha256": "638e2ea946eda9b66f7f583782612081d176acceeff0756adde7686026c61fde"
+      },
+      "zip": {
+        "path": "/luts/kodak_vision3_200t__kodak_2393__filmcast/1131S9.zip",
+        "name": "1131S9.zip",
+        "bytes": 982766,
+        "sha256": "638e2ea946eda9b66f7f583782612081d176acceeff0756adde7686026c61fde"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001580424427626705,
+          "p95": 0.005445605437234473,
+          "p99": 0.011649255824812653,
+          "max": 0.03219960624018918,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0014740958993001863,
+          "p95": 0.005313652782542703,
+          "p99": 0.012189462763413818,
+          "max": 0.02706532141842738,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Upstream support is qualitative field feedback, not controlled quantitative camera validation."
+      ]
+    }
+  },
+  "previews": {},
+  "previewMode": "runtime-std",
+  "generatedAt": "2026-11-05T14:32:02.891517+00:00",
+  "seconds": 1.719
+}

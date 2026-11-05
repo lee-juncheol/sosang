@@ -36,7 +36,7 @@
     "target": "lumix_realtime_vlog",
     "stops_above_midgray": null,
     "output_gamut_compress": "cam16ucs",
-    "adapter": "analytic-srgb-vgamut-vlog-jpg-tone-v3",
+    "adapter": "camera-vlog-alchemy-v1",
     "seed": 20261102,
     "qa_random_samples": 4096,
     "positive_mode": "direct_scan"
@@ -133,50 +133,72 @@
   "scanFilm": false,
   "processingPath": "film exposure -> film development -> print exposure -> print development -> print scan",
   "digitalConversion": null,
-  "jpgToneProtection": {
-    "method": "film-lab-jpg-tone-protection-v1",
-    "input": "already rendered encoded sRGB / Standard JPEG",
-    "neutralSamples": 4097,
-    "neutralAxis": "uniform encoded sRGB 0..1; interpolate OKLab response at equal input linear Y",
-    "neutralToneRetention": 0.2,
-    "neutralCastRemoval": 1.0,
-    "lightness": "Lraw = Lmodel + (1-retention)*(cuberoot(inputY)-Lneutral); Ltarget = Lsource + limit*tanh((Lraw-Lsource)/limit)",
-    "limit": "min(0.028+0.012*exp(-((Lsource-0.6)/0.2)^2), 0.5*min(Lsource,1-Lsource)) in OKLab L",
-    "chroma": "(ab_model-ab_neutral) * clip(Ltarget/Lmodel, 0, 3)",
-    "gamutMapping": "reduce OKLab chroma at fixed lightness and hue; exact neutral black/white endpoints",
-    "digitalBlackCorrection": false,
-    "perImageAdaptation": false,
-    "vlogModified": false,
-    "cameraInverseCalibrated": false,
-    "physicalFilmOrPrintMatch": false,
-    "limitations": [
-      "An explicit Film Lab JPEG rendering policy; not unmodified upstream tonality or an official Fujifilm JPEG recipe.",
-      "Keeps model colour differences while reducing repeated tonality; gamut-boundary chroma and contrast can change.",
-      "Cannot restore source detail already clipped or lost by the camera."
-    ]
-  },
   "runtimeInitPrintProfile": null,
-  "adapter": {
-    "id": "analytic-srgb-vgamut-vlog-jpg-tone-v3",
-    "target": "S1M2 / S1II (camera validation pending)",
-    "source": "https://pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf",
-    "generation": "direct-engine-grid-jpg-tone-v3",
-    "inputGain": 1.0,
-    "contract": "L_STD grid(x) = JpgToneProtection(x, F_VLOG(VLogEncode(sRGBDecode(x) @ sRGB_to_VGamut.T))); F_VLOG is the continuous upstream engine, not the exported VLOG cube. Native linear input gain = 1.0; no intermediate VLOG LUT interpolation. The display-referred Film Lab protection reduces repeated model tonality, removes neutral casts, bounds coloured-shadow lightness changes and maps chroma into sRGB. This is not an inverse camera profile or unmodified upstream tonality.",
-    "limitation": "Analytic working model; does not invert the camera's proprietary Standard rendering."
-  },
   "effects": {
     "grain": false,
     "halation": false,
     "blur": false,
     "autoExposure": false
   },
-  "gamutPolicy": "Native colour model retains upstream compression. STD additionally maps OKLab chroma into sRGB at protected lightness and hue. VLOG is unchanged.",
-  "preview": "Verified LUT-OFF S1M2 Standard JPEGs (resized, color unchanged) and a synthetic sRGB chart -> exported STD LUT directly (tetrahedral) -> sRGB. Not a camera-applied LUT accuracy validation.",
+  "gamutPolicy": "Unchanged source VLOG output gamut mapping and clipping; no added output correction.",
+  "preview": "Selected camera Standard pixels -> selected merged STD cube once, tetrahedral interpolation.",
   "sampleManifestSha256": "d9d74695c1e44947904b490eab2cf3cc9d0b9c580401505021f9fb2c8fa59536",
   "environment": {
     "python": "3.13.18",
     "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
   },
-  "license": "CC BY-SA 4.0; derived from spektrafilm by Andrea Volpato"
+  "license": "CC BY-SA 4.0; derived from spektrafilm by Andrea Volpato",
+  "sourceRenderingMethod": "spektrafilm-runtime",
+  "methodId": "camera-vlog-alchemy-v1",
+  "sourceVlog": {
+    "name": "0136VLOG.cube",
+    "sha256": "89bb71b4fd9715e79923cedf67f02b815e15a9ed299dbe916700bad46af0c0de"
+  },
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdGeneration": "camera-vlog-alchemy-v1",
+  "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "cameraAdapter": {
+    "id": "S1II",
+    "sourceUrl": "https://github.com/shenmintao/V-Log-Alchemy",
+    "commit": "e51ba9a23458ff5c316f630b860eb0201139d126",
+    "sourcePath": "Luts/Panasonic-Standard/Conversion/S1IIS2V.cube",
+    "sha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
+    "validation": "pending",
+    "cameraUse": "in-camera",
+    "aliases": [
+      "S1II",
+      "DC-S1M2"
+    ],
+    "sourceValidation": {
+      "status": "fixed_endpoint_extrapolation",
+      "controlled_model_pair_pending": true
+    }
+  },
+  "composition": {
+    "method": "camera-vlog-alchemy-v1",
+    "formula": "L_STD(x) = L_VLOG(A_camera(x))",
+    "interpolation": {
+      "adapter": "trilinear",
+      "creative": "tetrahedral"
+    },
+    "outputResolution": 33,
+    "serializationDecimals": 9,
+    "extraToneCurve": false,
+    "outputColourCorrection": false,
+    "imageStatistics": false
+  },
+  "distribution": {
+    "stdMethod": "camera-vlog-alchemy-v1",
+    "camera": "S1II",
+    "stdSha256": "ec1708ffeb3b9c8da310afeabd2ac74e43377d9a8c952a38ad2a712a8f5af67c",
+    "vlogSha256": "89bb71b4fd9715e79923cedf67f02b815e15a9ed299dbe916700bad46af0c0de"
+  },
+  "cameraVerified": false,
+  "limitations": [
+    "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+    "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+    "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+    "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+    "Matched controlled capture validation is pending for this camera model."
+  ]
 }
