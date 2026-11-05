@@ -1,25 +1,25 @@
 {
   "fileChecks": "passed",
   "rowsPerCube": 35937,
-  "serializationMaxError": 4.999989735576804e-07,
+  "serializationMaxError": 4.999847639242105e-07,
   "processMode": "negative_print",
   "scanFilm": false,
   "referenceModel": "spektrafilm-print-reference-blend-v1",
   "vlogVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.0017631031940599604,
-      "p95": 0.005111271953974944,
-      "p99": 0.010974726554717821,
-      "max": 0.06815510355659145,
+      "mean": 0.0017676225248513245,
+      "p95": 0.004981397766266109,
+      "p99": 0.010583103886475556,
+      "max": 0.07381102570765273,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.0022682855582568315,
-      "p95": 0.007095508744503936,
-      "p99": 0.015249166625605161,
-      "max": 0.04804016922548618,
+      "mean": 0.002270657690774063,
+      "p95": 0.007021439909996993,
+      "p99": 0.01452993552239611,
+      "max": 0.05126269964041155,
       "samples": 4350,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
@@ -28,8 +28,8 @@
   "cameraVerified": false,
   "filmCast": {
     "method": "spektrafilm-print-reference-blend-v1",
-    "amount": 0.21,
-    "percent": 21,
+    "amount": 0.78,
+    "percent": 78,
     "experimental": true,
     "film": "kodak_vision3_250d",
     "paper": "kodak_2393",
@@ -54,8 +54,8 @@
     ],
     "appliedCC": [
       0.0,
-      64.1353948059664,
-      73.9057137055706
+      61.36341724291119,
+      69.4868555920824
     ],
     "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
     "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
@@ -71,14 +71,14 @@
       "Experimental Film Lab variant, not an upstream spektrafilm preset.",
       "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
       "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
-      "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+      "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
       "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
       "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
     ],
     "amountPolicy": "chroma-target",
-    "targetChroma": 6.0,
-    "grayChroma": 5.998532140876702,
-    "grayHue": 231.9159411357147,
+    "targetChroma": 2.0,
+    "grayChroma": 1.970116680005178,
+    "grayHue": 230.63655114081786,
     "calibrationGray": {
       "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
       "outputSpace": "sRGB, 8-bit scale (unrounded)",
@@ -88,9 +88,9 @@
         111.64824952144563
       ],
       "filmCast": [
-        98.73868158283952,
-        111.98386033982439,
-        117.47805806686952
+        107.34298737832941,
+        111.60029186975517,
+        113.33414811990995
       ]
     }
   },
@@ -101,26 +101,26 @@
   "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
   "stdVsDirectEngine": {
     "tetrahedral": {
-      "mean": 0.001428428462580593,
-      "p95": 0.004803325639767187,
-      "p99": 0.009140695472767218,
-      "max": 0.026449119560199907,
+      "mean": 0.0014327467092441414,
+      "p95": 0.00466898808196794,
+      "p99": 0.009644836050531855,
+      "max": 0.028932244878487556,
       "samples": 4478,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     },
     "trilinear": {
-      "mean": 0.001315736735722439,
-      "p95": 0.004270259537802495,
-      "p99": 0.00836306646277931,
-      "max": 0.021393037887844663,
+      "mean": 0.0013210670740112379,
+      "p95": 0.004162398521226881,
+      "p99": 0.008806012094300198,
+      "max": 0.024571367721931796,
       "samples": 4478,
       "metric": "max absolute RGB channel error",
       "space": "encoded sRGB 0–1"
     }
   },
-  "stdSerializationMaxError": 4.999904101854469e-10,
-  "sourceVlogSha256": "eeb8f4574b9659ab28dd40f7ebc245cfb5f54351beda9473524124d093681d75",
+  "stdSerializationMaxError": 4.999648195447293e-10,
+  "sourceVlogSha256": "7fbbe2e9cf2fa9bd17344399bb04d270dd283f9b552e2fc056a641538df5cff2",
   "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
   "vlogUnchanged": true,
   "warnings": [

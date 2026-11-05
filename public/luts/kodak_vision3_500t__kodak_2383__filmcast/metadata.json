@@ -8,8 +8,8 @@
   "status": "ready",
   "filmCast": {
     "method": "spektrafilm-print-reference-blend-v1",
-    "amount": 0.29,
-    "percent": 29,
+    "amount": 1.0,
+    "percent": 100,
     "experimental": true,
     "film": "kodak_vision3_500t",
     "paper": "kodak_2383",
@@ -34,10 +34,10 @@
     ],
     "appliedCC": [
       0.0,
-      53.98209700653056,
-      61.625472320753545
+      53.01353916043718,
+      66.66411964139094
     ],
-    "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+    "formula": "appliedCC = filmCC + hueShiftCC",
     "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
     "databaseReload": false,
     "normalizePrintExposure": true,
@@ -51,14 +51,21 @@
       "Experimental Film Lab variant, not an upstream spektrafilm preset.",
       "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
       "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
-      "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+      "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
       "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
       "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
     ],
+    "directionPolicy": "editorial-hue",
+    "targetHue": 215.0,
+    "hueShiftCC": [
+      0.0,
+      8.4,
+      9.9
+    ],
     "amountPolicy": "chroma-target",
     "targetChroma": 10.0,
-    "grayChroma": 9.980325002876773,
-    "grayHue": 177.1051471583721,
+    "grayChroma": 9.95110094126426,
+    "grayHue": 215.3674697007532,
     "calibrationGray": {
       "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
       "outputSpace": "sRGB, 8-bit scale (unrounded)",
@@ -68,34 +75,34 @@
         116.80408146739757
       ],
       "filmCast": [
-        100.05482058630322,
-        123.80057707192637,
-        117.64452534463176
+        93.66149922158908,
+        119.44754631512647,
+        124.35201311743172
       ]
     }
   },
   "qa": {
     "fileChecks": "passed",
     "rowsPerCube": 35937,
-    "serializationMaxError": 4.999908980174439e-07,
+    "serializationMaxError": 4.999878144840153e-07,
     "processMode": "negative_print",
     "scanFilm": false,
     "referenceModel": "spektrafilm-print-reference-blend-v1",
     "vlogVsDirectEngine": {
       "tetrahedral": {
-        "mean": 0.00188232144163485,
-        "p95": 0.005740414647423173,
-        "p99": 0.014622790500914013,
-        "max": 0.07191062598944978,
+        "mean": 0.001874592389739281,
+        "p95": 0.005544686295074043,
+        "p99": 0.015017018280610542,
+        "max": 0.07864576979784442,
         "samples": 4350,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       },
       "trilinear": {
-        "mean": 0.002426787929916833,
-        "p95": 0.008158692810164481,
-        "p99": 0.01937349906174778,
-        "max": 0.05124774291858809,
+        "mean": 0.0024057160957204043,
+        "p95": 0.007950546836419615,
+        "p99": 0.019689919948882906,
+        "max": 0.0563630076318838,
         "samples": 4350,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
@@ -104,8 +111,8 @@
     "cameraVerified": false,
     "filmCast": {
       "method": "spektrafilm-print-reference-blend-v1",
-      "amount": 0.29,
-      "percent": 29,
+      "amount": 1.0,
+      "percent": 100,
       "experimental": true,
       "film": "kodak_vision3_500t",
       "paper": "kodak_2383",
@@ -130,10 +137,10 @@
       ],
       "appliedCC": [
         0.0,
-        53.98209700653056,
-        61.625472320753545
+        53.01353916043718,
+        66.66411964139094
       ],
-      "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+      "formula": "appliedCC = filmCC + hueShiftCC",
       "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
       "databaseReload": false,
       "normalizePrintExposure": true,
@@ -147,14 +154,21 @@
         "Experimental Film Lab variant, not an upstream spektrafilm preset.",
         "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
         "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
-        "Films listed in TARGET_HUE (Fujifilm C200) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+        "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
         "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
         "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
       ],
+      "directionPolicy": "editorial-hue",
+      "targetHue": 215.0,
+      "hueShiftCC": [
+        0.0,
+        8.4,
+        9.9
+      ],
       "amountPolicy": "chroma-target",
       "targetChroma": 10.0,
-      "grayChroma": 9.980325002876773,
-      "grayHue": 177.1051471583721,
+      "grayChroma": 9.95110094126426,
+      "grayHue": 215.3674697007532,
       "calibrationGray": {
         "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
         "outputSpace": "sRGB, 8-bit scale (unrounded)",
@@ -164,9 +178,9 @@
           116.80408146739757
         ],
         "filmCast": [
-          100.05482058630322,
-          123.80057707192637,
-          117.64452534463176
+          93.66149922158908,
+          119.44754631512647,
+          124.35201311743172
         ]
       }
     },
@@ -177,26 +191,26 @@
     "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
     "stdVsDirectEngine": {
       "tetrahedral": {
-        "mean": 0.0014026804526149404,
-        "p95": 0.004742579665291591,
-        "p99": 0.009827578251203443,
-        "max": 0.022935586161975344,
+        "mean": 0.001403073110031085,
+        "p95": 0.004782978415629526,
+        "p99": 0.00965777870123168,
+        "max": 0.022612835394161118,
         "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       },
       "trilinear": {
-        "mean": 0.0012466135069829222,
-        "p95": 0.0044854864854860866,
-        "p99": 0.00939265191450615,
-        "max": 0.01992604163435785,
+        "mean": 0.0012477230907144631,
+        "p95": 0.004419786050130412,
+        "p99": 0.008574337521957662,
+        "max": 0.018365411017208677,
         "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       }
     },
-    "stdSerializationMaxError": 4.999999858590343e-10,
-    "sourceVlogSha256": "efae3e0b0db0cc6c01758b639da8477a06b0d9e18fed8d0c29082f7414be9e3d",
+    "stdSerializationMaxError": 4.999936575877939e-10,
+    "sourceVlogSha256": "022492fb1dc93d104086c06bef04d181dc99a0079d5e737a678dc72eca069b1d",
     "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
     "vlogUnchanged": true,
     "warnings": [
@@ -219,31 +233,31 @@
       "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146STD.cube",
       "name": "1146STD.cube",
       "bytes": 1293941,
-      "sha256": "146475f88209040d4364dfd266f1d50c24c69ba43e8dbe0426efe2864bc44ad2"
+      "sha256": "8652faf1d8e4682e1a929f785a3269b2927f9aeff8a8b47568e375816b254a92"
     },
     "vlog": {
       "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146VLOG.cube",
       "name": "1146VLOG.cube",
       "bytes": 970431,
-      "sha256": "efae3e0b0db0cc6c01758b639da8477a06b0d9e18fed8d0c29082f7414be9e3d"
+      "sha256": "022492fb1dc93d104086c06bef04d181dc99a0079d5e737a678dc72eca069b1d"
     },
     "zip": {
       "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146LUTS.zip",
       "name": "1146LUTS.zip",
-      "bytes": 978536,
-      "sha256": "b81e263fba3b81842c79711ae285166b4f331be12f673504998ab983962953ae"
+      "bytes": 979021,
+      "sha256": "cf172b134969e01856ad10df422e8cd998bffa1f8033337893d936ebad390eea"
     },
     "qa": {
       "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/qa.json",
       "name": "qa.json",
-      "bytes": 5556,
-      "sha256": "d85915921f447e8b08cd9299cd344d50f1911924c7df481d41f58a1c376a8dd0"
+      "bytes": 5697,
+      "sha256": "25431592d43ca48b0c7c8ae8cdb44d11cf82c8f00642f220a97c513acc8c4663"
     },
     "provenance": {
       "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/provenance.json",
       "name": "provenance.json",
-      "bytes": 11378,
-      "sha256": "de9523fc3a06ab1b88a81f4840625d25842267ce45d1c774bf41d464b82f0ea7"
+      "bytes": 11729,
+      "sha256": "79897d12c359b89af3f3b2130433798479bf2a3fcc48b2cc3eb5e11a7b4a7a1e"
     }
   },
   "stdMethod": "camera-vlog-alchemy-v1",
@@ -253,29 +267,29 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146STD.cube",
         "name": "1146STD.cube",
         "bytes": 1293941,
-        "sha256": "146475f88209040d4364dfd266f1d50c24c69ba43e8dbe0426efe2864bc44ad2"
+        "sha256": "8652faf1d8e4682e1a929f785a3269b2927f9aeff8a8b47568e375816b254a92"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146LUTS.zip",
         "name": "1146LUTS.zip",
-        "bytes": 978536,
-        "sha256": "b81e263fba3b81842c79711ae285166b4f331be12f673504998ab983962953ae"
+        "bytes": 979021,
+        "sha256": "cf172b134969e01856ad10df422e8cd998bffa1f8033337893d936ebad390eea"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0014026804526149404,
-          "p95": 0.004742579665291591,
-          "p99": 0.009827578251203443,
-          "max": 0.022935586161975344,
+          "mean": 0.001403073110031085,
+          "p95": 0.004782978415629526,
+          "p99": 0.00965777870123168,
+          "max": 0.022612835394161118,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0012466135069829222,
-          "p95": 0.0044854864854860866,
-          "p99": 0.00939265191450615,
-          "max": 0.01992604163435785,
+          "mean": 0.0012477230907144631,
+          "p95": 0.004419786050130412,
+          "p99": 0.008574337521957662,
+          "max": 0.018365411017208677,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -294,32 +308,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146DC-L10.zip",
         "name": "1146STD.cube",
         "bytes": 1293943,
-        "sha256": "81ae16192b66a707bb7cdee73543b19f5d0da661ec417df898a971d78026563d",
+        "sha256": "21dd138ad066e3786b6249fcbab950e30c29d5729b5e92aa174d485ad35d451f",
         "encoding": "zip-entry",
-        "transferBytes": 978763,
-        "transferSha256": "eb77d9e0d58ce38eb6dd7782060076869e573a605f8657e039f3ba7e0ef996dd"
+        "transferBytes": 978873,
+        "transferSha256": "359879fb093a9bc315e4472346e5b92d79da741afe8391d57d6aa0d63431a9d7"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146DC-L10.zip",
         "name": "1146DC-L10.zip",
-        "bytes": 978763,
-        "sha256": "eb77d9e0d58ce38eb6dd7782060076869e573a605f8657e039f3ba7e0ef996dd"
+        "bytes": 978873,
+        "sha256": "359879fb093a9bc315e4472346e5b92d79da741afe8391d57d6aa0d63431a9d7"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0015533390734383374,
-          "p95": 0.0056922963091317344,
-          "p99": 0.01301424114587333,
-          "max": 0.035260939452322226,
+          "mean": 0.0015545106155129208,
+          "p95": 0.005633607331126964,
+          "p99": 0.012989114966072506,
+          "max": 0.031960350947453864,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.001397086514532087,
-          "p95": 0.005132052116339423,
-          "p99": 0.012517011832785129,
-          "max": 0.045095959031792116,
+          "mean": 0.0014033756611147384,
+          "p95": 0.0051861943903142825,
+          "p99": 0.0124800395640421,
+          "max": 0.04260227348722828,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -339,32 +353,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146G9II.zip",
         "name": "1146STD.cube",
         "bytes": 1293941,
-        "sha256": "7d04d81b6dbabf26b922b3338c61f75f69add7ebf017a396322d7ff2a5df70ff",
+        "sha256": "3e45701fb4af9b5c186c1e1ac309c66e2feb62081147885a5f97ae71bec407b1",
         "encoding": "zip-entry",
-        "transferBytes": 978697,
-        "transferSha256": "d47dc3808bbfe6d921f75f1cf952f5765b4844f6db08289354bcf5ec6a509f28"
+        "transferBytes": 979002,
+        "transferSha256": "df4dab169b0afc8382e988709fabb41eaa2ac7eb48816359dad2e82633ad120a"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146G9II.zip",
         "name": "1146G9II.zip",
-        "bytes": 978697,
-        "sha256": "d47dc3808bbfe6d921f75f1cf952f5765b4844f6db08289354bcf5ec6a509f28"
+        "bytes": 979002,
+        "sha256": "df4dab169b0afc8382e988709fabb41eaa2ac7eb48816359dad2e82633ad120a"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0016159105505703663,
-          "p95": 0.005486239199293556,
-          "p99": 0.01319439884842724,
-          "max": 0.05216587311257925,
+          "mean": 0.0015935876299272816,
+          "p95": 0.005415625586621413,
+          "p99": 0.012329466000810488,
+          "max": 0.04641331741258192,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014373808377272895,
-          "p95": 0.005176719879698155,
-          "p99": 0.013338346959016041,
-          "max": 0.03892319275505551,
+          "mean": 0.0014273087238993495,
+          "p95": 0.005205511696342951,
+          "p99": 0.012555004222118027,
+          "max": 0.035338208255477954,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -383,32 +397,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146GH6.zip",
         "name": "1146STD.cube",
         "bytes": 1293940,
-        "sha256": "b02b387ef83ccfbba9c85849e8c7de12bf86a7d270322697160711d720dc391a",
+        "sha256": "29049ba56b66443a8f85af6fee00b5abe6ae0af1d21975f1a19af6c4a5a63f6a",
         "encoding": "zip-entry",
-        "transferBytes": 979222,
-        "transferSha256": "a654c6b137302f1374298421d075a4d5e4ef2836d361742d5a74574b7df88328"
+        "transferBytes": 979716,
+        "transferSha256": "f5ae1859b1d4575bbe35c9e49a4f047b5e540c40cc64bde1e780e58b3c53a0b5"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146GH6.zip",
         "name": "1146GH6.zip",
-        "bytes": 979222,
-        "sha256": "a654c6b137302f1374298421d075a4d5e4ef2836d361742d5a74574b7df88328"
+        "bytes": 979716,
+        "sha256": "f5ae1859b1d4575bbe35c9e49a4f047b5e540c40cc64bde1e780e58b3c53a0b5"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0017841915261382583,
-          "p95": 0.006449422098841829,
-          "p99": 0.014906347570961364,
-          "max": 0.06156488122841841,
+          "mean": 0.0017870989161835552,
+          "p95": 0.006389753725521703,
+          "p99": 0.014620019453797942,
+          "max": 0.07178880607400617,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0016018165216282406,
-          "p95": 0.005986311570054164,
-          "p99": 0.014738448877031147,
-          "max": 0.06274198226508043,
+          "mean": 0.0016087584469918462,
+          "p95": 0.005948797173201579,
+          "p99": 0.014653967861489396,
+          "max": 0.0731701447652979,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -428,32 +442,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146GH7.zip",
         "name": "1146STD.cube",
         "bytes": 1293940,
-        "sha256": "d1ec86c23fe5b191b05c20a3113b7bd3994da26b92996b3cd54a0387526a2901",
+        "sha256": "0a0a8a047826c88dbb8faeaf1197cb1be06adc40604763cf5b717138611ff608",
         "encoding": "zip-entry",
-        "transferBytes": 978684,
-        "transferSha256": "16377fc63531bd34f5dfca6b067ce98bdae99833b6c0da621ea8061dbb2278e5"
+        "transferBytes": 978995,
+        "transferSha256": "e3a0fbf960931e88dce314c1af2a71819606be471470daa0b1425a4cca08c351"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146GH7.zip",
         "name": "1146GH7.zip",
-        "bytes": 978684,
-        "sha256": "16377fc63531bd34f5dfca6b067ce98bdae99833b6c0da621ea8061dbb2278e5"
+        "bytes": 978995,
+        "sha256": "e3a0fbf960931e88dce314c1af2a71819606be471470daa0b1425a4cca08c351"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0016159105505703663,
-          "p95": 0.005486239199293556,
-          "p99": 0.01319439884842724,
-          "max": 0.05216587311257925,
+          "mean": 0.0015935876299272816,
+          "p95": 0.005415625586621413,
+          "p99": 0.012329466000810488,
+          "max": 0.04641331741258192,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014373808377272895,
-          "p95": 0.005176719879698155,
-          "p99": 0.013338346959016041,
-          "max": 0.03892319275505551,
+          "mean": 0.0014273087238993495,
+          "p95": 0.005205511696342951,
+          "p99": 0.012555004222118027,
+          "max": 0.035338208255477954,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -472,32 +486,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S1IIE.zip",
         "name": "1146STD.cube",
         "bytes": 1293942,
-        "sha256": "7718439ee9786090248b7f0e4e39b5868263df5174fa67ac2310648fa13410b5",
+        "sha256": "0d083c6b070a73d68ce755e51c63ffab8327e6976c9fb83846f673e01138f318",
         "encoding": "zip-entry",
-        "transferBytes": 978951,
-        "transferSha256": "2fdf144413049b2aceabd466f01d9498b83c676c090d16c0ab8b4692eb83e4ea"
+        "transferBytes": 979408,
+        "transferSha256": "ee2810db1b0148b97a16e0a219c408d5e97980f8e9dfa9400e4141f6e3901e41"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S1IIE.zip",
         "name": "1146S1IIE.zip",
-        "bytes": 978951,
-        "sha256": "2fdf144413049b2aceabd466f01d9498b83c676c090d16c0ab8b4692eb83e4ea"
+        "bytes": 979408,
+        "sha256": "ee2810db1b0148b97a16e0a219c408d5e97980f8e9dfa9400e4141f6e3901e41"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.001594702944449799,
-          "p95": 0.005490073647330308,
-          "p99": 0.012322772705591999,
-          "max": 0.037779817819531825,
+          "mean": 0.0016058122631295631,
+          "p95": 0.005462587679112269,
+          "p99": 0.01240589193111901,
+          "max": 0.037607717143768954,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014931800421767612,
-          "p95": 0.005489488116389193,
-          "p99": 0.012602200557623238,
-          "max": 0.034293062332449276,
+          "mean": 0.001501370736061011,
+          "p95": 0.005507598166746513,
+          "p99": 0.01235838961743416,
+          "max": 0.03574666084425061,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -516,32 +530,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S1RII.zip",
         "name": "1146STD.cube",
         "bytes": 1293942,
-        "sha256": "a5f75daa2ba81dbf67799ad5c5543d3abf3c85ba11f773b645aa4b68626fe7ca",
+        "sha256": "2f77b411ffe5c153fdee573baca7375ee4fe960740b21e4ff62611f9c4d8dead",
         "encoding": "zip-entry",
-        "transferBytes": 978622,
-        "transferSha256": "3252ad25b80b4545d2bf961832a2629ab0eab8888ef2ab5f7c02da7932f9b804"
+        "transferBytes": 978861,
+        "transferSha256": "7bb01c49ee103a3e3a5e27ea7260363ffdf351589d652fa299feca27754eed78"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S1RII.zip",
         "name": "1146S1RII.zip",
-        "bytes": 978622,
-        "sha256": "3252ad25b80b4545d2bf961832a2629ab0eab8888ef2ab5f7c02da7932f9b804"
+        "bytes": 978861,
+        "sha256": "7bb01c49ee103a3e3a5e27ea7260363ffdf351589d652fa299feca27754eed78"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0014211318589031486,
-          "p95": 0.004804438590501885,
-          "p99": 0.010300698440903812,
-          "max": 0.049566355714294935,
+          "mean": 0.0014139952930986204,
+          "p95": 0.004847487393384053,
+          "p99": 0.009895157282766728,
+          "max": 0.047638411570428085,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0012491474151549414,
-          "p95": 0.004420591506797493,
-          "p99": 0.009788395475192124,
-          "max": 0.04326158755533527,
+          "mean": 0.0012444023887594746,
+          "p95": 0.004338316878250916,
+          "p99": 0.009454037525300062,
+          "max": 0.0426142610539853,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -559,32 +573,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S5II.zip",
         "name": "1146STD.cube",
         "bytes": 1293941,
-        "sha256": "d99df82b0106ea5f9f25418b03783269acbca870540982be8228a6e4f5641e10",
+        "sha256": "bcb2ffd3b213aae1edd595f2d7ed894fefb4061e8ee26cd45251b8f83c5e1cb1",
         "encoding": "zip-entry",
-        "transferBytes": 978965,
-        "transferSha256": "09d82ca0c6ec4afae6d877ab10ecf3d9f9e577a7f718c8279ed00e4e1f776316"
+        "transferBytes": 979080,
+        "transferSha256": "5c74f5c5eacf7fc920c94cb874361f5bf2068a419772b6d7c7ce55b2110004bc"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S5II.zip",
         "name": "1146S5II.zip",
-        "bytes": 978965,
-        "sha256": "09d82ca0c6ec4afae6d877ab10ecf3d9f9e577a7f718c8279ed00e4e1f776316"
+        "bytes": 979080,
+        "sha256": "5c74f5c5eacf7fc920c94cb874361f5bf2068a419772b6d7c7ce55b2110004bc"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0015476771128025357,
-          "p95": 0.005238031986454396,
-          "p99": 0.011761956409403121,
-          "max": 0.03479109082255502,
+          "mean": 0.0015445744223916355,
+          "p95": 0.00518117593968368,
+          "p99": 0.011588086662410776,
+          "max": 0.028665248260912907,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014229358285309654,
-          "p95": 0.005171298913854004,
-          "p99": 0.012412362798419268,
-          "max": 0.03352357177853299,
+          "mean": 0.0014243762191004318,
+          "p95": 0.005093179243705943,
+          "p99": 0.011997617820770478,
+          "max": 0.030877262805111494,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -603,32 +617,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S5IIX.zip",
         "name": "1146STD.cube",
         "bytes": 1293942,
-        "sha256": "4b0ecf9f33508390c7020be2b8f3c52cc6bcf64bc28a92ba656f0727a1847df2",
+        "sha256": "0eed1a17a3c5f3dfb9f0cb7f8b526e194bc7c3b8f57e060bfaa543e55f34e6f0",
         "encoding": "zip-entry",
-        "transferBytes": 978979,
-        "transferSha256": "2d038b93abf37fb492f6450beec59c8138dc32652270718df171c153bf8798b5"
+        "transferBytes": 979092,
+        "transferSha256": "86d286ae0677186fd68c1e7ef5bb5001229e01c53d35c705c78ce1dfe2de50e1"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S5IIX.zip",
         "name": "1146S5IIX.zip",
-        "bytes": 978979,
-        "sha256": "2d038b93abf37fb492f6450beec59c8138dc32652270718df171c153bf8798b5"
+        "bytes": 979092,
+        "sha256": "86d286ae0677186fd68c1e7ef5bb5001229e01c53d35c705c78ce1dfe2de50e1"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0015476771128025357,
-          "p95": 0.005238031986454396,
-          "p99": 0.011761956409403121,
-          "max": 0.03479109082255502,
+          "mean": 0.0015445744223916355,
+          "p95": 0.00518117593968368,
+          "p99": 0.011588086662410776,
+          "max": 0.028665248260912907,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014229358285309654,
-          "p95": 0.005171298913854004,
-          "p99": 0.012412362798419268,
-          "max": 0.03352357177853299,
+          "mean": 0.0014243762191004318,
+          "p95": 0.005093179243705943,
+          "p99": 0.011997617820770478,
+          "max": 0.030877262805111494,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -647,32 +661,32 @@
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S9.zip",
         "name": "1146STD.cube",
         "bytes": 1293939,
-        "sha256": "77534369b376662030617deae9dbea2e68ad5e2f96dfc53cf11d6c7058cc839a",
+        "sha256": "e38c97b5891e25a49b41ee3d506bfcb5ed65e957d0990a7a4736697112ad581c",
         "encoding": "zip-entry",
-        "transferBytes": 978758,
-        "transferSha256": "3b03ad4fde2d130a6145b2f3baa1c4169f91df192a6df17253dea116c8125782"
+        "transferBytes": 979306,
+        "transferSha256": "bd0ee1bcbd3a91d1b0d599d2a28c46c54f97ab319eeac55c5aabd62c588c32ac"
       },
       "zip": {
         "path": "/luts/kodak_vision3_500t__kodak_2383__filmcast/1146S9.zip",
         "name": "1146S9.zip",
-        "bytes": 978758,
-        "sha256": "3b03ad4fde2d130a6145b2f3baa1c4169f91df192a6df17253dea116c8125782"
+        "bytes": 979306,
+        "sha256": "bd0ee1bcbd3a91d1b0d599d2a28c46c54f97ab319eeac55c5aabd62c588c32ac"
       },
       "qa": {
         "tetrahedral": {
-          "mean": 0.0015492034697195242,
-          "p95": 0.005251011829027703,
-          "p99": 0.011728996114141247,
-          "max": 0.03493880590819631,
+          "mean": 0.001546254975258771,
+          "p95": 0.005174802518753581,
+          "p99": 0.011612213314710561,
+          "max": 0.028850607194628203,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
         },
         "trilinear": {
-          "mean": 0.0014239586162266404,
-          "p95": 0.005164750430187874,
-          "p99": 0.012414331228846264,
-          "max": 0.03335167243713394,
+          "mean": 0.0014254825036336596,
+          "p95": 0.005133280988013569,
+          "p99": 0.012011063423170994,
+          "max": 0.03071953839609337,
           "samples": 4478,
           "metric": "max absolute RGB channel error",
           "space": "encoded sRGB 0–1"
@@ -689,6 +703,6 @@
   },
   "previews": {},
   "previewMode": "runtime-std",
-  "generatedAt": "2026-11-05T14:32:11.310936+00:00",
-  "seconds": 1.683
+  "generatedAt": "2026-11-05T15:19:30.616536+00:00",
+  "seconds": 1.803
 }
