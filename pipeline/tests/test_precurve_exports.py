@@ -118,6 +118,8 @@ def test_fresh_generators_reproduce_camera_std_without_historical_baseline(tmp_p
     monkeypatch.setattr(generate_fuji, 'backup_record', reject_snapshot)
     stocks = profiles()
     if official:
+        if not (PUBLIC / 'luts/gfx_classic_chrome__fujifilm_crystal_archive_typeii').exists():
+            pytest.skip('FUJI official looks are retired from the public catalog')
         study = load_study()
         look = next(l for l in study['looks'] if l['film'] == 'gfx_classic_chrome')
         paper = next(s for s in stocks if s['id'] == 'fujifilm_crystal_archive_typeii')

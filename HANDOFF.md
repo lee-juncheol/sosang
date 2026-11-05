@@ -2,7 +2,7 @@
 
 작성: 2026-11-05. 이 파일을 읽은 뒤 아래 "남은 일"부터 진행하면 됩니다. 답변은 한국어로.
 
-## 이번에 바뀐 것 (모두 로컬 저장소에 반영됨, 아직 배포 전)
+## 이번에 바뀐 것 (배포됨)
 
 1. **추천 현상 방법(film cast)**: 조합별 혼합 비율을 18% 회색 CIELAB C* 목표(기본 6, Vision3 200T/500T 10, 하한 0.2)로 계산. `pipeline/print_blend.py`, `pipeline/generate_film_cast.py`, 변형 128개 `public/luts/<id>__filmcast/`. 자세한 내용 `docs/film-cast.md`.
 2. **인화 필터 M·Y 슬라이더(실험)**: spektrafilm Print M/Y filter shift를 브라우저에서 실시간 반영.
@@ -17,12 +17,18 @@
 
 검증: `node scripts/run-web.mjs test` 88개 통과, `tsc --noEmit` 통과, `npm run verify:assets` 통과(수정 전 시점).
 
+## 진행 상황 (2026-11-05 Claude Code)
+
+- 배포 완료: https://sosang.film-lab-jc.workers.dev (현상 방법 ⓘ 레이어, Esc·바깥 클릭 닫힘, 슬라이더, 추천 현상 다운로드 확인).
+- 임시 조각(`artifacts/print-timing/head.*`, `packs.part6`)과 백업 `artifacts/font-bump/`는 휴지통으로 옮김.
+- C200 추천 현상: 필름 데이터대로면 주황·노랑으로 남아 알려진 색과 반대여서, C200만 색상각 180°(초록~청록)로 방향을 지정함(`TARGET_HUE`, `docs/film-cast.md`). 다른 15종은 그대로.
+- 오래된 Python 테스트 정리(은퇴한 FUJI 공식 룩·이전 개수), 루트 `pytest.ini`로 napari 플러그인의 numba 충돌 해결. Python 327 통과·2 건너뜀, 웹 테스트 통과.
+- 커밋: 브랜치 `film-cast-print-timing` (main 병합·push 안 함).
+
 ## 남은 일
 
-1. **배포**: `npm run deploy:cloudflare` (빌드·검증·Wrangler 배포). Cloudflare 로그인이 풀려 있으면 `npm run cloudflare:login`. 배포 후 https://sosang.film-lab-jc.workers.dev 에서 현상 방법 ⓘ 레이어, 슬라이더, 추천 현상 다운로드 확인.
-   - 원격 세션에서는 Mac용 node_modules(rollup 네이티브)가 리눅스 셸에서 안 돌고 npm 접속도 막혀서 배포하지 못했음.
-2. **ⓘ 레이어의 Esc·바깥 클릭 닫힘**은 화면에서 직접 확인하지 못했음 — 한 번 눌러 보기.
-3. **정리(사용자 확인 후 삭제)**: `artifacts/print-timing/head.00`~`head.11`, `packs.part6` (전송용 임시 조각, 약 264MB). 백업 `artifacts/font-bump/`(CSS·main.tsx 수정 전 사본)는 확인 끝나면 삭제 가능.
+- X-Tra 400(주황), Gold 200·Ultramax 400(분홍)도 알려진 색과 방향이 다름. 필요하면 `TARGET_HUE`에 추가.
+- 구주소(`film-lab.film-lab-jc.workers.dev`) Worker는 이번에 다시 배포하지 않음.
 
 ## 참고
 

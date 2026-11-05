@@ -12,7 +12,8 @@ from pipeline.camera_std import METHOD, BASELINE, models
 
 def test_all_current_downloads_use_camera_specific_source_and_preserve_native_colour():
     catalog=json.loads((PUBLIC/'catalog.json').read_text())
-    assert len(catalog['combinations'])==238
+    # 148 engine looks + 128 recommended-development variants (FUJI official looks retired).
+    assert len(catalog['combinations'])==276
     expected={model['id'] for model in models()}
     for c in catalog['combinations']:
         assert c['stdMethod']==METHOD
@@ -35,6 +36,8 @@ def test_original_vlog_matches_snapshot_before_camera_migration():
     current=json.loads((PUBLIC/'catalog.json').read_text())
     by_id={c['id']:c for c in current['combinations']}
     for old in previous['combinations']:
+        if old['id'].startswith('gfx_'):
+            continue  # FUJI official looks were retired from the public catalog
         now=by_id[old['id']]
         assert now['files']['vlog']==old['files']['vlog']
         assert sha256(PUBLIC/old['files']['vlog']['path'].lstrip('/'))==old['files']['vlog']['sha256']

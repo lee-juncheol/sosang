@@ -1,6 +1,6 @@
 # Cloudflare 공개 배포본
 
-현행 sosang 빌드는 148개 엔진 룩, 10개 카메라의 합성 STD 1,480개, 공통 V-Log 148개와 사용자가 제공한 후지 STD LUT 9개를 제공합니다. 제공된 후지 LUT는 인화지·카메라 변환 없이 그대로 제공하며 별도 `suppliedFuji` 카탈로그로 관리합니다. 선택한 기종의 ZIP을 미리보기·다운로드 전송에 사용합니다. 모델별 변환·검증 상태·권리는 [카메라 STD 문서](camera-std.md)를 참고하세요. 빌드 갱신과 실제 공개 사이트 배포는 별도입니다.
+현행 sosang 빌드는 148개 엔진 룩, 10개 카메라의 합성 STD 1,480개, 공통 V-Log 148개와 사용자가 제공한 후지 STD LUT 9개를 제공합니다. 여기에 네거티브 인화 128개 조합마다 추천 현상 방법 변형이 하나씩 붙고([필름 색 남김 문서](film-cast.md)), 인화 필터 M·Y 슬라이더용 데이터 128개(`/print-timing/`, [인화 필터 문서](print-timing.md))가 함께 배포됩니다. 제공된 후지 LUT는 인화지·카메라 변환 없이 그대로 제공하며 별도 `suppliedFuji` 카탈로그로 관리합니다. 선택한 기종의 ZIP을 미리보기·다운로드 전송에 사용합니다. 모델별 변환·검증 상태·권리는 [카메라 STD 문서](camera-std.md)를 참고하세요. 빌드 갱신과 실제 공개 사이트 배포는 별도입니다.
 
 `scripts/prepare-cloudflare.mjs`는 완성된 `dist/`를 읽어 별도 `dist-cloudflare/`를 생성한다. 공개 카탈로그에서 `reference_interpretation` 조합과 `referenceStudy`를 제거하고 상태별 개수를 재계산한다. 제외 조합의 디렉토리 전체와 `research/reference-looks.json`도 복사하지 않는다. 기존 FUJI 공식 필름·`fujiStudy`·`research/fujifilm-official.json`과 90개 합성 룩은 제거한다. 제공 후지 LUT 9개와 provenance·NOTICE는 `/supplied-fuji/`에서 원본 수치 그대로 제공한다. 공개되는 148개 조합의 카메라별 STD·VLOG·QA·출처 자산은 입력 `dist/`의 바이트를 유지한다. 미리보기는 선택한 카메라의 STD로 브라우저에서 계산하고, 과거 버전의 미리보기 사본은 포함하지 않는다. 외부 리뷰 사진을 모은 `sample-study/`는 배포 입력에 포함하지 않는다.
 

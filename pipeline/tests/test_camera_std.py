@@ -61,7 +61,9 @@ def test_official_production_std_uses_camera_adapter_not_retired_precurve():
     from pipeline.fuji import apply_official
     path = PUBLIC / 'luts/gfx_classic_chrome__official_direct/0200VLOG.cube'
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
-    combo = next(c for c in catalog['combinations'] if c['id'] == 'gfx_classic_chrome__official_direct')
+    combo = next((c for c in catalog['combinations'] if c['id'] == 'gfx_classic_chrome__official_direct'), None)
+    if combo is None:
+        pytest.skip('FUJI official looks are retired from the public catalog')
     path = PUBLIC / combo['files']['vlog']['path'].lstrip('/')
     pixels = np.random.default_rng(31).random((4, 13, 3))
     expected = compose(read_cube(path, 'VLOG'), 'S5II', pixels.reshape(-1, 3)).reshape(pixels.shape)

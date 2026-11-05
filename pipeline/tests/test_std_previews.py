@@ -35,10 +35,8 @@ def test_camera_samples_are_verified_lut_off_and_color_unchanged():
     'fujifilm_velvia_100__direct_scan',
     'kodak_portra_400__digital_scan',
     'fujifilm_c200__digital_scan',
-    'gfx_classic_chrome__official_direct',
-    'gfx_classic_chrome__fujifilm_crystal_archive_typeii',
-    'gfx_classic_neg__kodak_portra_endura',
-    'gfx_acros__kodak_2383',
+    'fujifilm_c200__fujifilm_crystal_archive_typeii__filmcast',
+    'kodak_gold_200__kodak_portra_endura__filmcast',
 ])
 @pytest.mark.parametrize('sample_id', [sample['id'] for sample in json.loads((PUBLIC / 'samples/manifest.json').read_text()) if sample['inputKind'] == 'camera-std'])
 def test_preview_matches_independently_read_exported_std_cube(combo_id, sample_id):
@@ -64,11 +62,14 @@ def test_preview_matches_independently_read_exported_std_cube(combo_id, sample_i
 def test_every_film_paper_choice_has_current_runtime_preview():
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
     ready = [combo for combo in catalog['combinations'] if combo['status'] == 'ready']
-    models = [combo for combo in ready if not combo['processMode'].startswith('official_')]
-    official = [combo for combo in ready if combo['processMode'].startswith('official_')]
-    assert len(models) == 148
-    assert len(official) == 90
-    assert len(ready) == 238
+    # 148 engine looks plus one recommended-development variant per negative print.
+    # The retired FUJI official looks are no longer in the catalog.
+    base = [combo for combo in ready if not combo.get('castBaseId')]
+    cast = [combo for combo in ready if combo.get('castBaseId')]
+    assert len(base) == 148
+    assert len(cast) == 128
+    assert len(ready) == 276
+    assert not any(combo['processMode'].startswith('official_') for combo in ready)
     assert not any(combo['processMode'] == 'reference_interpretation' for combo in ready)
     for combo in ready:
         assert combo['stdMethod'] == 'camera-vlog-alchemy-v1'
