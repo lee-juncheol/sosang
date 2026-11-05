@@ -16,7 +16,7 @@ it does not establish physical film accuracy or a camera-specific match.
 
 Source adapter: https://github.com/shenmintao/V-Log-Alchemy/blob/e51ba9a23458ff5c316f630b860eb0201139d126/Luts/Panasonic-Standard/Conversion/S1IIS2V.cube
 Adapter SHA256: 7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e
-Creative VLOG SHA256: b9a30a44bb5a92131d4fd87a0c9346784beae130fae62176af3bfd2f3190bcc4
+Creative VLOG SHA256: 5da8e8cca9f930b5c4f89579821381e2bed02d8a9cf5b685fad18e1f13ee934c
 Upstream camera calibration status: pending.
 
 Modified by Film Lab: merged camera Standard adapter and creative VLOG renderer.
