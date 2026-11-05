@@ -7,75 +7,38 @@
   "processMode": "negative_print",
   "status": "ready",
   "files": {
+    "std": {
+      "path": "/luts/kodak_portra_160__kodak_endura_premier/0077STD.cube",
+      "name": "0077STD.cube",
+      "bytes": 1293941,
+      "sha256": "2266bf1c954e12df0bc91f59dba4ac3e76dd3bc1a90130d6f79f5dfb3d107fbb"
+    },
     "vlog": {
       "path": "/luts/kodak_portra_160__kodak_endura_premier/0077VLOG.cube",
       "name": "0077VLOG.cube",
       "bytes": 970431,
       "sha256": "5fc64036cfcec5ebf98766db082909076585b182dfb76d816946d61beb9fb98e"
     },
-    "std": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/0077STD.cube",
-      "name": "0077STD.cube",
-      "bytes": 970429,
-      "sha256": "5928f452255e8213f4091e3b935d8b5a1616e041c75f23277c20d8d9d322336a"
-    },
     "zip": {
       "path": "/luts/kodak_portra_160__kodak_endura_premier/0077LUTS.zip",
       "name": "0077LUTS.zip",
-      "bytes": 747650,
-      "sha256": "f37d0cefd5c8f47b4aca48781213210db1cd80263431fb1a369fe64065b74ee9"
+      "bytes": 951741,
+      "sha256": "276c76a9eac5578b2b5831c286b2d9b3af4742c753612523c81ddec2bfbf5bf4"
     },
     "qa": {
       "path": "/luts/kodak_portra_160__kodak_endura_premier/qa.json",
       "name": "qa.json",
-      "bytes": 5260,
-      "sha256": "2c4ad0ad7169771bf48826b8014479c5e2fd3e9a7bd8729b26b7555d580868d8"
+      "bytes": 3171,
+      "sha256": "2009bfdddbe9d55ad297633c4af08872e2c395579d886a0905321ac0f0e3ddf4"
     },
     "provenance": {
       "path": "/luts/kodak_portra_160__kodak_endura_premier/provenance.json",
       "name": "provenance.json",
-      "bytes": 7355,
-      "sha256": "22eeab564c3a5dd24516f44aa888b3aa036d146b5c5dcfb2ca623496aa7e62b8"
+      "bytes": 7410,
+      "sha256": "8def119b5a2ac9bd0530ba359ce5076cb1af36caf4af103272658da315ad39a8"
     }
   },
-  "previews": {
-    "std_playground": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/std_playground.webp",
-      "name": "std_playground.webp",
-      "bytes": 140158,
-      "sha256": "0caf6a478388f677f21de79deec0d727785ed28b274b5e4b502c9f159cb5b4c6"
-    },
-    "std_playground_panel": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/std_playground_panel.webp",
-      "name": "std_playground_panel.webp",
-      "bytes": 99434,
-      "sha256": "250dbc182459e0b23105e3b61b165d149d19b674e206ce2ec923c5e1777e1e9f"
-    },
-    "std_figures": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/std_figures.webp",
-      "name": "std_figures.webp",
-      "bytes": 60880,
-      "sha256": "2e03f225cc4cc79482f0c638a5060ee07911a3b18cbc8ecdaef25c51d8501858"
-    },
-    "std_closeup": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/std_closeup.webp",
-      "name": "std_closeup.webp",
-      "bytes": 34810,
-      "sha256": "7bcd4c428f042007ee9350842d7edb5f476a12b3ff71b6965f9a7f7fb634274e"
-    },
-    "std_shelf": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/std_shelf.webp",
-      "name": "std_shelf.webp",
-      "bytes": 95142,
-      "sha256": "c9daacbfcc69bdeec5d81f29729a6168044674db3a2b142a6e3d13bb64d40c6c"
-    },
-    "chart": {
-      "path": "/luts/kodak_portra_160__kodak_endura_premier/chart.webp",
-      "name": "chart.webp",
-      "bytes": 4220,
-      "sha256": "eb9f3b5e668be9f6d73213167c5a9157ffa48478cf91ae107e5fb116946cdbb1"
-    }
-  },
+  "previews": {},
   "qa": {
     "fileChecks": "passed",
     "rowsPerCube": 35937,
@@ -103,126 +66,494 @@
         "space": "encoded sRGB 0–1"
       }
     },
+    "warnings": [
+      "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+      "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+      "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+      "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+      "Matched controlled capture validation is pending for this camera model."
+    ],
+    "cameraVerified": false,
+    "sampling": {
+      "randomRgb": 4096,
+      "neutralRamp": 257,
+      "grid": 125,
+      "seed": 20261102
+    },
+    "cameraInterpolation": "Undocumented. Both tetrahedral and trilinear output evaluation are measured.",
+    "vlogUnchanged": true,
+    "sourceVlogSha256": "5fc64036cfcec5ebf98766db082909076585b182dfb76d816946d61beb9fb98e",
+    "stdMethod": "camera-vlog-alchemy-v1",
+    "stdGeneration": "camera-vlog-alchemy-v1",
+    "camera": "S1II",
+    "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+    "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
     "stdVsDirectEngine": {
       "tetrahedral": {
-        "mean": 0.0008751399134498119,
-        "p95": 0.002269085257395604,
-        "p99": 0.004233620579115094,
-        "max": 0.05205017175255916,
-        "samples": 4350,
+        "mean": 0.0016215820875994712,
+        "p95": 0.005017772568681574,
+        "p99": 0.00933144489759234,
+        "max": 0.023037521586925847,
+        "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       },
       "trilinear": {
-        "mean": 0.0008775298235255896,
-        "p95": 0.00231485748573914,
-        "p99": 0.0040285584516681445,
-        "max": 0.037004237021166675,
-        "samples": 4350,
+        "mean": 0.0014925492948007618,
+        "p95": 0.004475938782078725,
+        "p99": 0.008372803131663843,
+        "max": 0.026826592038231456,
+        "samples": 4478,
         "metric": "max absolute RGB channel error",
         "space": "encoded sRGB 0–1"
       }
     },
-    "stdGeneration": "direct-engine-grid-jpg-tone-v3",
-    "stdInputGain": 1.0,
-    "jpgToneProtection": {
-      "method": "film-lab-jpg-tone-protection-v1",
-      "input": "already rendered encoded sRGB / Standard JPEG",
-      "neutralSamples": 4097,
-      "neutralAxis": "uniform encoded sRGB 0..1; interpolate OKLab response at equal input linear Y",
-      "neutralToneRetention": 0.2,
-      "neutralCastRemoval": 1.0,
-      "lightness": "Lraw = Lmodel + (1-retention)*(cuberoot(inputY)-Lneutral); Ltarget = Lsource + limit*tanh((Lraw-Lsource)/limit)",
-      "limit": "min(0.028+0.012*exp(-((Lsource-0.6)/0.2)^2), 0.5*min(Lsource,1-Lsource)) in OKLab L",
-      "chroma": "(ab_model-ab_neutral) * clip(Ltarget/Lmodel, 0, 3)",
-      "gamutMapping": "reduce OKLab chroma at fixed lightness and hue; exact neutral black/white endpoints",
-      "digitalBlackCorrection": false,
-      "perImageAdaptation": false,
-      "vlogModified": false,
-      "cameraInverseCalibrated": false,
-      "physicalFilmOrPrintMatch": false,
-      "limitations": [
-        "An explicit Film Lab JPEG rendering policy; not unmodified upstream tonality or an official Fujifilm JPEG recipe.",
-        "Keeps model colour differences while reducing repeated tonality; gamut-boundary chroma and contrast can change.",
-        "Cannot restore source detail already clipped or lost by the camera."
-      ]
-    },
-    "photoPixelFidelity": {
-      "std_playground": {
-        "mean": 0.0009023012020978,
-        "p95": 0.002487515073680697,
-        "p99": 0.003611101097939773,
-        "max": 0.004098160892889113,
-        "samples": 1024,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      },
-      "std_playground_panel": {
-        "mean": 0.0008632742811121477,
-        "p95": 0.0020909885903137903,
-        "p99": 0.0028126628390053314,
-        "max": 0.003812228362146536,
-        "samples": 1024,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      },
-      "std_figures": {
-        "mean": 0.000733671887158513,
-        "p95": 0.002064633269694638,
-        "p99": 0.003000930870544306,
-        "max": 0.003636635915511971,
-        "samples": 1024,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      },
-      "std_closeup": {
-        "mean": 0.0007378323760389229,
-        "p95": 0.0017402750619152085,
-        "p99": 0.0024721263522037573,
-        "max": 0.004161745006835527,
-        "samples": 1024,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      },
-      "std_shelf": {
-        "mean": 0.0006767475460607273,
-        "p95": 0.0018459453651785696,
-        "p99": 0.002647430586944149,
-        "max": 0.00414452116284178,
-        "samples": 1024,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      }
-    },
-    "stdReferenceDescription": "Continuous colour model followed by Film Lab display-referred JPG tone protection; not the unmodified native engine tone",
-    "stdVsContinuousComposition": {
-      "tetrahedral": {
-        "mean": 0.07323067288398635,
-        "p95": 0.15392104191943368,
-        "p99": 0.19299890115042387,
-        "max": 0.5549123075519765,
-        "samples": 4350,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      },
-      "trilinear": {
-        "mean": 0.07323758044813033,
-        "p95": 0.1538209196480949,
-        "p99": 0.19318121278950798,
-        "max": 0.5549123075519765,
-        "samples": 4350,
-        "metric": "max absolute RGB channel error",
-        "space": "encoded sRGB 0–1"
-      }
-    },
-    "stdVsContinuousCompositionPurpose": "Diagnostic difference from legacy VLOG-cube composition; not an engine accuracy metric or quality gate.",
-    "grayBlackToWhiteDelta": 1.0,
-    "warnings": [],
-    "cameraVerified": false,
-    "sampling": "4096 uniform random RGB + 129 gray ramp + 125 RGB grid; fixed seed",
-    "cameraInterpolation": "unknown; both tetrahedral and trilinear measured"
+    "stdSerializationMaxError": 4.999968217234141e-10,
+    "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e"
   },
   "seconds": 1.913,
   "peakRssBytes": 879476736,
-  "generatedAt": "2026-11-03T07:19:58.626054+00:00"
+  "generatedAt": "2026-11-03T15:52:39.144622+00:00",
+  "previewMode": "runtime-std",
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdByCamera": {
+    "S1II": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077STD.cube",
+        "name": "0077STD.cube",
+        "bytes": 1293941,
+        "sha256": "2266bf1c954e12df0bc91f59dba4ac3e76dd3bc1a90130d6f79f5dfb3d107fbb"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077LUTS.zip",
+        "name": "0077LUTS.zip",
+        "bytes": 951741,
+        "sha256": "276c76a9eac5578b2b5831c286b2d9b3af4742c753612523c81ddec2bfbf5bf4"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0016215820875994712,
+          "p95": 0.005017772568681574,
+          "p99": 0.00933144489759234,
+          "max": 0.023037521586925847,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0014925492948007618,
+          "p95": 0.004475938782078725,
+          "p99": 0.008372803131663843,
+          "max": 0.026826592038231456,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "DC-L10": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077DC-L10.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293943,
+        "sha256": "24a16054a9767e511d9d30e1e806b365aacc19740cb384e1ab3439223a2d39f6",
+        "encoding": "zip-entry",
+        "transferBytes": 952196,
+        "transferSha256": "bf4d6e64ab46ff0b85ad7ad49fd39fa937652c5a0eb70289e9e0fe3aaa44c2d8"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077DC-L10.zip",
+        "name": "0077DC-L10.zip",
+        "bytes": 952196,
+        "sha256": "bf4d6e64ab46ff0b85ad7ad49fd39fa937652c5a0eb70289e9e0fe3aaa44c2d8"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0017957134026744517,
+          "p95": 0.00571904568091043,
+          "p99": 0.011815436853896225,
+          "max": 0.04515217493359022,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0016640585490294473,
+          "p95": 0.005358515835550695,
+          "p99": 0.011435851636011917,
+          "max": 0.03197783878900762,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model.",
+        "For DC-L10 only. This adapter is not compatible with the older DMC-L10."
+      ]
+    },
+    "G9II": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077G9II.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293941,
+        "sha256": "16da15241cefae167be74f4f79d3ce250f53063ca3a7d67670132f158e7228cb",
+        "encoding": "zip-entry",
+        "transferBytes": 951509,
+        "transferSha256": "18d44511c1cd88c7d87fe0234e7ad79da3f622dd455d0267381d7c6b3a3c3a73"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077G9II.zip",
+        "name": "0077G9II.zip",
+        "bytes": 951509,
+        "sha256": "18d44511c1cd88c7d87fe0234e7ad79da3f622dd455d0267381d7c6b3a3c3a73"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001919151824074912,
+          "p95": 0.00603283243893182,
+          "p99": 0.014693967424985117,
+          "max": 0.049928406588737095,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001794520389665607,
+          "p95": 0.005492479411842054,
+          "p99": 0.01418846103797435,
+          "max": 0.06735475347328929,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "GH6": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077GH6.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293940,
+        "sha256": "3806e6b48bf081b7b713922c2bdd62f6c96e002f1e7e649dbfdaa871bd8b0029",
+        "encoding": "zip-entry",
+        "transferBytes": 951830,
+        "transferSha256": "7c8fa33c71b51876c605707d4fa828e12dcf11ee28dafa3bec16d57c1a6e69ad"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077GH6.zip",
+        "name": "0077GH6.zip",
+        "bytes": 951830,
+        "sha256": "7c8fa33c71b51876c605707d4fa828e12dcf11ee28dafa3bec16d57c1a6e69ad"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0020274295084319934,
+          "p95": 0.0066686937324684555,
+          "p99": 0.014889159820195357,
+          "max": 0.0559144335408534,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0018682608743690852,
+          "p95": 0.005931393263920779,
+          "p99": 0.013697178483042083,
+          "max": 0.04682453403183254,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model.",
+        "GH6: post-processing only; Standard capture cannot bake this LUT in camera."
+      ]
+    },
+    "GH7": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077GH7.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293940,
+        "sha256": "7395630dc63d7b7231358ca0eccde1007ef058fe574ead1204147db98a7fba85",
+        "encoding": "zip-entry",
+        "transferBytes": 951500,
+        "transferSha256": "c93df6219d932d3ece751525b2b4d3ecf00340d20a7f54589ad653c42045efc0"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077GH7.zip",
+        "name": "0077GH7.zip",
+        "bytes": 951500,
+        "sha256": "c93df6219d932d3ece751525b2b4d3ecf00340d20a7f54589ad653c42045efc0"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.001919151824074912,
+          "p95": 0.00603283243893182,
+          "p99": 0.014693967424985117,
+          "max": 0.049928406588737095,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001794520389665607,
+          "p95": 0.005492479411842054,
+          "p99": 0.01418846103797435,
+          "max": 0.06735475347328929,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S1IIE": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S1IIE.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293942,
+        "sha256": "4fb7a4c8a839750bb47ee41bb3fd32b40bb77be0e14a9869a1e47d3b417803f1",
+        "encoding": "zip-entry",
+        "transferBytes": 951750,
+        "transferSha256": "3f7714730e77588d0af30758b449e1a5c7bae1a60358141bc477ce28725795dc"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S1IIE.zip",
+        "name": "0077S1IIE.zip",
+        "bytes": 951750,
+        "sha256": "3f7714730e77588d0af30758b449e1a5c7bae1a60358141bc477ce28725795dc"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0018324175519118407,
+          "p95": 0.005710477435280557,
+          "p99": 0.011680788482012294,
+          "max": 0.04841320057634291,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0017069425347582335,
+          "p95": 0.00522763502113385,
+          "p99": 0.012023225049942497,
+          "max": 0.03383621159427133,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S1RII": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S1RII.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293942,
+        "sha256": "73e97d330ab39206369159fd5b7c8960ddb04867f30d3b3e3e8df653eff9ca57",
+        "encoding": "zip-entry",
+        "transferBytes": 951602,
+        "transferSha256": "91ffee403bf993cc11330f0d935e8646b86c56786a7731c5d178769a926dff51"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S1RII.zip",
+        "name": "0077S1RII.zip",
+        "bytes": 951602,
+        "sha256": "91ffee403bf993cc11330f0d935e8646b86c56786a7731c5d178769a926dff51"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0016745464352785383,
+          "p95": 0.005399419976199707,
+          "p99": 0.009347647665554655,
+          "max": 0.03633079050010854,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0015242490704926958,
+          "p95": 0.004839070950094066,
+          "p99": 0.008794318135612883,
+          "max": 0.023343081097781077,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT."
+      ]
+    },
+    "S5II": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S5II.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293941,
+        "sha256": "f6a148d8d5b9dea9c51e1bd815c9be4c61ab65929a4561e3fc3b3654f2201b90",
+        "encoding": "zip-entry",
+        "transferBytes": 951499,
+        "transferSha256": "67f310d6af13a0428c7c62a5a5c34e411628112110db05762cb74a34cad1728c"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S5II.zip",
+        "name": "0077S5II.zip",
+        "bytes": 951499,
+        "sha256": "67f310d6af13a0428c7c62a5a5c34e411628112110db05762cb74a34cad1728c"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0018272802090844942,
+          "p95": 0.005958092492810676,
+          "p99": 0.011690540232285766,
+          "max": 0.0465746702738824,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001681354465968415,
+          "p95": 0.005208318895237437,
+          "p99": 0.010809229934769378,
+          "max": 0.03708974107512644,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S5IIX": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S5IIX.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293942,
+        "sha256": "a469812674cb036140687df4f123ac67f7812f641d07f9fd95c2fefc4ee4f132",
+        "encoding": "zip-entry",
+        "transferBytes": 951512,
+        "transferSha256": "92722884cd9c2792d9b461623fc9e6d721ad379d110420d566e26d220add55dd"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S5IIX.zip",
+        "name": "0077S5IIX.zip",
+        "bytes": 951512,
+        "sha256": "92722884cd9c2792d9b461623fc9e6d721ad379d110420d566e26d220add55dd"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0018272802090844942,
+          "p95": 0.005958092492810676,
+          "p99": 0.011690540232285766,
+          "max": 0.0465746702738824,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.001681354465968415,
+          "p95": 0.005208318895237437,
+          "p99": 0.010809229934769378,
+          "max": 0.03708974107512644,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Matched controlled capture validation is pending for this camera model."
+      ]
+    },
+    "S9": {
+      "std": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S9.zip",
+        "name": "0077STD.cube",
+        "bytes": 1293939,
+        "sha256": "c8a022d1a0f7f4d2fdf1651552ef0b0e8af78358bc59b629441ccef6b2e3667a",
+        "encoding": "zip-entry",
+        "transferBytes": 951548,
+        "transferSha256": "12fefe30bb2cdafe761e1b1e03f1b71ce7713471ebf92fd120a163a1a6bc49bf"
+      },
+      "zip": {
+        "path": "/luts/kodak_portra_160__kodak_endura_premier/0077S9.zip",
+        "name": "0077S9.zip",
+        "bytes": 951548,
+        "sha256": "12fefe30bb2cdafe761e1b1e03f1b71ce7713471ebf92fd120a163a1a6bc49bf"
+      },
+      "qa": {
+        "tetrahedral": {
+          "mean": 0.0018281882113557932,
+          "p95": 0.005947412138510107,
+          "p99": 0.011680637091550842,
+          "max": 0.045648349209646444,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        },
+        "trilinear": {
+          "mean": 0.0016821103145275667,
+          "p95": 0.005228865745388556,
+          "p99": 0.010815683271818251,
+          "max": 0.037263002322849265,
+          "samples": 4478,
+          "metric": "max absolute RGB channel error",
+          "space": "encoded sRGB 0–1"
+        }
+      },
+      "warnings": [
+        "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+        "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+        "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+        "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+        "Upstream support is qualitative field feedback, not controlled quantitative camera validation."
+      ]
+    }
+  }
 }
