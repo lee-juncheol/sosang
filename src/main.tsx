@@ -105,6 +105,10 @@ function App() {
   // film-cast button moves them to its preset; on 0/0 or on that preset the
   // published, verified LUT files are used, anywhere else a cube is baked.
   const [methodInfo, setMethodInfo] = useState(false)
+  // Phones: the settings sit below the preview, so show a small live copy while it is off screen.
+  const [previewOffscreen, setPreviewOffscreen] = useState(false)
+  // Keep the last frame while the next one is computed, so the thumbnail does not blink.
+  const miniFrame = useRef<string | undefined>(undefined)
   useEffect(() => { if (!methodInfo) return; const close = (e: KeyboardEvent) => { if (e.key === 'Escape') setMethodInfo(false) }; const outside = (e: PointerEvent) => { if (!(e.target as Element)?.closest?.('.film-cast-switch')) setMethodInfo(false) }; window.addEventListener('keydown', close); window.addEventListener('pointerdown', outside); return () => { window.removeEventListener('keydown', close); window.removeEventListener('pointerdown', outside) } }, [methodInfo])
   // Portra 400 is the blend reference: its film-cast variant equals the neutral look.
   const castLocked = !castCombo || baseCombo?.film === catalog?.filmCast?.referenceFilm
@@ -133,6 +137,13 @@ function App() {
     : activeCombo && !stdAsset ? t("이 카메라용 STD LUT가 준비되지 않았습니다.") : undefined
   const samplePhoto = useSamplePhoto(view === 'studio' && !activePhoto ? builtinSample : null)
   const photoLook = usePhotoLook(activePhoto || samplePhoto.photo, view === 'studio' && activeCombo?.status === 'ready' && !blockedReason ? (timing.active ? timing.preview : stdAsset) : undefined)
+  useEffect(() => {
+    const target = previewPanel.current?.querySelector('.preview')
+    if (!target || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => setPreviewOffscreen(!entry.isIntersecting), { threshold: 0.15 })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [view, photoLook.path, catalog])
   const processingError = timing.error || (!activePhoto ? samplePhoto.error : undefined) || photoLook.error
   const retryPreview = () => { if (!activePhoto && samplePhoto.error) samplePhoto.retry(); else photoLook.retry() }
 
@@ -224,6 +235,8 @@ function App() {
   const referenceLabel = isNegativeDigital ? t("디지털 변환 기준") : t("직접 엔진")
   const sample = activePhoto?.sample || builtinSample!
   const resultPath = photoLook.path
+  if (resultPath) miniFrame.current = resultPath
+  const miniSrc = resultPath ?? miniFrame.current
   const publishedAsset = selectDownloadAsset(combo, format, exportCameraId)
   const selectedAsset = timing.active ? (format === 'zip' ? undefined : publishedAsset) : publishedAsset
   const publishedFilename = downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, format, camera?.name || exportCameraId, !!combo.castBaseId)
@@ -236,7 +249,8 @@ function App() {
   const stdMetric = selectedQa.metric
   const stdWarnings = selectedQa.warnings
   const filtered = libraryFilms.filter(f => (brand === '모두' || f.brand === brand) && f.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (a.id === 'kodak_portra_400' ? -1 : b.id === 'kodak_portra_400' ? 1 : a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)))
+    .sort((a, b) => (a.id === 'kodak_portra_400' ? -1 : b.id === 'kodak_portra_400' ? 1
+      : Number(a.type === 'supplied') - Number(b.type === 'supplied') || a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)))
   const formatName = format === 'vlog' ? 'V-Log' : format === 'std' ? stdLabel : `${camera?.name || '—'} STD + V-Log`
   function chooseCamera(id: string) {
     setCameraId(id); setNotice('')
@@ -298,12 +312,12 @@ function App() {
               {(['M', 'Y'] as const).map(channel => { const value = channel === 'M' ? timingM : timingY, set = (v: number) => setTiming(channel === 'M' ? { m: v } : { y: v })
                 return <label className="timing-row" key={channel}><span className={`timing-channel timing-${channel.toLowerCase()}`}>{channel}</span><input type="range" min={-timing.span} max={timing.span} step={0.1} value={value} aria-label={t("{0} 필터 이동 (Kodak CC)", [channel])} onChange={e => { set(Number(e.target.value)); setNotice('') }}/><output>{formatShift(value)}</output></label> })}
               <div className="timing-actions"><small>{timing.loading ? t("조정값으로 LUT를 계산하는 중…") : timing.active ? t("최종 필터 이동: {0}", [timingLabel]) : null}</small><button type="button" disabled={castSelected ? onCastPreset : onNeutral} onClick={() => { resetTiming(); setNotice('') }}>{t("초기화")}</button></div>
-              <p className="film-cast-note"><strong className="timing-usage">{t("슬라이더를 움직이면 미리보기와 다운로드 LUT에 바로 반영됩니다. M+는 초록, Y+는 파랑, M−는 마젠타, Y−는 노랑 쪽으로 움직입니다. 추천 현상 방법을 고르면 그 조합의 추천값에서 시작하고, 값은 필름·인화지와 현상 방법마다 따로 기억합니다. 새로고침하면 처음 값으로 돌아갑니다.")}</strong></p>
+              <p className="film-cast-note">{t("미리보기와 다운로드 LUT에 바로 반영됩니다. 값은 새로고침 전까지 조합마다 기억합니다.")}</p>
               {timing.active && format === 'zip' && <p className="film-cast-note">{t("인화 필터를 조정한 LUT는 STD 또는 V-Log 파일로 내려받을 수 있습니다.")}</p>}
             </fieldset>}
             {!isDigital && !castActive && <p className="paper-balance-note">{t("중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다.")} <button onClick={() => dialog.current?.showModal()}>{t("생성 기준 보기")}</button></p>}
           </div>
-          <div className="export-section"><div className="section-label"><span>{t("LUT 내보내기")}</span><Icon name="download" size={16}/></div><div className="export-spec"><span>{t("출력")} <b>sRGB</b></span><span>{t("격자")} <b>33 × 33 × 33</b></span></div>
+          <div className="export-section">{previewOffscreen && miniSrc && <button type="button" className="mini-preview" onClick={() => previewPanel.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })} aria-label={t("미리보기로 돌아가기")}><img src={miniSrc} alt=""/><span>{t("미리보기")}</span></button>}<div className="section-label"><span>{t("LUT 내보내기")}</span><Icon name="download" size={16}/></div><div className="export-spec"><span>{t("출력")} <b>sRGB</b></span><span>{t("격자")} <b>33 × 33 × 33</b></span></div>
             <div className="export-camera-control"><label className="output-label" htmlFor="export-camera">{t("카메라 선택")}</label><select id="export-camera" value={exportCameraId} disabled={format === 'vlog' || isSupplied} onChange={event => chooseCamera(event.target.value)}>{catalog.cameraAdapters?.models.filter(model => !isSupplied || model.id === exportCameraId).map(model => <option key={model.id} value={model.id}>{model.name}{model.cameraUse === 'post-only' ? ' · ' + t("편집용") : ''}</option>)}</select></div>
             {isSupplied && <p className="reference-export-note">{t("이 후지 LUT는 S1II Standard용 파일입니다.")}</p>}
             {!isSupplied && camera?.cameraUse === 'post-only' && format !== 'vlog' && <p className="reference-export-note">{t("이 모델의 STD LUT는 편집 프로그램용입니다. 카메라 내 LUT 적용 지원을 뜻하지 않습니다.")}</p>}

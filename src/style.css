@@ -83,3 +83,23 @@ html:lang(en) .process-option{font-size:13px}
 .timing-actions{flex-direction:column;align-items:stretch;gap:4px}.timing-actions button{order:-1;align-self:flex-end}.timing-actions small{font-size:13px;color:var(--muted)}
 .film-cast-switch{position:relative}.method-legend{display:flex;align-items:center;gap:6px}.method-info-button{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:var(--muted);padding:0}.method-info-button:hover,.method-info-button[aria-expanded=true]{color:var(--mint);background:#ffffff0d}
 .method-info-layer{position:absolute;z-index:30;top:30px;left:0;right:0;max-height:min(60vh,460px);overflow:auto;padding:16px 18px 14px;background:#1c1d22;border:1px solid var(--line-faint);border-radius:10px;box-shadow:0 18px 40px #0009}.method-info-layer h4{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--mint)}.method-info-layer p{margin:0 0 14px;font-size:13px;line-height:1.65;color:#d6d7de}.method-info-layer p:last-child{margin-bottom:0}.method-info-close{position:absolute;top:6px;right:8px;width:28px;height:28px;font-size:20px;line-height:1;color:var(--muted)}.method-info-close:hover{color:#fff}
+
+/* 2026-11 UX pass: keep the preview in view while adjusting, calmer settings column. */
+.mini-preview{display:none}
+.eyebrow,.section-label small,.export-spec b,.download-meta,.samples-heading>span:last-child{font-size:11px}
+.paper-option{min-height:44px;padding:6px 8px}.paper-option small{margin-top:1px}.paper-option strong{line-height:1.4}
+.timing-row input[type=range]{height:28px}
+@media(min-width:651px){
+  /* The settings column scrolls on its own so the preview never leaves the screen. */
+  .recipe-panel{position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3b41 transparent;border-radius:12px}
+}
+@media(max-width:650px){
+  .export-section{padding-top:10px;gap:6px 10px}
+  .paper-option{min-height:52px;padding:8px}.paper-option small{margin-top:3px}
+  .timing-row input[type=range]{height:44px}
+  .mini-preview{display:flex;flex-direction:column;position:absolute;right:12px;bottom:calc(100% + 10px);width:128px;padding:3px;border-radius:8px;background:#1b1c20;border:1px solid #414349;box-shadow:0 8px 24px #0006;color:var(--muted);font-size:11px;gap:3px;z-index:21}
+  .mini-preview img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:5px;display:block}
+  .mini-preview span{padding:0 4px 2px;text-align:left}
+}
+@media(max-width:650px) and (prefers-reduced-motion:no-preference){.mini-preview{animation:mini-in .18s ease-out}}
+@keyframes mini-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
