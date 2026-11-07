@@ -1,6 +1,6 @@
 # S1M2 / S1II 실기 확인
 
-2026-11-04 C200 + Crystal Archive Type II의 원래 V-Log LUT와 S1II 합성 STD LUT를 사용자 카메라에서 각각 적용했습니다. EXIF는 DC-S1M2 펌웨어 1.5, LUT1 100%, LUT2 OFF를 확인하며 사용자는 결과가 상당히 비슷하다고 평가했습니다. 이는 한 장면의 정성 확인입니다. [자료와 수치 검증의 구분](camera-std.md)
+2026-11-04 C200 + Crystal Archive Type II의 원래 V-Log LUT와 S1II 합성 STD LUT를 사용자 카메라에서 각각 적용했습니다. EXIF는 DC-S1M2 펌웨어 1.5, LUT1 100%, LUT2 OFF를 확인하며 사용자는 이후 여러 장면을 같은 방식으로 촬영해 비교했고, 결과가 상당히 비슷하다고 평가했습니다. 이는 여러 장면의 정성 확인이며 차트·색차계 측정은 아닙니다. [자료와 수치 검증의 구분](camera-std.md)
 
 ## 같은 장면으로 비교하기
 

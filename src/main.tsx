@@ -62,10 +62,16 @@ function castDirection(hue: number) {
   return hue < 70 || hue >= 345 ? '따뜻한 주황·붉은' : hue < 110 ? '노란' : hue < 160 ? '연두' : hue < 200 ? '초록·청록' : hue < 260 ? '청록·푸른' : hue < 300 ? '보랏빛' : '분홍빛'
 }
 
+type View = 'studio' | 'gallery' | 'gallery/recommended'
+function viewFromHash(): View {
+  if (window.location.hash === '#gallery/recommended') return 'gallery/recommended'
+  return window.location.hash === '#gallery' ? 'gallery' : 'studio'
+}
+
 function App() {
   const { locale, ready: localeReady, setLocale, t, message } = useLocale()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
-  const [view, setView] = useState<'studio' | 'gallery'>(() => window.location.hash === '#gallery' ? 'gallery' : 'studio')
+  const [view, setView] = useState<View>(viewFromHash)
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [filmId, setFilmId] = useState('kodak_portra_400')
@@ -168,19 +174,29 @@ function App() {
   }, [attempt])
 
   useEffect(() => {
-    const syncView = () => setView(window.location.hash === '#gallery' ? 'gallery' : 'studio')
+    const syncView = () => setView(viewFromHash())
     window.addEventListener('hashchange', syncView)
     return () => window.removeEventListener('hashchange', syncView)
   }, [])
-  function navigate(next: 'studio' | 'gallery') {
+  function navigate(next: View, scrollToTop = true) {
     setView(next)
     window.location.hash = next
-    window.scrollTo({ top: 0, behavior: 'instant' })
+    if (scrollToTop) window.scrollTo({ top: 0, behavior: 'instant' })
   }
   function useGalleryLook(photo: GalleryPhoto) {
     setFilmId(photo.filmId)
     if (photo.paperId) setPaperId(photo.paperId)
-    setNegativeMode('negative_print'); setFilmCastOn(false)
+    const recorded = catalog?.combinations.find(combo => combo.id === photo.combinationId)
+    const useCast = !!recorded?.castBaseId && recorded.film !== catalog?.filmCast?.referenceFilm
+    setNegativeMode('negative_print'); setFilmCastOn(useCast)
+    // Reopen the recorded preset even if this look was fine-tuned in the studio.
+    if (recorded?.processMode === 'negative_print') {
+      const key = (recorded.castBaseId || recorded.id) + '|' + (useCast ? 'film-cast' : 'neutral')
+      setTimingStore(store => {
+        if (!(key in store)) return store
+        const next = { ...store }; delete next[key]; return next
+      })
+    }
     setCameraId(photo.cameraId)
     const nextSample = sampleForCamera(catalog?.samples || [], photo.cameraId) || catalog?.samples[0]
     if (nextSample) setSampleId(nextSample.id)
@@ -264,9 +280,9 @@ function App() {
   }
 
   return <>
-    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view === 'gallery' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a></nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
-    <main className={view === 'gallery' ? 'gallery-main' : undefined}>
-      {view === 'gallery' ? <FilmGallery catalog={catalog} locale={locale} t={t} onUseLook={useGalleryLook}/> : <>
+    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view !== 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a></nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
+    <main className={view !== 'studio' ? 'gallery-main' : undefined}>
+      {view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
       <div className="intro"><div className="studio-title"><h1>{t("스튜디오")}</h1><LutUsageGuide locale={locale} t={t}/></div><div className="catalog-stat"><b>{catalog.counts.ready + suppliedLooks.length}</b><span>{t("가지 컬러 조합")}<small>33³ LUT · sRGB</small></span></div></div>
       <div className="workspace">
         <aside id="film-library" className="film-library" ref={filmLibrary} tabIndex={-1} aria-label={t("필름 선택")}>

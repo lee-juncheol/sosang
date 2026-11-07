@@ -45,6 +45,8 @@ assert(Array.isArray(catalog.combinations), 'Destination catalog has no combinat
 const selected = [];
 async function select(relative) {
   assert(!relative.includes('\\') && !/[\r\n\0]/.test(relative), `Unsafe source path: ${relative}`);
+  // This local video production workspace is not corresponding application source.
+  if (relative === 'docs/video') return;
   const name = path.posix.basename(relative);
   if (name.startsWith('.') || excludedDirectories.has(name.toLowerCase()) || excludedFiles.test(name)) return;
   const absolute = path.join(root, relative);
@@ -100,8 +102,8 @@ assets before it can display the available looks.
 Runtime assets are supplied separately by the public deployment from which
 this archive was downloaded. Its /catalog.json lists public sample images,
 preview images, and per-look ZIP assets, with byte sizes and SHA-256 hashes.
-The gallery uses /gallery/manifest.json and its image/thumbnail paths; include
-those prepared derivatives as well. Camera gallery photos are already rendered
+The gallery uses /gallery/manifest.json and /gallery/recommended/manifest.json;
+include the prepared image and thumbnail paths from each. Gallery photos are already rendered
 and must never be fed through another LUT as Standard sample inputs.
 Serve that catalog and its referenced files at the same URL paths alongside
 the compiled app; include the public /favicon.svg, /fonts/ and /licenses/ files too.

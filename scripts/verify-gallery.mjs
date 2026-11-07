@@ -3,6 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { downloadFilename } from '../src/lutNames.ts';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const digestPattern = /^[a-f0-9]{64}$/;
@@ -15,6 +16,10 @@ const filmLutNames = {
   'Fujifilm Velvia 100.cube': 'fujifilm_velvia_100',
 };
 export const GALLERY_MANIFEST = 'gallery/manifest.json';
+export const RECOMMENDED_MANIFEST = 'gallery/recommended/manifest.json';
+const recommendedPhotoFields = new Set(['id', 'sourceFilename', 'filmId', 'paperId', 'combinationId', 'path', 'thumbnailPath',
+  'width', 'height', 'thumbnailWidth', 'thumbnailHeight', 'cameraId', 'cameraName', 'capturedAt', 'exif',
+  'sourceSha256', 'preparedSha256', 'thumbnailSha256', 'filmEvidence', 'paperEvidence', 'renderKind', 'credit', 'license']);
 
 function localPath(root, url, prefix) {
   assert(typeof url === 'string' && url.startsWith(prefix) && !/[\\?#]/.test(url), `Invalid photo path: ${url}`);
@@ -123,14 +128,62 @@ export function assertPhotoContract(gallery, catalog) {
   assert.equal(gallery.counts.films, new Set(gallery.items.map(item => item.filmId)).size);
 }
 
+// Unlike the first gallery, these camera LUT filenames explicitly encode
+// the paper and FC variant. Today's recommended paper may change later.
+export function assertRecommendedContract(manifest, catalog) {
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.id, 'recommended');
+  assert.equal(manifest.source, 'user-provided');
+  assert.equal(manifest.paperEvidence, 'camera-exif-lut-filename');
+  assert.equal(manifest.cameraId, 'S1II');
+  assert(!/(?:\/(?:Users|home|Volumes|private|tmp)\/|file:\/\/|[A-Z]:[\\/])/i.test(JSON.stringify(manifest)), 'Private local path in recommended gallery');
+  assert(Array.isArray(manifest.items) && manifest.items.length > 0, 'Recommended gallery is empty');
+  const ids = new Set(), films = new Set(), pairs = new Set();
+  for (const photo of manifest.items) {
+    assert(Object.keys(photo).every(key => recommendedPhotoFields.has(key)), 'Unexpected public recommended photo field');
+    assert.match(photo.sourceFilename, /^P\d+\.webp$/i, 'Expected a WebP source basename');
+    assert.equal(photo.id, photo.sourceFilename.replace(/\.webp$/i, '').toLowerCase());
+    assert(!ids.has(photo.id), 'Duplicate recommended source'); ids.add(photo.id);
+    const prefix = '/gallery/recommended/';
+    assert.equal(photo.path, `${prefix}images/${photo.id}.webp`, 'Invalid recommended image path');
+    assert.equal(photo.thumbnailPath, `${prefix}thumbs/${photo.id}.webp`, 'Invalid recommended thumbnail path');
+    assert.equal(photo.cameraId, manifest.cameraId);
+    assert.equal(photo.filmEvidence, 'camera-exif-lut1-name');
+    assert.equal(photo.paperEvidence, manifest.paperEvidence);
+    assert.equal(photo.renderKind, 'camera-rendered');
+    assert(!('previewLut' in photo) && !('inputKind' in photo), 'Recommended gallery photos are already graded');
+    assert(photo.exif && Object.keys(photo.exif).every(key => exifFields.has(key)), 'Unexpected private EXIF field in recommended gallery');
+    assert.equal(photo.exif.PhotoStyle, 'Standard or Custom');
+    assert.equal(photo.exif.LUT1Opacity, 100);
+    assert.equal(photo.exif.LUT2Opacity, 0);
+    const combo = catalog.combinations.find(c => c.id === photo.combinationId);
+    const film = catalog.films.find(f => f.id === photo.filmId);
+    const paper = catalog.papers.find(p => p.id === photo.paperId);
+    assert(combo && film && paper && combo.status === 'ready' && combo.processMode === 'negative_print', 'Unknown recommended print combination');
+    assert.equal(combo.film, film.id, 'Recommended photo film mismatch');
+    assert.equal(combo.paper, paper.id, 'Recommended photo paper mismatch');
+    assert.equal(photo.exif.LUT1Name, downloadFilename(film, paper, combo.processMode, 'std', manifest.cameraId, !!combo.castBaseId), 'Recommended recipe does not match captured LUT filename');
+    for (const key of ['sourceSha256', 'preparedSha256', 'thumbnailSha256']) assert.match(photo[key], digestPattern, `Invalid recommended photo ${key}`);
+    for (const [key, limit] of [['width', 2400], ['height', 2400], ['thumbnailWidth', 480], ['thumbnailHeight', 480]]) {
+      assert(Number.isInteger(photo[key]) && photo[key] > 0 && photo[key] <= limit, `Unexpected recommended photo ${key}`);
+    }
+    films.add(film.id); pairs.add(combo.id);
+  }
+  assert.equal(manifest.counts.photos, ids.size);
+  assert.equal(manifest.counts.films, films.size);
+  assert.equal(manifest.counts.combinations, pairs.size);
+}
+
 export async function verifyGallery(rootDir = 'public', suppliedCatalog) {
   const root = path.resolve(rootDir);
   const catalog = suppliedCatalog || JSON.parse(await fs.readFile(path.join(root, 'catalog.json'), 'utf8'));
   const gallery = JSON.parse(await fs.readFile(path.join(root, GALLERY_MANIFEST), 'utf8'));
   assertPhotoContract(gallery, catalog);
+  const recommended = JSON.parse(await fs.readFile(path.join(root, RECOMMENDED_MANIFEST), 'utf8'));
+  assertRecommendedContract(recommended, catalog);
   const sampleManifest = JSON.parse(await fs.readFile(path.join(root, 'samples/manifest.json'), 'utf8'));
   assert.deepEqual(sampleManifest, catalog.samples, 'Catalog uses stale sample metadata');
-  const expectedGallery = new Set([GALLERY_MANIFEST]), expectedSamples = new Set(['samples/manifest.json', 'samples/external/manifest.json']);
+  const expectedGallery = new Set([GALLERY_MANIFEST, RECOMMENDED_MANIFEST]), expectedSamples = new Set(['samples/manifest.json', 'samples/external/manifest.json']);
   let images = 0;
   async function verifyImage(url, sha256, width, height, prefix) {
     const filename = localPath(root, url, prefix), bytes = await fs.readFile(filename);
@@ -139,7 +192,7 @@ export async function verifyGallery(rootDir = 'public', suppliedCatalog) {
     images++;
     return path.relative(root, filename).split(path.sep).join('/');
   }
-  for (const item of gallery.items) {
+  for (const item of [...gallery.items, ...recommended.items]) {
     expectedGallery.add(await verifyImage(item.path, item.preparedSha256, item.width, item.height, '/gallery/'));
     expectedGallery.add(await verifyImage(item.thumbnailPath, item.thumbnailSha256, item.thumbnailWidth, item.thumbnailHeight, '/gallery/'));
   }
@@ -168,7 +221,8 @@ export async function verifyGallery(rootDir = 'public', suppliedCatalog) {
   }
   await checkInventory(path.join(root, 'gallery'), expectedGallery);
   await checkInventory(path.join(root, 'samples'), expectedSamples);
-  return { photos: gallery.items.length, standardSamples: gallery.counts.standardSamples, films: gallery.counts.films, verifiedImages: images };
+  return { photos: gallery.items.length, standardSamples: gallery.counts.standardSamples, films: gallery.counts.films,
+    recommendedPhotos: recommended.counts.photos, recommendedCombinations: recommended.counts.combinations, verifiedImages: images };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) console.log(JSON.stringify(await verifyGallery(process.argv[2]), null, 2));

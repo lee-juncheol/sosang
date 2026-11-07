@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { assertPhotoContract, inspectWebp, verifyGallery } from '../scripts/verify-gallery.mjs';
+import { createHash } from 'node:crypto';
+import { assertPhotoContract, assertRecommendedContract, inspectWebp, verifyGallery, RECOMMENDED_MANIFEST } from '../scripts/verify-gallery.mjs';
 
 const root = path.resolve(new URL('../public', import.meta.url).pathname);
 async function current() {
@@ -14,7 +15,33 @@ async function current() {
 
 test('published gallery derivatives and replacement Standard samples retain their exact provenance', async () => {
   const result = await verifyGallery(root);
-  assert.deepEqual(result, { photos: 108, standardSamples: 13, films: 5, verifiedImages: 243 });
+  assert.deepEqual(result, { photos: 108, standardSamples: 13, films: 5, recommendedPhotos: 270, recommendedCombinations: 14, verifiedImages: 783 });
+});
+
+test('recommended gallery contains the selected 270 original WebPs and resolves the exact captured combination, including FC', async () => {
+  const { catalog } = await current();
+  const manifest = JSON.parse(await fs.readFile(path.join(root, RECOMMENDED_MANIFEST), 'utf8'));
+  assertRecommendedContract(manifest, catalog);
+  // Digest of the authorized source folder's sorted basename + original bytes' hashes.
+  const sourceIndex = manifest.items.map(item => item.sourceFilename + ' ' + item.sourceSha256 + '\n').sort().join('');
+  assert.equal(createHash('sha256').update(sourceIndex).digest('hex'), 'd5f2d5e5cd01c5f9ad58c81d3ef3180a5d9cca2c005b96278ba2cc718f05d714');
+  const castPhoto = manifest.items.find(item => item.combinationId.endsWith('__filmcast'));
+  assert(castPhoto);
+  assert(manifest.items.some(item => !item.combinationId.endsWith('__filmcast')), 'The neutral capture must stay neutral');
+  for (const change of [
+    photo => { photo.combinationId = photo.combinationId.replace(/__filmcast$/, ''); },
+    photo => { photo.exif.LUT1Name = 'another.cube'; },
+    photo => { photo.exif.GPSLongitude = 123; },
+    photo => { photo.authoringPath = '/private/original.webp'; },
+    photo => { photo.exif.LUT2Opacity = 50; },
+    photo => { photo.thumbnailPath = photo.path; },
+    photo => { photo.path = '/gallery/recommended/../private.webp'; },
+    photo => { photo.sourceFilename = 'private/' + photo.sourceFilename; },
+  ]) {
+    const photo = structuredClone(castPhoto);
+    change(photo);
+    assert.throws(() => assertRecommendedContract({ ...manifest, items: [photo], counts: { photos: 1, films: 1, combinations: 1 } }, catalog));
+  }
 });
 
 test('gallery keeps the captured film and user-confirmed recommended paper, including paperless Velvia', async () => {
