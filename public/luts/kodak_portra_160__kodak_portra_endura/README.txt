@@ -15,7 +15,9 @@ merged cube. QA compares the serialized cube against the sequential transform;
 it does not establish physical film accuracy or a camera-specific match.
 
 Source adapter: https://github.com/shenmintao/V-Log-Alchemy/blob/e51ba9a23458ff5c316f630b860eb0201139d126/Luts/Panasonic-Standard/Conversion/S1IIS2V.cube
-Adapter SHA256: 7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e
+Adapter modified by Film Lab: smoothed only in colours with no nearby camera
+sample (fixes a cyan band in blue skies); neutral axis unchanged.
+Adapter SHA256 (Film Lab smoothed): a46b3369f1d9f4d8948e6fc9f20ed5594602b7361a0e1a0958b9d06a4d0611f1
 Creative VLOG SHA256: 04a35278844fda95175027b86c9d74e32cc476eee9c61b04b2779d8c9e7d1b4c
 Upstream camera calibration status: pending.
 
