@@ -60,7 +60,7 @@ export async function saveFile(filename: string, data: BlobPart, type: string): 
 export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean }
 export type CameraEntry = { index: number; name: string; styleCode: number; inUse: boolean }
 export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number | null }
-export type CameraDeleteResult = { index: number; name: string; backup: string }
+export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
 export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'verify_failed' | 'unsupported_platform' | 'busy' | 'camera_error' | 'internal'
 export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'done'
@@ -103,9 +103,18 @@ export function cameraRegister(cube: string, slot: number, name: string, overwri
   return withProgress(() => cameraCall<CameraRegisterResult>('camera_register_lut', { cube, slot, name, overwrite }), onProgress)
 }
 
-/** Empty one Library slot (the entry selected in the camera is refused). */
-export function cameraDelete(slot: number, onProgress?: (step: CameraProgress) => void): Promise<CameraDeleteResult> {
-  return withProgress(() => cameraCall<CameraDeleteResult>('camera_delete_lut', { slot }), onProgress)
+export type CameraRegisterManyResult = { registered: { index: number; name: string }[]; backup: string; otherChanges: number }
+
+/** Register several .cube texts in one write. Every file and slot is checked first; if one is
+ *  refused, nothing is written. */
+export function cameraRegisterMany(items: { cube: string; slot: number; name: string }[], overwrite: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRegisterManyResult> {
+  return withProgress(() => cameraCall<CameraRegisterManyResult>('camera_register_luts', { items, overwrite }), onProgress)
+}
+
+/** Empty one or more Library slots in one write. The entry selected in the camera is refused,
+ *  and if any slot is refused nothing changes. */
+export function cameraDelete(slots: number[], onProgress?: (step: CameraProgress) => void): Promise<CameraDeleteResult> {
+  return withProgress(() => cameraCall<CameraDeleteResult>('camera_delete_luts', { slots }), onProgress)
 }
 
 /** Entries 0 (built-in Vlog_709) and 1 (ARRI 709) came with the camera and are never changed. */
