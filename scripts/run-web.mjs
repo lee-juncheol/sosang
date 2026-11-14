@@ -26,6 +26,9 @@ else if (action==='deploy:cloudflare') { buildCloudflare(); run(['node_modules/w
 else if (action==='preview:cloudflare') { run(['node_modules/wrangler/bin/wrangler.js','dev','--config','wrangler.jsonc','--ip','127.0.0.1',...process.argv.slice(3)]); }
 else if (action==='cloudflare:login') { run(['node_modules/wrangler/bin/wrangler.js','login',...process.argv.slice(3)]); }
 else if (action==='verify:assets') { run(['--experimental-strip-types','scripts/verify-assets.mjs',...process.argv.slice(3)]); }
-else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/lut-names.test.ts','tests/print-timing.test.ts','tests/download-zip.test.ts','tests/cloudflare.test.mjs','tests/geo.test.mjs','tests/legacy-redirect.test.mjs','tests/i18n.test.ts','tests/pack-static.test.mjs','tests/gallery.test.mjs','tests/supplied-fuji.test.mjs']); }
+else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/lut-names.test.ts','tests/print-timing.test.ts','tests/download-zip.test.ts','tests/cloudflare.test.mjs','tests/geo.test.mjs','tests/legacy-redirect.test.mjs','tests/i18n.test.ts','tests/pack-static.test.mjs','tests/gallery.test.mjs','tests/supplied-fuji.test.mjs','tests/platform.test.ts']); }
+else if (action==='build:app') { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build','--config','vite.app.config.ts']); }
+else if (action==='dev:app') { run(['node_modules/vite/bin/vite.js','--config','vite.app.config.ts']); }
+else if (action==='app:dev' || action==='app:build') { process.env.PATH=`${resolve(homedir(),'.cargo/bin')}:${process.env.PATH}`; run(['node_modules/@tauri-apps/cli/tauri.js',action==='app:dev'?'dev':'build',...process.argv.slice(3)]); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }

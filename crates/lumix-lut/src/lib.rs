@@ -24,6 +24,12 @@ const ITEM_LUTS: u16 = 0x051F;
 const TITLE_STRIDE: usize = 776;
 const TITLE_HEADER: usize = 8;
 const TITLE_NAME_BYTES: usize = 512;
+/// Link value of an empty title entry.
+const EMPTY_LINK: u16 = 0xFFFF;
+/// Selected Library entry + 1, stored three times. Observed on DC-S1M2 firmware 1.5 only
+/// (settings length 9,197,673): it follows the LUT chosen in the camera menu.
+const SELECTED_OFFSETS: [usize; 3] = [0x8B_FC84, 0x8B_FCA0, 0x8B_FCBC];
+const SELECTED_LAYOUT_LEN: usize = 9_197_673;
 const LUT_RECORD_LEN: u32 = 0x34A4C; // grid u16 + flag u16 + 33^3*3 u16 + 2 pad bytes
 const LUT_DATA_BYTES: usize = LUT_ENTRIES * 6;
 const MODEL_OFFSET: usize = 0x1E;
@@ -53,7 +59,7 @@ impl std::fmt::Display for Error {
             Error::UnsupportedModel(m) => write!(f, "camera model {m} is not supported yet"),
             Error::Checksum { stored, expected } => write!(f, "settings checksum mismatch (stored {stored:#04x}, expected {expected:#04x})"),
             Error::Cube(m) => write!(f, "cannot use this .cube file: {m}"),
-            Error::UnsupportedPhotoStyle(t) => write!(f, "#LUMIXPHOTOSTYLE {t} is not supported yet (only STD or no tag)"),
+            Error::UnsupportedPhotoStyle(t) => write!(f, "#LUMIXPHOTOSTYLE {t} is not supported yet (only STD, VLOG or no tag)"),
             Error::InvalidName(m) => write!(f, "invalid LUT name: {m}"),
             Error::Slot(m) => write!(f, "{m}"),
             Error::Guard(m) => write!(f, "refusing to write: {m}"),
@@ -302,6 +308,52 @@ impl SettingsBlob {
             return Err(Error::Guard(format!("byte {i:#x} would change outside the target slot")));
         }
         debug_assert_eq!(&b[r + 8 + LUT_DATA_BYTES..r + 8 + LUT_DATA_BYTES + 2], &[0, 0]);
+        SettingsBlob::parse(b)
+    }
+
+    /// Library entry selected in the camera menu, when it can be read for this layout.
+    pub fn selected_entry(&self) -> Option<usize> {
+        if self.bytes.len() != SELECTED_LAYOUT_LEN || self.model != "DC-S1M2" {
+            return None;
+        }
+        let v = self.bytes[SELECTED_OFFSETS[0]];
+        if SELECTED_OFFSETS.iter().any(|&o| self.bytes[o] != v) || v == 0 || v as usize > self.layout.title_count {
+            return None;
+        }
+        Some(v as usize - 1)
+    }
+
+    /// Return a new blob with Library entry `index` emptied, the way the camera's own delete
+    /// does it: only the title entry changes (link 0xFFFF, V-Log style, no name); the LUT
+    /// record is left as it is and is ignored while the entry is empty.
+    pub fn without_lut(&self, index: usize) -> Result<SettingsBlob, Error> {
+        if index == 0 || index >= self.layout.title_count {
+            return Err(Error::Slot(format!("entry {index} is not a user slot (1..={})", self.layout.title_count - 1)));
+        }
+        if !self.entries()[index].in_use {
+            return Err(Error::Slot(format!("entry {index} is already empty")));
+        }
+        if self.selected_entry() == Some(index) {
+            return Err(Error::Slot(format!("entry {index} is selected in the camera; choose another LUT there first")));
+        }
+        let mut b = self.bytes.clone();
+        let t = self.title_offset(index);
+        b[t..t + 4].copy_from_slice(&(index as u32).to_le_bytes());
+        b[t + 4..t + 6].copy_from_slice(&EMPTY_LINK.to_le_bytes());
+        b[t + 6..t + 8].copy_from_slice(&BaseStyle::VLog.code().to_le_bytes());
+        b[t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES].fill(0);
+        let last = b.len() - 1;
+        b[last] = checksum_for(&b);
+
+        let allowed = [t..t + TITLE_STRIDE, last..last + 1];
+        if let Some((i, _)) = b
+            .iter()
+            .zip(&self.bytes)
+            .enumerate()
+            .find(|(i, (x, y))| x != y && !allowed.iter().any(|a| a.contains(i)))
+        {
+            return Err(Error::Guard(format!("byte {i:#x} would change outside the target slot")));
+        }
         SettingsBlob::parse(b)
     }
 }

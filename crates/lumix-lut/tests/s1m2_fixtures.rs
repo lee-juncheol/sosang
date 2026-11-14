@@ -80,3 +80,56 @@ fn rejects_corrupted_checksum() {
     b[n - 1] ^= 0x55;
     assert!(matches!(SettingsBlob::parse(b), Err(Error::Checksum { .. })));
 }
+
+const TITLES: usize = 0xF6B8;
+const STRIDE: usize = 776;
+
+#[test]
+fn reads_the_entry_selected_in_the_camera() {
+    let cases = [("s1m2_fw15_first_read.bin", 32), ("s1m2_fw15_test01_slot40.bin", 2), ("s1m2_fw15_before_camera_delete.bin", 39), ("s1m2_fw15_after_camera_delete.bin", 2)];
+    for (name, selected) in cases {
+        let Some(b) = fixture(name) else { continue };
+        assert_eq!(SettingsBlob::parse(b).unwrap().selected_entry(), Some(selected), "{name}");
+    }
+}
+
+#[test]
+fn delete_writes_the_same_empty_entry_as_the_camera() {
+    // The camera deleted entry 39 (WEDDIRS) between these two captures.
+    let (Some(before), Some(after)) = (fixture("s1m2_fw15_test01_slot40.bin"), fixture("s1m2_fw15_after_camera_delete.bin")) else { return };
+    let s = SettingsBlob::parse(before.clone()).unwrap();
+    let out = s.without_lut(37).unwrap();
+    let mine = &out.as_bytes()[TITLES + 37 * STRIDE..TITLES + 38 * STRIDE];
+    let camera = &after[TITLES + 39 * STRIDE..TITLES + 40 * STRIDE];
+    assert_eq!(&mine[0..4], &37u32.to_le_bytes());
+    assert_eq!(&mine[4..], &camera[4..], "empty entry differs from the camera's own delete");
+    assert!(!out.entries()[37].in_use);
+    assert_eq!(out.free_slots(), vec![37, 38, 39]);
+    // Only the title entry and the checksum change; the LUT record is left in place.
+    let changed: Vec<usize> = out.as_bytes().iter().zip(&before).enumerate().filter(|(_, (a, b))| a != b).map(|(i, _)| i).collect();
+    let last = before.len() - 1;
+    assert!(changed.iter().all(|&i| (TITLES + 37 * STRIDE..TITLES + 38 * STRIDE).contains(&i) || i == last), "{changed:x?}");
+    assert!(out.lut(37).is_none(), "an empty entry reports no LUT");
+}
+
+#[test]
+fn delete_refuses_the_selected_entry_empty_entries_and_the_built_in() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    assert_eq!(s.selected_entry(), Some(2));
+    assert!(matches!(s.without_lut(2), Err(Error::Slot(_))), "entry 2 is selected in the camera");
+    assert!(matches!(s.without_lut(38), Err(Error::Slot(_))), "entry 38 is empty");
+    assert!(matches!(s.without_lut(0), Err(Error::Slot(_))));
+    assert!(matches!(s.without_lut(41), Err(Error::Slot(_))));
+}
+
+#[test]
+fn registering_into_an_empty_entry_writes_the_same_title_as_the_camera() {
+    // Entry 39 before the delete holds WEDDIRS.cube as the camera imported it from a card.
+    let (Some(b), Some(cam)) = (fixture("s1m2_fw15_test01_slot40.bin"), fixture("s1m2_fw15_before_camera_delete.bin")) else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    let out = s.with_lut(39, "WEDDIRS.cube", BaseStyle::Standard, &test01(), false).unwrap();
+    let mine = &out.as_bytes()[TITLES + 39 * STRIDE..TITLES + 40 * STRIDE];
+    let camera = &cam[TITLES + 39 * STRIDE..TITLES + 40 * STRIDE];
+    assert_eq!(mine, camera, "title entry differs from the camera's own import");
+}

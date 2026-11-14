@@ -1,4 +1,5 @@
 import type { Asset } from './types'
+import { serverUrl } from './platform.ts'
 
 const invalidZip = () => new Error('ZIP LUT 파일 검증에 실패했습니다. 페이지를 새로고침해 주세요.')
 
@@ -112,7 +113,7 @@ export async function extractZipEntry(buffer: ArrayBuffer, name: string, expecte
 
 // Shared by downloads and the upload renderer, including packed production LUTs.
 export async function fetchVerifiedAsset(asset: Asset): Promise<ArrayBuffer> {
-  const response = await fetch(asset.path)
+  const response = await fetch(serverUrl(asset.path))
   if (!response.ok) throw new Error('LUT 파일을 가져오지 못했습니다. 다시 시도해 주세요.')
   let buffer = await response.arrayBuffer()
   if (asset.encoding === 'zip-entry') {

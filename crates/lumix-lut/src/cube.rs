@@ -24,10 +24,12 @@ pub struct CubeFile {
 }
 
 impl CubeFile {
-    /// Base Photo Style the camera will assign. Untagged files fall back to V-Log, as the manual states.
+    /// Base Photo Style the camera will assign. Untagged files fall back to V-Log, as the manual
+    /// states; an explicit `VLOG` tag is stored the same way (code 49, not yet checked against a
+    /// file the camera imported itself).
     pub fn base_style(&self) -> Result<BaseStyle, Error> {
         match self.photo_style_tag.as_deref() {
-            None => Ok(BaseStyle::VLog),
+            None | Some("VLOG") => Ok(BaseStyle::VLog),
             Some("STD") => Ok(BaseStyle::Standard),
             Some(other) => Err(Error::UnsupportedPhotoStyle(other.to_string())),
         }

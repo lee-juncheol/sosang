@@ -1,0 +1,28 @@
+mod camera;
+mod files;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(camera::CameraLock::default())
+        .invoke_handler(tauri::generate_handler![
+            camera::camera_status,
+            camera::camera_list_luts,
+            camera::camera_register_lut,
+            camera::camera_delete_lut,
+            files::save_file,
+            files::open_external
+        ])
+        .setup(|_app| {
+            lumix_ptp::start_discovery();
+            #[cfg(debug_assertions)]
+            if std::env::var_os("SOSANG_CAMERA_SELFCHECK").is_some() {
+                camera::self_check(_app.handle().clone());
+            }
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running the sosang app");
+}

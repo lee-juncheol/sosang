@@ -20,7 +20,9 @@ LUMIX 카메라의 [LUT Library]에 SD 카드 없이 USB로 LUT를 등록하는 
 | `0x9421` | `0x080000A2` | 카메라 → PC, 설정 파일 전체 | DC-S1M2 9,197,673 바이트, 약 6초 |
 | `0x9422` | `0x080000A2` | PC → 카메라, 같은 형식 | 약 11초, 응답 `0x2001` |
 
-macOS에서는 `ptpcamerad`가 장치를 잡고 있어 libusb/WebUSB로는 열 수 없습니다(`claimInterface` 실패 확인). ImageCaptureCore의 `requestSendPTPCommand:outData:completion:`을 씁니다. 쓰기 명령의 완료 블록에는 받은 데이터 자리에 `nil`이 들어옵니다.
+macOS에서는 `ptpcamerad`가 장치를 잡고 있어 libusb/WebUSB로는 열 수 없습니다(`claimInterface` 실패 확인). ImageCaptureCore의 `requestSendPTPCommand:outData:completion:`을 씁니다. 쓰기 명령의 완료 블록에는 받은 데이터 자리에 `nil`이 들어옵니다. `ICDeviceBrowser`를 멈췄다가 새로 시작하면 이미 연결된 카메라를 다시 알려 주지 않으므로, 브라우저는 프로세스가 끝날 때까지 유지하고 명령마다 세션만 열고 닫습니다.
+
+데스크톱 앱(`src-tauri`)은 `camera_status`, `camera_list_luts`, `camera_register_lut` 명령으로 이 기능을 씁니다. 디버그 빌드에서 `SOSANG_CAMERA_SELFCHECK=1`을 주고 실행하면, 시작할 때 연결 확인과 목록 읽기를 실행하고 결과를 출력합니다(쓰기는 하지 않습니다).
 
 ## 설정 파일 구조
 
@@ -39,6 +41,12 @@ macOS에서는 `ptpcamerad`가 장치를 잡고 있어 libusb/WebUSB로는 열 �
 - 데이터: `u32 0x0C`, 이어서 레코드 41개, 끝에 8바이트.
 - 레코드 n(이름 표 칸 n+1과 짝): `u32 0x34A4C`, `u16 격자(33, 빈 칸은 0)`, `u16 기본 스타일(이름 표와 같은 값)`, `33³ × RGB u16 LE`(R이 가장 빨리 바뀜, `round(v × 65535)`), `u16 0`.
 - 카메라가 SD 카드에서 직접 넣은 값과 이 방식으로 계산한 값은 최대 1 LSB 차이였습니다(반올림 차이).
+
+### 삭제와 선택 상태
+- 카메라가 직접 지울 때는 이름 표 칸만 바뀝니다: `연결 = 0xFFFF`, `기본 스타일 = 49`, 이름 영역 0. LUT 레코드는 그대로 남고, 칸이 비어 있는 동안에는 쓰이지 않습니다(2026-11-14 캡처 비교). `SettingsBlob::without_lut`는 이 칸을 바이트 단위로 같게 만듭니다.
+- 이름 표 칸의 마지막 3바이트는 사용 여부와 관계없이 `FF FF FF`이며 건드리지 않습니다.
+- `0x8BFC84`, `0x8BFCA0`, `0x8BFCBC`(DC-S1M2 fw 1.5, 설정 파일 9,197,673바이트)에는 카메라 메뉴에서 고른 칸 번호 + 1이 같은 값으로 세 번 들어 있습니다. 카메라는 선택된 LUT를 지우면 이 값을 바꾸는데, 그 규칙은 확인하지 못했습니다. 그래서 선택된 칸은 지우지 않습니다.
+- 앱은 0번(Vlog_709)과 1번(ARRI 709)은 바꾸지 않습니다.
 
 ## 등록 절차 (`lumix_ptp::register_lut`)
 

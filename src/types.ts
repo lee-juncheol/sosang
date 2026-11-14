@@ -47,6 +47,8 @@ export interface Combination {
 }
 export interface CameraAdapter {
   id: string; name: string; asset: Asset; validation: 'controlled' | 'field' | 'pending'; cameraUse: 'in-camera' | 'post-only'
+  /** Model strings the camera reports, e.g. "DC-S1M2". */
+  aliases?: string[]
 }
 export interface SuppliedFujiLook { stock: Stock; std: Asset; sourceFile: string; sourceSha256: string }
 export interface SuppliedFuji { methodId: 'supplied-fuji-std-v1'; cameraId: string; looks: SuppliedFujiLook[]; provenance: Asset; notice: Asset }

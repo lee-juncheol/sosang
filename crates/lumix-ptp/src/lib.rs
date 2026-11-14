@@ -82,6 +82,13 @@ impl DeviceInfo {
     }
 }
 
+/// Start USB camera discovery in the background (call once at app start; safe to call again).
+/// A freshly started browser can take a while to report a camera that is already connected.
+pub fn start_discovery() {
+    #[cfg(target_os = "macos")]
+    mac::start_discovery();
+}
+
 /// An open PTP session with one camera.
 pub struct Camera {
     #[cfg(target_os = "macos")]
@@ -179,10 +186,7 @@ pub fn register_lut(
     let current = camera.read_settings()?;
     let patched = current.with_lut(index, name, style, lut, allow_overwrite)?;
 
-    std::fs::create_dir_all(backup_dir)?;
-    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let backup = backup_dir.join(format!("{}-settings-{stamp}.bin", camera.info.model));
-    std::fs::write(&backup, current.as_bytes())?;
+    let backup = save_backup(camera, &current, backup_dir)?;
 
     progress("writing");
     camera.write_settings(&patched)?;
@@ -199,6 +203,47 @@ pub fn register_lut(
     let other_changes = after.as_bytes().iter().zip(patched.as_bytes()).filter(|(a, b)| a != b).count();
     progress("done");
     Ok(RegisterReport { index, name: name.to_string(), backup, other_changes })
+}
+
+fn save_backup(camera: &Camera, blob: &SettingsBlob, backup_dir: &Path) -> Result<PathBuf, PtpError> {
+    std::fs::create_dir_all(backup_dir)?;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let backup = backup_dir.join(format!("{}-settings-{stamp}.bin", camera.info.model));
+    std::fs::write(&backup, blob.as_bytes())?;
+    Ok(backup)
+}
+
+/// What [`delete_lut`] did.
+#[derive(Debug, Clone)]
+pub struct DeleteReport {
+    pub index: usize,
+    /// Name the entry had before it was emptied.
+    pub name: String,
+    pub backup: PathBuf,
+}
+
+/// Empty Library entry `index`, with a backup and a read-back check. Only the title entry
+/// changes, as in the camera's own delete; the entry selected in the camera is refused.
+pub fn delete_lut(camera: &Camera, index: usize, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
+    if !camera.info.write_verified() {
+        return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
+    }
+    progress("reading");
+    let current = camera.read_settings()?;
+    let name = current.entries().get(index).map(|e| e.name.clone()).unwrap_or_default();
+    let patched = current.without_lut(index)?;
+    let backup = save_backup(camera, &current, backup_dir)?;
+
+    progress("writing");
+    camera.write_settings(&patched)?;
+
+    progress("verifying");
+    let after = camera.read_settings()?;
+    if after.entries()[index].in_use {
+        return Err(PtpError::Verify(format!("entry {index} still holds {:?}", after.entries()[index].name)));
+    }
+    progress("done");
+    Ok(DeleteReport { index, name, backup })
 }
 
 /// Parse a PTP DeviceInfo dataset (data phase only).
