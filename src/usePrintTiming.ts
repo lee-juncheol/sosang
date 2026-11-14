@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchVerifiedAsset } from './assets'
 import type { Cube } from './lut'
-import { bakeTimingCube, clampShift, parseAdapterCube, parseTimingPack, serializeCube, type TimingPack } from './printTiming'
+import { bakeTimingCube, clampShift, EXPOSURE_SPAN, parseAdapterCube, parseTimingPack, serializeCube, type PrintControls, type TimingPack } from './printTiming'
 import type { Asset, Catalog, Combination } from './types'
 
 // Packs and camera adapters are verified once and kept for the session.
@@ -30,6 +30,8 @@ export interface PrintTiming {
   available: boolean; active: boolean; span: number
   /** Total shift from the film's database neutral filters (film-cast preset + sliders). */
   total: { m: number; y: number }
+  /** Print exposure (stops) and fade (0..100), clamped. */
+  controls: PrintControls
   preview?: { key: string; cube: Cube }
   loading: boolean; error?: string
   bake(format: 'std' | 'vlog', cameraId: string): Promise<string>
@@ -43,18 +45,21 @@ export interface PrintTiming {
  * nothing is baked here (`published`).
  */
 export function usePrintTiming(catalog: Catalog | null, base: Combination | undefined,
-  m: number, y: number, previewCameraId: string, enabled: boolean, published: boolean): PrintTiming {
+  m: number, y: number, previewCameraId: string, enabled: boolean, published: boolean,
+  rawControls: PrintControls = { exposure: 0, fade: 0 }): PrintTiming {
   const info = catalog?.printTiming
   const entry = base && base.processMode === 'negative_print' && !base.castBaseId ? info?.packs[base.id] : undefined
   const span = info?.rangeCC?.[1] ?? 30
   const total = { m: clampShift(m, span), y: clampShift(y, span) }
+  const controls = { exposure: Math.max(-EXPOSURE_SPAN, Math.min(EXPOSURE_SPAN, Math.round(rawControls.exposure * 10) / 10)),
+    fade: Math.max(0, Math.min(100, Math.round(rawControls.fade))) }
   const available = !!entry && !!catalog?.cameraAdapters
   const active = available && enabled && !published
   const adapterAsset = catalog?.cameraAdapters?.models.find(model => model.id === previewCameraId)?.asset
   // The preview object must keep its identity between renders, or the photo
   // worker restarts on every render and never finishes.
   const [state, setState] = useState<{ key: string; preview?: { key: string; cube: Cube }; error?: string }>({ key: '' })
-  const key = active && entry && adapterAsset ? `${base!.id}:${previewCameraId}:${total.m.toFixed(2)}:${total.y.toFixed(2)}` : ''
+  const key = active && entry && adapterAsset ? `${base!.id}:${previewCameraId}:${total.m.toFixed(2)}:${total.y.toFixed(2)}:${controls.exposure.toFixed(1)}:${controls.fade}` : ''
 
   useEffect(() => {
     if (!key || !entry || !adapterAsset) return
@@ -62,7 +67,7 @@ export function usePrintTiming(catalog: Catalog | null, base: Combination | unde
     // Debounce while a slider is being dragged; the bake itself takes ~50 ms.
     const timer = window.setTimeout(() => {
       Promise.all([loadPack(base!.id, entry.asset), loadAdapter(adapterAsset)])
-        .then(([pack, adapter]) => { if (live) setState({ key, preview: { key, cube: bakeTimingCube(pack, total.m, total.y, adapter) } }) })
+        .then(([pack, adapter]) => { if (live) setState({ key, preview: { key, cube: bakeTimingCube(pack, total.m, total.y, adapter, controls) } }) })
         .catch(e => { if (live) setState({ key, error: e instanceof Error ? e.message : '인화 필터 데이터를 불러오지 못했습니다.' }) })
     }, 120)
     return () => { live = false; window.clearTimeout(timer) }
@@ -73,13 +78,13 @@ export function usePrintTiming(catalog: Catalog | null, base: Combination | unde
     const pack = await loadPack(base!.id, entry.asset)
     const model = catalog.cameraAdapters.models.find(item => item.id === cameraId)
     if (format === 'std' && !model) throw new Error('이 카메라용 STD 변환이 없습니다.')
-    const cube = bakeTimingCube(pack, total.m, total.y, format === 'std' ? await loadAdapter(model!.asset) : undefined)
-    const label = `M ${total.m.toFixed(1)} Y ${total.y.toFixed(1)} CC`
+    const cube = bakeTimingCube(pack, total.m, total.y, format === 'std' ? await loadAdapter(model!.asset) : undefined, controls)
+    const label = `M ${total.m.toFixed(1)} Y ${total.y.toFixed(1)} CC, print exposure ${controls.exposure >= 0 ? '+' : ''}${controls.exposure.toFixed(1)} stop, fade ${controls.fade}%`
     return serializeCube(cube, format === 'std' ? 'STD' : 'VLOG', `${format === 'std' ? `${cameraId} Standard` : 'V-Log'} - ${base!.id} - print filter ${label}`,
-      `sosang print filter timing (experimental): spektrafilm enlarger shift ${label} from the database neutral filters, ${info!.method}.`)
+      `sosang print controls (experimental): spektrafilm enlarger shift from the database neutral filters, print exposure and scanner black level - ${label}, ${info!.method}.`)
   }
 
   const ready = state.key === key && key !== ''
-  return { available, active, span, total, preview: ready ? state.preview : undefined,
+  return { available, active, span, total, controls, preview: ready ? state.preview : undefined,
     loading: active && !ready, error: ready ? state.error : undefined, bake }
 }

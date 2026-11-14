@@ -116,7 +116,9 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
   const source = JSON.parse(await fs.readFile(path.join(root, 'camera-adapters/source.json'), 'utf8'));
   assert.equal(source.commit, ALCHEMY_COMMIT);
   assert.equal(source.repository, 'https://github.com/shenmintao/V-Log-Alchemy');
-  assert.equal(source.filesUnmodified, true);
+  // Film Lab smooths the upstream adapters where no camera sample exists (pipeline/smooth_adapters.py).
+  assert.equal(source.filesUnmodified, false);
+  assert.equal(source.filmLabModification, 'film-lab-adapter-smoothing-v2-sky');
   const manifest = JSON.parse(await fs.readFile(path.join(root, 'camera-adapters/manifest.json'), 'utf8'));
   const sourceHashes = new Map();
   for (const model of adapters.models) {

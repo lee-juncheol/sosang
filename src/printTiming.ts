@@ -14,9 +14,29 @@ const MAGIC = 'SFPT1\n'
 
 export interface TimingPack {
   id: string; size: number; gridCC: number[]
+  /** log10 paper exposure range that A's 0..1 codes span. */
+  wire: { min: number; max: number }
   a: Float32Array[] // 9 tables, index m * 3 + y
   b: Float32Array
 }
+
+/**
+ * Two more darkroom controls that act at the same split, so they need no new data:
+ * - exposure: spektrafilm `enlarger.print_exposure` as stops (2^stops). It multiplies
+ *   the paper exposure, i.e. adds log10(2^stops) to every A code. More exposure prints darker.
+ * - fade: spektrafilm scanner black correction (`black_correction`, `black_level`).
+ *   0 = off; 100 = print black lifted to FADE_MAX_BLACK (sRGB code). The engine
+ *   also moves print exposure so 18% grey stays put; that is solved here on B's
+ *   neutral axis.
+ */
+export interface PrintControls { exposure: number; fade: number }
+export const EXPOSURE_SPAN = 1
+export const FADE_MAX_BLACK = 0.2
+export const neutralControls = (c?: PrintControls) => !c || (Math.abs(c.exposure) < 0.005 && c.fade < 0.5)
+
+const srgbDecode = (v: number) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+const srgbEncode = (v: number) => v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055
+const luminance = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 export function parseTimingPack(buffer: ArrayBuffer, expectedId?: string): TimingPack {
   const bytes = new Uint8Array(buffer)
@@ -29,6 +49,8 @@ export function parseTimingPack(buffer: ArrayBuffer, expectedId?: string): Timin
   const size: number = header.resolution
   const gridCC: number[] = header.gridCC
   if (header.method !== PRINT_TIMING_METHOD || size !== 33 || gridCC?.length !== 3 || gridCC[1] !== 0 || gridCC[0] !== -gridCC[2]) throw new Error('지원하지 않는 인화 필터 데이터입니다.')
+  const wire = header.wire
+  if (!wire || !Number.isFinite(wire.min) || !Number.isFinite(wire.max) || wire.max <= wire.min) throw new Error('지원하지 않는 인화 필터 데이터입니다.')
   if (expectedId && header.id !== expectedId) throw new Error('다른 조합의 인화 필터 데이터입니다.')
   const count = size ** 3 * 3
   const offset = start + length
@@ -40,7 +62,7 @@ export function parseTimingPack(buffer: ArrayBuffer, expectedId?: string): Timin
     for (let i = 0; i < count; i++) out[i] = raw[index * count + i] / 65535
     return out
   }
-  return { id: header.id, size, gridCC, a: Array.from({ length: 9 }, (_, i) => table(i)), b: table(9) }
+  return { id: header.id, size, gridCC, wire: { min: wire.min, max: wire.max }, a: Array.from({ length: 9 }, (_, i) => table(i)), b: table(9) }
 }
 
 /** Camera Standard -> V-Log adapter cube (any photo style tag, values in 0..1). */
@@ -125,9 +147,47 @@ function trilinear(t: ArrayLike<number>, n: number, r: number, g: number, b: num
   }
 }
 
+/** Linear luminance of B at one paper exposure code on the neutral axis. */
+function neutralY(pack: TimingPack, t: number, o: Float64Array) {
+  tetrahedral(pack.b, pack.size, t, t, t, o)
+  return luminance(srgbDecode(o[0]), srgbDecode(o[1]), srgbDecode(o[2]))
+}
+
+/** Neutral code where B's luminance equals target (B darkens as exposure rises). */
+function codeForY(pack: TimingPack, target: number, o: Float64Array) {
+  const steps = 512
+  let prevT = 0, prevY = neutralY(pack, 0, o)
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, y = neutralY(pack, t, o)
+    if ((prevY - target) * (y - target) <= 0 && prevY !== y) return prevT + (t - prevT) * (prevY - target) / (prevY - y)
+    prevT = t; prevY = y
+  }
+  return undefined
+}
+
+/** Code shift and linear black correction for the exposure / fade controls. */
+export function controlTransform(pack: TimingPack, controls?: PrintControls) {
+  const span = pack.wire.max - pack.wire.min
+  const o = new Float64Array(3)
+  let shift = controls ? Math.log10(2 ** controls.exposure) / span : 0
+  let black: { m: number; q: number } | undefined
+  if (controls && controls.fade >= 0.5) {
+    const yBlack = neutralY(pack, 1, o), yWhite = neutralY(pack, 0, o)
+    const nativeBlack = srgbEncode(yBlack)
+    const target = srgbDecode(nativeBlack + Math.min(controls.fade, 100) / 100 * Math.max(0, FADE_MAX_BLACK - nativeBlack))
+    const m = (yWhite - target) / (yWhite - yBlack + 1e-10), q = target - m * yBlack
+    black = { m, q }
+    // spektrafilm keeps 18% grey: print exposure moves to where the corrected curve hits 0.184.
+    const t0 = codeForY(pack, 0.184, o), t1 = codeForY(pack, (0.184 - q) / m, o)
+    if (t0 !== undefined && t1 !== undefined) shift += t1 - t0
+  }
+  return { shift, black }
+}
+
 /** Bake a 33^3 cube for V-Log input (adapter omitted) or a camera's Standard input. */
-export function bakeTimingCube(pack: TimingPack, m: number, y: number, adapter?: Cube): Cube {
+export function bakeTimingCube(pack: TimingPack, m: number, y: number, adapter?: Cube, controls?: PrintControls): Cube {
   const n = pack.size, exposure = blendExposure(pack, m, y)
+  const { shift, black } = controlTransform(pack, controls)
   const table = new Float64Array(n ** 3 * 3)
   const v = new Float64Array(3), e = new Float64Array(3), o = new Float64Array(3)
   let k = 0
@@ -136,7 +196,12 @@ export function bakeTimingCube(pack: TimingPack, m: number, y: number, adapter?:
     if (adapter) trilinear(adapter.table, adapter.size, r, g, b, v)
     else { v[0] = r; v[1] = g; v[2] = b }
     tetrahedral(exposure, n, v[0], v[1], v[2], e)
-    tetrahedral(pack.b, n, e[0], e[1], e[2], o)
+    tetrahedral(pack.b, n, e[0] + shift, e[1] + shift, e[2] + shift, o)
+    if (black) {
+      const lr = srgbDecode(clamp01(o[0])), lg = srgbDecode(clamp01(o[1])), lb = srgbDecode(clamp01(o[2]))
+      const yy = luminance(lr, lg, lb), scale = clamp01(black.m * yy + black.q) / (yy + 1e-10)
+      o[0] = srgbEncode(clamp01(lr * scale)); o[1] = srgbEncode(clamp01(lg * scale)); o[2] = srgbEncode(clamp01(lb * scale))
+    }
     table[k++] = clamp01(o[0]); table[k++] = clamp01(o[1]); table[k++] = clamp01(o[2])
   }
   return { size: n, table }

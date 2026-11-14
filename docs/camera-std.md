@@ -16,6 +16,25 @@
 - GH6, S5II, S5IIX, G9II, GH7, S9, S1IIE, S1RII, S1II, DC-L10. GH6는 후반 작업 전용입니다. **DMC-L10은 미지원**입니다.
 - 원작자의 정량 검증은 S1RII 펌웨어 1.5, 정성 현장 검증은 S9이며 S1II를 포함한 나머지는 모델별 통제 촬영 검증이 남아 있습니다.
 
+## 변환 다듬기 (2026-11-11)
+
+레딧 사용자 제보(S5II Standard JPG, 파란 하늘)로 모든 엔진 룩에서 파랑→청록 구간에 색 띠가 생기는 문제를 확인했습니다. 단계를 나눠 시험한 결과 원인은 필름 룩이 아니라 입력 변환이었습니다.
+
+- 원본 v1.6 변환은 9칸 격자로 풀어 33칸으로 늘린 표입니다. 실측 S1RII 짝 자료(20,591개, `PanasonicForwardPairAnchors.npz`)가 없는 색, 특히 하늘색에서 곡선이 꺾입니다. 부드러운 하늘 띠의 색상 폭이 원본 6도에서 변환 후 약 35도로 벌어지고, 녹색 값이 중간에 다시 올라갑니다.
+- `pipeline/smooth_adapters.py`가 실측 자료와 가까운 표 칸(거리 0.03 이하)은 그대로 두고, 먼 칸(0.08 이상)일수록 3칸 가우시안으로 다듬은 표에 가깝게 섞습니다. 회색축은 원본 값을 정확히 유지합니다.
+- 결과: 하늘 띠 색상 폭 약 35도 → 약 13도(10개 기종). S1RII 실측 오차(V-Log, ×1000)는 차트 3.2 → 8.0, 실제 장면 5.5 → 5.8입니다. 0.05 이상 바뀐 칸은 전체의 5~8%이며 대부분 채도가 아주 높은 색입니다.
+- 한계: 하늘색에는 실측이 없어 "더 매끄러움"만 확인했고 실제 V-Log 색과의 일치는 미검증입니다. 실측은 S1RII 한 기종이며 다른 기종에도 같은 거리 기준을 씁니다.
+- 원본 파일·해시: `manifest.json`의 `upstreamSha256`, 수정 전 전체 산출물은 `artifacts/before-adapter-smoothing/`.
+
+### 하늘 2차 다듬기 (2026-11-14, `film-lab-adapter-smoothing-v2-sky`)
+
+- 이유: 레딧 사용자 사진(S5II 해변 하늘)에서 1차 후에도 하늘 색이 파랑→청록→파랑으로 4° 정도 되돌아가는 옅은 사선 띠가 남음. 필름(VLOG) 쪽은 매끈했고 어댑터의 하늘 구간이 원인.
+- 방법: 입력 색이 하늘 파랑(OKLab 색상 255°±45°, 채도 0.02 이상)인 노드만 sigma 2.5 노드로 한 번 더 흐리고, 회색 축은 정확히 복원. 다른 색은 그대로.
+- 결과(카메라 10종 × 필름 3종): 하늘 굴곡 0.63~1.65 → 0.20~0.51 (V-Log 직접 0.25 수준). 피부·녹색·회색 변화 없음, 사진 평균 ΔE 0.07~0.11. 자세한 내용 `artifacts/lut-validation/2026-11-14-adapter-sky/`.
+- 1차 상태 백업: `artifacts/before-sky-adapter-v2/` (어댑터, 모든 STD·카메라 ZIP, catalog.json).
+
+재생성: `.venv/bin/python -m pipeline.smooth_adapters --source artifacts/before-adapter-smoothing` → `.venv/bin/python -m pipeline.smooth_adapters --sky-v2` → `PYTHONPATH=vendor/spektrafilm/src .venv/bin/python scripts/migrate-camera-std.py --jobs 6` → `.venv/bin/python scripts/refresh-colour-reference.py`.
+
 ## S1II 사용자 실기 관찰
 
 2026-11-04 사용자 제공 C200 + Crystal Archive Type II 결과:

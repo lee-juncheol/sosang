@@ -39,12 +39,22 @@ def test_c200_s1ii_numerical_rows_exactly_match_user_approved_test():
     # This catches interpolation order, source replacement, tone edits and
     # serialization changes without relying on a generated expected result.
     path = PUBLIC / 'luts/fujifilm_c200__fujifilm_crystal_archive_typeii/0001VLOG.cube'
-    raw = compose(read_cube(path, 'VLOG'), 'S1II', cube_grid(33))
-    data = serialize_std(raw, 'S1II', path.name)
-    rows = b'\n'.join(data.splitlines()[6:]) + b'\n'
-    assert hashlib.sha256(rows).hexdigest() == '48bbac62dc8afec9a1ffe9abd2a982dabaa875767f26523d2f379490bba2751a'
-    assert data.splitlines()[1] == b'#LUMIXPHOTOSTYLE STD'
-    assert len(rows.splitlines()) == 33**3
+    vlog, grid = read_cube(path, 'VLOG'), cube_grid(33)
+
+    def row_hash(raw):
+        data = serialize_std(raw, 'S1II', path.name)
+        assert data.splitlines()[1] == b'#LUMIXPHOTOSTYLE STD'
+        rows = b'\n'.join(data.splitlines()[6:]) + b'\n'
+        assert len(rows.splitlines()) == 33**3
+        return hashlib.sha256(rows).hexdigest()
+
+    # The approved test used the raw upstream adapter; the composition maths must still reproduce it.
+    upstream = ROOT / 'artifacts/before-adapter-smoothing/camera-adapters/S1IIS2V.cube'
+    if upstream.exists():
+        raw = np.clip(alchemy_tetrahedral(vlog, alchemy_trilinear(read_cube(upstream), grid)), 0., 1.)
+        assert row_hash(raw) == '48bbac62dc8afec9a1ffe9abd2a982dabaa875767f26523d2f379490bba2751a'
+    # Production uses the Film Lab smoothed adapter (pipeline/smooth_adapters.py, v1 2026-11-11 + sky v2 2026-11-14).
+    assert row_hash(compose(vlog, 'S1II', grid)) == '01f20f1eea199b82d89403edf42c211b8b14bc7b01dd07b974ada08d3c924d82'
 
 
 def test_all_adapter_sources_have_pinned_hash_and_finite_domain():

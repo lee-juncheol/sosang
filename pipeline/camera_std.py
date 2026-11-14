@@ -76,6 +76,8 @@ def prepare_sources(checkout: Path):
               'license': 'Apache-2.0', 'filesUnmodified': True,
               'note': 'Conversion cubes are copied without changes; Film Lab merged creative LUTs are separately identified derivatives.'})
     models.cache_clear(); adapter_table.cache_clear()
+    # Copied files are the raw upstream adapters. Run pipeline.smooth_adapters
+    # afterwards to restore the Film Lab smoothed adapters used in production.
     return camera_catalog()
 
 
@@ -318,7 +320,9 @@ merged cube. QA compares the serialized cube against the sequential transform;
 it does not establish physical film accuracy or a camera-specific match.
 
 Source adapter: {SOURCE_URL}/blob/{COMMIT}/{model['sourcePath']}
-Adapter SHA256: {model['asset']['sha256']}
+Adapter modified by Film Lab: smoothed only in colours with no nearby camera
+sample (fixes a cyan band in blue skies); neutral axis unchanged.
+Adapter SHA256 (Film Lab smoothed): {model['asset']['sha256']}
 Creative VLOG SHA256: {source_hash}
 Upstream camera calibration status: {model['validation']}.
 
@@ -329,7 +333,8 @@ SPEKTRAFILM_LICENSE.txt and spektrafilm-LICENSE.txt preserve upstream terms.
 FUJIFILM source rights remain separate where FUJIFILM_NOTICE.txt is included.
 
 ''' + '\n'.join('- ' + warning for warning in warnings) + '\n'
-        changelog = '2026-11-04 Film Lab: replaced camera-agnostic STD with pinned camera-specific V-Log Alchemy composition. Original creative VLOG bytes unchanged.\n'
+        changelog = ('2026-11-04 Film Lab: replaced camera-agnostic STD with pinned camera-specific V-Log Alchemy composition. Original creative VLOG bytes unchanged.\n'
+                     '2026-11-11 Film Lab: smoothed the camera adapter where no camera sample exists, fixing a cyan band in blue skies. Original creative VLOG bytes unchanged.\n')
         qa_bytes = json_bytes(qa); provenance_bytes = json_bytes(provenance)
         entries = {std_name: std_bytes, vlog_path.name: vlog_bytes, 'qa.json': qa_bytes,
                    'provenance.json': provenance_bytes, 'README.txt': readme.encode(),

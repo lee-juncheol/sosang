@@ -4,7 +4,7 @@
 
 ## 현재 색 변환
 
-STD는 **기종별 Panasonic Standard → V-Log/V-Gamut 변환 → 기존 V-Log 룩**을 하나의 33³ LUT로 합성합니다. V-Log Alchemy `e51ba9a23458ff5c316f630b860eb0201139d126`의 모델별 변환을 고정해 사용합니다. 기본 카메라는 **S1II / DC-S1M2**입니다. 이전 STD B 선행 커브는 현행 생성 경로에 사용하지 않습니다.
+STD는 **기종별 Panasonic Standard → V-Log/V-Gamut 변환 → 기존 V-Log 룩**을 하나의 33³ LUT로 합성합니다. V-Log Alchemy `e51ba9a23458ff5c316f630b860eb0201139d126`의 모델별 변환을 고정해 사용하되, 실측 자료가 없는 색 구간만 Film Lab이 다듬었습니다(파란 하늘의 청록 띠 수정). [변환 다듬기](docs/camera-std.md#변환-다듬기-2026-11-11) 기본 카메라는 **S1II / DC-S1M2**입니다. 이전 STD B 선행 커브는 현행 생성 경로에 사용하지 않습니다.
 
 148개 필름·인화지/스캔 룩에 10개 카메라의 STD 변환을 제공합니다. 기존 V-Log 148개, STD 1,480개, 카메라별 ZIP 1,480개를 유지합니다. 이전 공식 후지 90조합은 제거했습니다. 별도로 사용자 제공 후지 STD LUT 9종을 RGB 값 변경 없이 S1II용으로 제공하며, 이 9종에는 인화지·Alchemy·V-Log 변환을 추가하지 않습니다. [후지 LUT 출처와 처리](docs/supplied-fuji.md)
 
@@ -68,7 +68,7 @@ Cloudflare의 `/api/locale`은 한국 접속에 한국어, 그 밖의 국가에 
 ## 자료와 권리
 
 - 원본 엔진: [spektrafilm](https://github.com/andreavolpato/spektrafilm). 엔진·프로파일의 권리 문서를 보존합니다.
-- 카메라 입력 변환: [V-Log Alchemy](https://github.com/shenmintao/V-Log-Alchemy/tree/e51ba9a23458ff5c316f630b860eb0201139d126), Apache-2.0. 출처, 고정 commit, 원본·결과 해시, 합성 변경 고지를 기록합니다.
+- 카메라 입력 변환: [V-Log Alchemy](https://github.com/shenmintao/V-Log-Alchemy/tree/e51ba9a23458ff5c316f630b860eb0201139d126), Apache-2.0. 출처, 고정 commit, 원본·결과 해시, 합성 변경 고지를 기록합니다. 변환 파일은 Film Lab이 수정했으며 원본 해시는 `public/camera-adapters/manifest.json`의 `upstreamSha256`에 남깁니다.
 - 과거 FUJIFILM 공식 LUT: [출처와 합성 계약](docs/fujifilm-official.md). 공식 데이터의 권리는 FUJIFILM에 있으며 입력/인화 연결은 Film Lab의 변환입니다.
 - 사용자 사진의 권리는 촬영자에게 있습니다. 코드나 LUT 라이선스를 사진에 적용하지 않습니다.
 

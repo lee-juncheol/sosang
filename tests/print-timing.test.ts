@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { parseStdCube } from '../src/lut.ts'
-import { bakeTimingCube, blendExposure, clampShift, filmCastShift, formatShift, parseAdapterCube, parseTimingPack, sameShift, serializeCube, shiftCode, shiftWeights } from '../src/printTiming.ts'
+import { bakeTimingCube, blendExposure, clampShift, controlTransform, FADE_MAX_BLACK, filmCastShift, formatShift, neutralControls, parseAdapterCube, parseTimingPack, sameShift, serializeCube, shiftCode, shiftWeights } from '../src/printTiming.ts'
 import type { Catalog } from '../src/types.ts'
 
 const catalog: Catalog = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf8'))
@@ -77,4 +77,34 @@ test('a film-cast variant maps to a filter shift from its base neutral filters',
   assert.ok(Math.abs(m - (cast.appliedCC[1] - cast.filmCC[1])) < 1e-12 && Math.abs(y - (cast.appliedCC[2] - cast.filmCC[2])) < 1e-12)
   assert.ok(Math.abs(m) <= 30 && Math.abs(y) <= 30)
   assert.deepEqual(filmCastShift(undefined), { m: 0, y: 0 })
+})
+
+test('print exposure and fade match direct spektrafilm runs (print_exposure, scanner black level)', () => {
+  const reference = JSON.parse(readFileSync(new URL('./fixtures/print-controls-reference.json', import.meta.url), 'utf8'))
+  assert.equal(reference.id, ID)
+  const enc = (v: number) => v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055
+  const dec = (v: number) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  const last = (pack.size ** 3 - 1) * 3, t = pack.b
+  const nativeBlack = enc(0.2126 * dec(t[last]) + 0.7152 * dec(t[last + 1]) + 0.0722 * dec(t[last + 2]))
+  for (const [name, engine] of Object.entries(reference.cases) as [string, number[][]][]) {
+    const exposure = Number(/E([+-][\d.]+)/.exec(name)?.[1] ?? 0), black = /B([\d.]+)/.exec(name)?.[1]
+    const fade = black ? (Number(black) - nativeBlack) / (FADE_MAX_BLACK - nativeBlack) * 100 : 0
+    const cube = bakeTimingCube(pack, 0, 0, undefined, { exposure, fade })
+    const got = (reference.index as number[]).flatMap(i => [cube.table[i * 3], cube.table[i * 3 + 1], cube.table[i * 3 + 2]])
+    const e = error(got, engine.flat())
+    assert.ok(e.mean < 0.005 && e.p99 < 0.04, `${name}: ${JSON.stringify(e)}`)
+  }
+})
+
+test('zero controls keep the plain timing cube', () => {
+  assert.ok(neutralControls({ exposure: 0, fade: 0 }) && !neutralControls({ exposure: 0.1, fade: 0 }) && !neutralControls({ exposure: 0, fade: 1 }))
+  assert.deepEqual(controlTransform(pack, { exposure: 0, fade: 0 }), { shift: 0, black: undefined })
+  assert.deepEqual(bakeTimingCube(pack, 3, -2, undefined, { exposure: 0, fade: 0 }).table, bakeTimingCube(pack, 3, -2).table)
+  // More print exposure darkens a negative print; fade lifts the deepest black.
+  const mid = Math.round(16 * 33 * 33 + 16 * 33 + 16) * 3
+  const plain = bakeTimingCube(pack, 0, 0), darker = bakeTimingCube(pack, 0, 0, undefined, { exposure: 0.5, fade: 0 })
+  assert.ok(darker.table[mid + 1] < plain.table[mid + 1])
+  const faded = bakeTimingCube(pack, 0, 0, undefined, { exposure: 0, fade: 100 })
+  // V-Log black prints as paper black; at fade 100 it is lifted to about FADE_MAX_BLACK.
+  assert.ok(faded.table[1] > plain.table[1] + 0.1 && Math.abs(faded.table[1] - FADE_MAX_BLACK) < 0.03, `${plain.table[1]} -> ${faded.table[1]}`)
 })
