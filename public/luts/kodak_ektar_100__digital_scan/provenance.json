@@ -189,6 +189,14 @@
     "name": "0164VLOG.cube",
     "sha256": "c98dea500f3f4787b3e7987933b79baed9807d2f86be7a6879184a6801639905"
   },
+  "cameraVerified": false,
+  "limitations": [
+    "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+    "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+    "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+    "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+    "Matched controlled capture validation is pending for this camera model."
+  ],
   "stdMethod": "camera-vlog-alchemy-v1",
   "stdGeneration": "camera-vlog-alchemy-v1",
   "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
@@ -197,7 +205,7 @@
     "sourceUrl": "https://github.com/shenmintao/V-Log-Alchemy",
     "commit": "e51ba9a23458ff5c316f630b860eb0201139d126",
     "sourcePath": "Luts/Panasonic-Standard/Conversion/S1IIS2V.cube",
-    "sha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
+    "sha256": "a46b3369f1d9f4d8948e6fc9f20ed5594602b7361a0e1a0958b9d06a4d0611f1",
     "validation": "pending",
     "cameraUse": "in-camera",
     "aliases": [
@@ -225,15 +233,7 @@
   "distribution": {
     "stdMethod": "camera-vlog-alchemy-v1",
     "camera": "S1II",
-    "stdSha256": "ded4dccceef103949633f07691f2f6658b34d4819d72fb6490aecd6f54cb9890",
+    "stdSha256": "8f7eba98b03c385cb8d14a828769930014b2ac37fd15761f19f87f650e452a82",
     "vlogSha256": "c98dea500f3f4787b3e7987933b79baed9807d2f86be7a6879184a6801639905"
-  },
-  "cameraVerified": false,
-  "limitations": [
-    "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
-    "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
-    "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
-    "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
-    "Matched controlled capture validation is pending for this camera model."
-  ]
+  }
 }

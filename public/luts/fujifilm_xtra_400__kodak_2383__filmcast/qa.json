@@ -101,34 +101,9 @@
       ]
     }
   },
-  "stdMethod": "camera-vlog-alchemy-v1",
-  "stdGeneration": "camera-vlog-alchemy-v1",
   "camera": "S1II",
-  "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
-  "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
-  "stdVsDirectEngine": {
-    "tetrahedral": {
-      "mean": 0.001648972227225853,
-      "p95": 0.005252457623126331,
-      "p99": 0.009708385156767928,
-      "max": 0.025558133822783685,
-      "samples": 4478,
-      "metric": "max absolute RGB channel error",
-      "space": "encoded sRGB 0–1"
-    },
-    "trilinear": {
-      "mean": 0.0015499031901202206,
-      "p95": 0.004745012905696584,
-      "p99": 0.009283954209067559,
-      "max": 0.02439152745349446,
-      "samples": 4478,
-      "metric": "max absolute RGB channel error",
-      "space": "encoded sRGB 0–1"
-    }
-  },
-  "stdSerializationMaxError": 4.999967107011116e-10,
   "sourceVlogSha256": "757c40f9ca585ef10ed75cc525d3761ea212e9ea83b872da13c3ad2bca570bd9",
-  "sourceAdapterSha256": "7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f8672a8231daefa7e",
+  "sourceAdapterSha256": "a46b3369f1d9f4d8948e6fc9f20ed5594602b7361a0e1a0958b9d06a4d0611f1",
   "vlogUnchanged": true,
   "warnings": [
     "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
@@ -143,5 +118,30 @@
     "neutralRamp": 257,
     "grid": 125,
     "seed": 20261102
-  }
+  },
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdGeneration": "camera-vlog-alchemy-v1",
+  "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "stdVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0008517519468237751,
+      "p95": 0.002614797735853876,
+      "p99": 0.004371025854194789,
+      "max": 0.01087901675054112,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0010021342598142376,
+      "p95": 0.0030420172844209453,
+      "p99": 0.004495460054041793,
+      "max": 0.01326893254091302,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdSerializationMaxError": 4.999968217234141e-10
 }
