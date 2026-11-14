@@ -189,3 +189,14 @@ fn several_lut_store_is_all_or_nothing() {
     assert!(matches!(s.with_luts(&[item(38, "A"), item(39, "명")], false), Err(Error::InvalidName(_))));
     assert!(matches!(s.with_luts(&[], false), Err(Error::Slot(_))));
 }
+
+#[test]
+fn expected_state_must_match_the_camera() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    assert!(s.check_expected(&[(38, None), (40, Some("TEST01")), (37, Some("WEDBLU33.cube"))]).is_ok());
+    assert!(matches!(s.check_expected(&[(37, None)]), Err(Error::Changed(_))), "37 is in use");
+    assert!(matches!(s.check_expected(&[(38, Some("X.cube"))]), Err(Error::Changed(_))), "38 is empty");
+    assert!(matches!(s.check_expected(&[(40, Some("OTHER"))]), Err(Error::Changed(_))), "40 holds TEST01");
+    assert!(matches!(s.check_expected(&[(41, None)]), Err(Error::Slot(_))));
+}

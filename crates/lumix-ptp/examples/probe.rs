@@ -5,6 +5,8 @@
 //!   cargo run -p lumix-ptp --example probe -- --register FILE.cube SLOT NAME [--overwrite]
 //!   cargo run -p lumix-ptp --example probe -- --test01 SLOT [--overwrite]
 //!   cargo run -p lumix-ptp --example probe -- --dump FILE  # save the settings read (personal data)
+//!   cargo run -p lumix-ptp --example probe -- --describe-backup FILE.bin MILLIS ACTION
+//!       # write the .json record for an older backup of THIS camera (serial is not printed)
 //!
 //! Backups go to ./camera-backups/. ImageCaptureCore needs the main run loop, so the work runs
 //! on a second thread while the main thread spins NSRunLoop.
@@ -42,6 +44,12 @@ fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let backups = Path::new("camera-backups");
     let progress = |s: &str| println!("  .. {s}");
     match args.first().map(String::as_str) {
+        Some("--describe-backup") => {
+            let (file, millis, action) = (Path::new(&args[1]), args[2].parse()?, &args[3]);
+            lumix_lut::SettingsBlob::parse(std::fs::read(file)?)?;
+            lumix_ptp::write_backup_info(cam.info(), file, millis, action)?;
+            println!("wrote {}", file.with_extension("json").display());
+        }
         Some("--dump") => {
             std::fs::write(&args[1], blob.as_bytes())?;
             println!("saved {}", args[1]);

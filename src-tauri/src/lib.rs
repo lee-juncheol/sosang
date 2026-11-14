@@ -13,6 +13,8 @@ pub fn run() {
             camera::camera_register_lut,
             camera::camera_register_luts,
             camera::camera_delete_luts,
+            camera::camera_list_backups,
+            camera::camera_restore_backup,
             files::save_file,
             files::open_external
         ])

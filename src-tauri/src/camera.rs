@@ -3,7 +3,7 @@
 //! talk to the camera at the same time.
 
 use lumix_lut::parse_cube;
-use lumix_ptp::{delete_luts, register_lut, register_luts, Camera, DeviceInfo, PtpError};
+use lumix_ptp::{delete_luts, register_luts, restore_settings, Camera, DeviceInfo, PtpError};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -43,6 +43,7 @@ impl From<PtpError> for CommandError {
             PtpError::Settings(lumix_lut::Error::Cube(_) | lumix_lut::Error::UnsupportedPhotoStyle(_)) => "bad_cube",
             PtpError::Settings(lumix_lut::Error::InvalidName(_)) => "bad_name",
             PtpError::Settings(lumix_lut::Error::Slot(_)) => "bad_slot",
+            PtpError::Settings(lumix_lut::Error::Changed(_)) => "slot_changed",
             PtpError::Verify(_) => "verify_failed",
             PtpError::Unsupported => "unsupported_platform",
             _ => "camera_error",
@@ -144,7 +145,10 @@ pub async fn camera_list_luts(app: AppHandle) -> Result<Library, CommandError> {
 /// Register a .cube file in one Library slot: read, back up, write, read back. About 25 s.
 /// Emits `camera-progress` with "reading", "writing", "verifying", "done".
 #[tauri::command]
-pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name: String, overwrite: bool) -> Result<RegisterResult, CommandError> {
+///
+/// `expected` is what the caller last saw in the slot (`null` = empty); the write stops if
+/// the camera no longer matches.
+pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name: String, overwrite: bool, expected: Option<String>) -> Result<RegisterResult, CommandError> {
     if slot < FIRST_USER_ENTRY {
         return Err(CommandError::new("bad_slot", format!("entry {slot} came with the camera")));
     }
@@ -154,10 +158,11 @@ pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name
     lumix_lut::validate_name(&name)?;
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
-        let report = register_lut(camera, slot, &name, style, &cube.lut, overwrite, &backups, |step| {
+        let lut = lumix_lut::NewLut { index: slot, name: &name, style, lut: &cube.lut };
+        let report = register_luts(camera, &[lut], overwrite, &[(slot, expected)], &backups, |step| {
             let _ = app.emit("camera-progress", step);
         })?;
-        Ok(RegisterResult { index: report.index, name: report.name, backup: report.backup.display().to_string(), other_changes: report.other_changes })
+        Ok(RegisterResult { index: slot, name: name.clone(), backup: report.backup.display().to_string(), other_changes: report.other_changes })
     })
     .await
 }
@@ -168,6 +173,8 @@ pub struct NewLutRequest {
     cube: String,
     slot: usize,
     name: String,
+    /// What the caller last saw in the slot (`null` = empty).
+    expected: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -184,6 +191,7 @@ pub struct RegisterManyResult {
 #[tauri::command]
 pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, overwrite: bool) -> Result<RegisterManyResult, CommandError> {
     let mut parsed = Vec::with_capacity(items.len());
+    let mut expected = Vec::with_capacity(items.len());
     for (i, item) in items.iter().enumerate() {
         if item.slot < FIRST_USER_ENTRY {
             return Err(CommandError::new("bad_slot", format!("file {}: entry {} came with the camera", i + 1, item.slot)));
@@ -197,11 +205,12 @@ pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, ove
         let style = cube.base_style().map_err(at)?;
         lumix_lut::validate_name(&item.name).map_err(at)?;
         parsed.push((item.slot, item.name.clone(), style, cube.lut));
+        expected.push((item.slot, item.expected.clone()));
     }
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
         let luts: Vec<lumix_lut::NewLut> = parsed.iter().map(|(index, name, style, lut)| lumix_lut::NewLut { index: *index, name, style: *style, lut }).collect();
-        let report = register_luts(camera, &luts, overwrite, &backups, |step| {
+        let report = register_luts(camera, &luts, overwrite, &expected, &backups, |step| {
             let _ = app.emit("camera-progress", step);
         })?;
         Ok(RegisterManyResult {
@@ -230,19 +239,102 @@ pub struct DeleteResult {
 /// Empty one or more Library slots in one write: read, back up, write, read back. About 25 s.
 /// Emits `camera-progress` like `camera_register_lut`.
 #[tauri::command]
-pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>) -> Result<DeleteResult, CommandError> {
+///
+/// `names` are the names the caller saw in those slots, in the same order; the write stops if
+/// the camera no longer matches.
+pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>, names: Vec<String>) -> Result<DeleteResult, CommandError> {
     if let Some(slot) = slots.iter().find(|&&s| s < FIRST_USER_ENTRY) {
         return Err(CommandError::new("bad_slot", format!("entry {slot} came with the camera")));
     }
+    if names.len() != slots.len() {
+        return Err(CommandError::new("internal", "one name per slot is needed"));
+    }
+    let expected: Vec<lumix_ptp::Expected> = slots.iter().copied().zip(names.into_iter().map(Some)).collect();
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
-        let report = delete_luts(camera, &slots, &backups, |step| {
+        let report = delete_luts(camera, &slots, &expected, &backups, |step| {
             let _ = app.emit("camera-progress", step);
         })?;
         Ok(DeleteResult {
             deleted: report.deleted.into_iter().map(|(index, name)| EntryName { index, name }).collect(),
             backup: report.backup.display().to_string(),
         })
+    })
+    .await
+}
+
+/// The `.json` written beside each backup by lumix-ptp.
+#[derive(Debug, serde::Deserialize)]
+struct BackupInfo {
+    model: String,
+    firmware: String,
+    serial: String,
+    created: u64,
+    action: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupEntry {
+    /// File name without extension; pass it back to `camera_restore_backup`.
+    id: String,
+    model: String,
+    firmware: String,
+    /// Milliseconds since 1970.
+    created: u64,
+    action: String,
+}
+
+fn read_backup_info(dir: &std::path::Path, id: &str) -> Option<BackupInfo> {
+    let text = std::fs::read_to_string(dir.join(format!("{id}.json"))).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Backups that can be restored (those with an info file), newest first. No camera needed.
+#[tauri::command]
+pub async fn camera_list_backups(app: AppHandle) -> Result<Vec<BackupEntry>, CommandError> {
+    let dir = backup_dir(&app)?;
+    let Ok(read) = std::fs::read_dir(&dir) else { return Ok(Vec::new()) };
+    let mut list: Vec<BackupEntry> = read
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            let id = name.strip_suffix(".bin")?.to_string();
+            let info = read_backup_info(&dir, &id)?;
+            Some(BackupEntry { id, model: info.model, firmware: info.firmware, created: info.created, action: info.action })
+        })
+        .collect();
+    list.sort_by(|a, b| b.created.cmp(&a.created));
+    Ok(list)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreResult {
+    backup: String,
+}
+
+/// Write a backup back to the camera: only to the same camera (serial), model and firmware it
+/// came from. The current settings are backed up first; the camera must read back the file
+/// exactly. About 25 s. Emits `camera-progress`.
+#[tauri::command]
+pub async fn camera_restore_backup(app: AppHandle, id: String) -> Result<RestoreResult, CommandError> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err(CommandError::new("bad_backup", "invalid backup id"));
+    }
+    let dir = backup_dir(&app)?;
+    let info = read_backup_info(&dir, &id).ok_or_else(|| CommandError::new("bad_backup", "backup info file is missing"))?;
+    let bytes = std::fs::read(dir.join(format!("{id}.bin"))).map_err(|e| CommandError::new("bad_backup", e.to_string()))?;
+    let saved = lumix_lut::SettingsBlob::parse(bytes).map_err(|e| CommandError::new("bad_backup", e.to_string()))?;
+    with_camera(app, move |app, camera| {
+        let now = camera.info();
+        if now.serial != info.serial || now.model != info.model || now.version != info.firmware || saved.model() != now.model {
+            return Err(CommandError::new("other_camera", format!("backup is from {} firmware {}, a different camera or firmware", info.model, info.firmware)));
+        }
+        let report = restore_settings(camera, &saved, &backup_dir(app)?, |step| {
+            let _ = app.emit("camera-progress", step);
+        })?;
+        Ok(RestoreResult { backup: report.backup.display().to_string() })
     })
     .await
 }
