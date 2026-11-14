@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Translate } from './i18n'
 import { CameraError, cameraListLuts, cameraLutName, cameraRegister, FIRST_USER_ENTRY, isApp, type CameraLibrary, type CameraProgress, type CameraRegisterResult } from './platform.ts'
+import { CameraBusyOverlay } from './CameraBusyOverlay'
 import './cameraRegister.css'
 
 type Props = {
@@ -28,6 +29,9 @@ export function errorText(t: Translate, error: unknown): string {
     case 'bad_cube': return t("이 LUT 파일은 카메라에 등록할 수 없는 형식입니다.")
     case 'bad_name': return t("이름은 영문, 숫자, 기호로 95자 이내여야 합니다.")
     case 'bad_slot': return t("선택한 칸에 등록할 수 없습니다. 목록을 다시 읽어 주세요.")
+    case 'slot_changed': return t("목록을 읽은 뒤 카메라의 LUT가 바뀌었습니다. 아무것도 쓰지 않았습니다. 목록을 다시 읽어 주세요.")
+    case 'other_camera': return t("이 백업은 다른 카메라나 다른 펌웨어에서 만든 것이라 되돌릴 수 없습니다.")
+    case 'bad_backup': return t("백업 파일을 읽지 못했습니다.")
     case 'verify_failed': return t("쓰기 후 다시 읽은 내용이 보낸 내용과 다릅니다. 카메라의 LUT 라이브러리를 확인해 주세요.")
     default: return t("카메라와 통신하지 못했습니다. 케이블과 카메라 전원을 확인한 뒤 다시 시도해 주세요.")
   }
@@ -75,7 +79,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
     setPhase('registering'); setStep(null); setError(null); setResult(null)
     try {
       const cube = await getCube()
-      const done = await cameraRegister(cube, slot, name, overwrite, setStep)
+      const done = await cameraRegister(cube, slot, name, overwrite, library.entries[slot]?.inUse ? library.entries[slot].name : null, setStep)
       setResult(done)
       const freeSlots = library.freeSlots.filter(s => s !== done.index)
       setLibrary({
@@ -98,6 +102,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
   const userEntries = library?.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY) ?? []
 
   return <section className="camera-register" aria-labelledby="camera-register-title" aria-busy={busy}>
+    {phase === 'registering' && <CameraBusyOverlay t={t} status={progress}/>}
     <div className="camera-register-heading">
       <h3 id="camera-register-title">{t("카메라에 바로 등록")}</h3>
       {library && <span>{library.camera.model} · {t("펌웨어 {0}", [library.camera.firmware])}</span>}

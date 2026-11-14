@@ -16,7 +16,8 @@
 .lut-manager-done small,.lut-manager-error small{display:block;margin-top:4px;color:var(--faint);font:11px var(--mono)}
 .lut-manager-body{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
 .lut-manager-list,.lut-manager-add{padding:18px 20px;background:var(--surface);border:1px solid var(--line-faint);border-radius:12px;min-width:0}
-.lut-manager-add{position:sticky;top:16px;display:flex;flex-direction:column;gap:8px}
+.lut-manager-side{position:sticky;top:16px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.lut-manager-add{display:flex;flex-direction:column;gap:8px}
 .lut-manager h2{margin:0;font-size:16px}
 .lut-manager-list-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .lut-manager-list-heading span{font-size:12px;color:var(--muted)}
@@ -58,7 +59,7 @@
 .lut-manager-confirm{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;color:#ffcf70;cursor:pointer}
 .lut-manager-confirm input{margin-top:3px;accent-color:var(--accent)}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media(max-width:900px){.lut-manager-body{grid-template-columns:minmax(0,1fr)}.lut-manager-add{position:static}}
+@media(max-width:900px){.lut-manager-body{grid-template-columns:minmax(0,1fr)}.lut-manager-side{position:static}}
 .lut-manager.dragging .lut-manager-add{border-color:var(--accent)}
 .lut-drop{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 12px;border:1.5px dashed #4a4b52;border-radius:9px;text-align:center}
 .lut-drop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -76,3 +77,14 @@
 .lut-queue-fields{display:flex;flex-direction:column;gap:6px}
 .lut-queue .lut-manager-warning{margin:0;font-size:12px}
 .lut-queue-replace{margin:0;font-size:12px;color:#ffcf70}
+.lut-manager-backups{padding:18px 20px;background:var(--surface);border:1px solid var(--line-faint);border-radius:12px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.lut-manager-secondary{min-height:38px;border:1px solid #414249;border-radius:7px;font-size:13px;color:var(--text)}
+.lut-manager-secondary:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.lut-backup-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto}
+.lut-backup-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--well)}
+.lut-backup-list li>div{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12px}
+.lut-backup-list b{font-weight:600}
+.lut-backup-list span{color:var(--muted);overflow-wrap:anywhere}
+.lut-backup-list small{color:var(--faint);font-size:11px}
+.lut-backup-list button{min-height:28px;padding:0 9px;border:1px solid #414249;border-radius:6px;font-size:12px;color:var(--text);white-space:nowrap}
+.lut-backup-list button.danger{border-color:#ff7a7a;color:#ffb4b4}

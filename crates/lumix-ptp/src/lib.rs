@@ -179,7 +179,7 @@ pub fn register_lut(
     backup_dir: &Path,
     progress: impl FnMut(&str),
 ) -> Result<RegisterReport, PtpError> {
-    let r = register_luts(camera, &[NewLut { index, name, style, lut }], allow_overwrite, backup_dir, progress)?;
+    let r = register_luts(camera, &[NewLut { index, name, style, lut }], allow_overwrite, &[], backup_dir, progress)?;
     Ok(RegisterReport { index, name: name.to_string(), backup: r.backup, other_changes: r.other_changes })
 }
 
@@ -193,16 +193,34 @@ pub struct RegisterManyReport {
     pub other_changes: usize,
 }
 
+/// What the caller last saw in a Library entry: `None` = empty, `Some(name)` = in use.
+/// Writes stop when the camera no longer matches (see [`SettingsBlob::check_expected`]).
+pub type Expected = (usize, Option<String>);
+
+fn check_expected(blob: &SettingsBlob, expected: &[Expected]) -> Result<(), PtpError> {
+    let list: Vec<(usize, Option<&str>)> = expected.iter().map(|(i, n)| (*i, n.as_deref())).collect();
+    Ok(blob.check_expected(&list)?)
+}
+
 /// Store several LUTs in a single write, with a backup and a read-back check of every entry.
-/// If any one is refused, nothing is written.
-pub fn register_luts(camera: &Camera, luts: &[NewLut<'_>], allow_overwrite: bool, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RegisterManyReport, PtpError> {
+/// If any one is refused, or an entry no longer matches `expected`, nothing is written.
+pub fn register_luts(
+    camera: &Camera,
+    luts: &[NewLut<'_>],
+    allow_overwrite: bool,
+    expected: &[Expected],
+    backup_dir: &Path,
+    mut progress: impl FnMut(&str),
+) -> Result<RegisterManyReport, PtpError> {
     if !camera.info.write_verified() {
         return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
     }
     progress("reading");
     let current = camera.read_settings()?;
+    check_expected(&current, expected)?;
     let patched = current.with_luts(luts, allow_overwrite)?;
-    let backup = save_backup(camera, &current, backup_dir)?;
+    let names: Vec<String> = luts.iter().map(|l| format!("{} {}", l.index, l.name)).collect();
+    let backup = save_backup(camera, &current, backup_dir, &format!("before adding {}", names.join(", ")))?;
 
     progress("writing");
     camera.write_settings(&patched)?;
@@ -224,12 +242,80 @@ pub fn register_luts(camera: &Camera, luts: &[NewLut<'_>], allow_overwrite: bool
     Ok(RegisterManyReport { registered: luts.iter().map(|l| (l.index, l.name.to_string())).collect(), backup, other_changes })
 }
 
-fn save_backup(camera: &Camera, blob: &SettingsBlob, backup_dir: &Path) -> Result<PathBuf, PtpError> {
+/// Save `blob` as `{model}-settings-{millis}.bin` with a `.json` beside it that records the
+/// camera (model, firmware, serial), the time and why the backup was taken. Restoring checks
+/// the camera against that record.
+fn save_backup(camera: &Camera, blob: &SettingsBlob, backup_dir: &Path, action: &str) -> Result<PathBuf, PtpError> {
     std::fs::create_dir_all(backup_dir)?;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
     let backup = backup_dir.join(format!("{}-settings-{stamp}.bin", camera.info.model));
     std::fs::write(&backup, blob.as_bytes())?;
+    write_backup_info(&camera.info, &backup, stamp, action)?;
     Ok(backup)
+}
+
+/// Write the `.json` record beside a settings backup (see [`save_backup`]). Public so a backup
+/// taken before records existed can be described for the camera it came from.
+pub fn write_backup_info(i: &DeviceInfo, backup: &Path, created_millis: u128, action: &str) -> Result<(), PtpError> {
+    let stamp = created_millis;
+    let info = format!(
+        "{{\"model\":{},\"firmware\":{},\"serial\":{},\"created\":{stamp},\"action\":{}}}\n",
+        json_string(&i.model),
+        json_string(&i.version),
+        json_string(&i.serial),
+        json_string(action)
+    );
+    std::fs::write(backup.with_extension("json"), info)?;
+    Ok(())
+}
+
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// What [`restore_settings`] did.
+#[derive(Debug, Clone)]
+pub struct RestoreReport {
+    /// Backup of the settings as they were just before the restore.
+    pub backup: PathBuf,
+}
+
+/// Write a saved settings file back to the camera, after backing up the current one, and
+/// check that the camera then reads back exactly that file. The caller checks that the file
+/// came from this camera (serial, model, firmware) before calling.
+pub fn restore_settings(camera: &Camera, saved: &SettingsBlob, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RestoreReport, PtpError> {
+    if !camera.info.write_verified() {
+        return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
+    }
+    progress("reading");
+    let current = camera.read_settings()?;
+    if current.as_bytes().len() != saved.as_bytes().len() {
+        return Err(PtpError::Verify("the saved settings do not have this camera's layout".into()));
+    }
+    let backup = save_backup(camera, &current, backup_dir, "before restoring a backup")?;
+
+    progress("writing");
+    camera.write_settings(saved)?;
+
+    progress("verifying");
+    let after = camera.read_settings()?;
+    if after.as_bytes() != saved.as_bytes() {
+        let n = after.as_bytes().iter().zip(saved.as_bytes()).filter(|(a, b)| a != b).count();
+        return Err(PtpError::Verify(format!("{n} bytes differ from the restored file")));
+    }
+    progress("done");
+    Ok(RestoreReport { backup })
 }
 
 /// What [`delete_luts`] did.
@@ -243,17 +329,19 @@ pub struct DeleteReport {
 /// Empty one or more Library entries in a single write, with a backup and a read-back check.
 /// Only their title entries change, as in the camera's own delete; the entry selected in the
 /// camera is refused, and if any entry is refused nothing is written.
-pub fn delete_luts(camera: &Camera, indices: &[usize], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
+pub fn delete_luts(camera: &Camera, indices: &[usize], expected: &[Expected], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
     if !camera.info.write_verified() {
         return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
     }
     progress("reading");
     let current = camera.read_settings()?;
+    check_expected(&current, expected)?;
     let patched = current.without_luts(indices)?;
     let entries = current.entries();
     let mut deleted: Vec<(usize, String)> = indices.iter().map(|&i| (i, entries[i].name.clone())).collect();
     deleted.sort_by_key(|(i, _)| *i);
-    let backup = save_backup(camera, &current, backup_dir)?;
+    let names: Vec<String> = deleted.iter().map(|(i, n)| format!("{i} {n}")).collect();
+    let backup = save_backup(camera, &current, backup_dir, &format!("before deleting {}", names.join(", ")))?;
 
     progress("writing");
     camera.write_settings(&patched)?;
@@ -305,6 +393,12 @@ pub fn parse_device_info(d: &[u8]) -> Option<DeviceInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn backup_info_strings_are_valid_json() {
+        assert_eq!(super::json_string("plain"), "\"plain\"");
+        assert_eq!(super::json_string("a\"b\\c\n"), "\"a\\\"b\\\\c\\u000a\"");
+    }
+
     #[test]
     fn device_info_from_s1m2() {
         // DeviceInfo returned by a DC-S1M2 on firmware 1.5 (serial replaced).

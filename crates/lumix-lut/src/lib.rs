@@ -50,6 +50,8 @@ pub enum Error {
     Slot(String),
     /// Internal guard: the patch would have changed bytes outside the allowed ranges.
     Guard(String),
+    /// A Library entry no longer holds what the caller saw (changed on the camera meanwhile).
+    Changed(String),
 }
 
 impl std::fmt::Display for Error {
@@ -63,6 +65,7 @@ impl std::fmt::Display for Error {
             Error::InvalidName(m) => write!(f, "invalid LUT name: {m}"),
             Error::Slot(m) => write!(f, "{m}"),
             Error::Guard(m) => write!(f, "refusing to write: {m}"),
+            Error::Changed(m) => write!(f, "the camera's LUT Library changed: {m}"),
         }
     }
 }
@@ -342,6 +345,23 @@ impl SettingsBlob {
         SettingsBlob::parse(b)
     }
 
+    /// Check that each listed entry still holds what the caller last saw: `None` = empty,
+    /// `Some(name)` = in use under that name. Guards against writing over a slot that changed
+    /// on the camera after the list was read.
+    pub fn check_expected(&self, expected: &[(usize, Option<&str>)]) -> Result<(), Error> {
+        let entries = self.entries();
+        for &(index, want) in expected {
+            let Some(entry) = entries.get(index) else {
+                return Err(Error::Slot(format!("entry {index} does not exist")));
+            };
+            let have = entry.in_use.then_some(entry.name.as_str());
+            if have != want {
+                return Err(Error::Changed(format!("entry {index} is now {} (expected {})", show(have), show(want))));
+            }
+        }
+        Ok(())
+    }
+
     /// Library entry selected in the camera menu, when it can be read for this layout.
     pub fn selected_entry(&self) -> Option<usize> {
         if self.bytes.len() != SELECTED_LAYOUT_LEN || self.model != "DC-S1M2" {
@@ -408,6 +428,10 @@ impl SettingsBlob {
         }
         SettingsBlob::parse(b)
     }
+}
+
+fn show(entry: Option<&str>) -> String {
+    entry.map_or_else(|| "empty".to_string(), |n| format!("{n:?}"))
 }
 
 /// Titles are stored as UTF-16; keep to printable ASCII so they also survive card file names.

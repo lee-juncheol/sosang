@@ -1,0 +1,8 @@
+.camera-busy-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:#0b0c0ecc;backdrop-filter:blur(3px)}
+.camera-busy-card{width:min(440px,100%);padding:28px 26px 22px;border-radius:14px;background:var(--surface);border:1px solid #ffcf7066;box-shadow:0 20px 60px #0008;text-align:center;outline:none}
+.camera-busy-card h2{margin:14px 0 8px;font-size:20px;color:#ffcf70}
+.camera-busy-card p{margin:0;font-size:14px;line-height:1.6;color:var(--muted)}
+.camera-busy-status{margin-top:14px!important;min-height:1.4em;color:var(--accent)!important;font-size:13px!important}
+.camera-busy-spinner{width:36px;height:36px;margin:0 auto;border-radius:50%;border:3px solid #ffcf7033;border-top-color:#ffcf70;animation:camera-busy-spin 1s linear infinite}
+@keyframes camera-busy-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.camera-busy-spinner{animation:none;border-top-color:#ffcf7033;border-color:#ffcf70}}

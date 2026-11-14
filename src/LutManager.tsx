@@ -1,11 +1,12 @@
 import { useRef, useState, type DragEvent } from 'react'
 import type { Translate } from './i18n'
 import { errorText } from './CameraRegister'
-import { cameraDelete, cameraListLuts, cameraLutName, cameraRegisterMany, cubeSummary, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
+import { CameraBusyOverlay } from './CameraBusyOverlay'
+import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
 import './lutManager.css'
 
-type Busy = null | { kind: 'reading' } | { kind: 'deleting'; indices: number[] } | { kind: 'adding'; indices: number[] }
-type Done = { kind: 'deleted' | 'added'; entries: { index: number; name: string }[]; backup: string }
+type Busy = null | { kind: 'reading' } | { kind: 'deleting'; indices: number[] } | { kind: 'adding'; indices: number[] } | { kind: 'restoring'; indices: number[] }
+type Done = { kind: 'deleted' | 'added' | 'restored'; entries: { index: number; name: string }[]; backup: string }
 /** A file waiting to go to the camera. `error` set = the file cannot be used. */
 type QueueItem = { id: number; fileName: string; text: string; style: string | null; error: string; name: string; slot: number | null }
 
@@ -33,6 +34,8 @@ export function LutManager({ t }: { t: Translate }) {
   const [dragging, setDragging] = useState(false)
   const [confirmOverwrite, setConfirmOverwrite] = useState(false)
   const nextId = useRef(1)
+  const [backups, setBackups] = useState<CameraBackup[] | null>(null)
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
   const [done, setDone] = useState<Done | null>(null)
   const [error, setError] = useState<{ text: string; detail: string } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -53,7 +56,7 @@ export function LutManager({ t }: { t: Translate }) {
     if (!library || !indices.length) return
     setBusy({ kind: 'deleting', indices }); setStep(null); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false)
     try {
-      const result = await cameraDelete(indices, setStep)
+      const result = await cameraDelete(indices, indices.map(i => library.entries[i].name), setStep)
       const gone = new Set(result.deleted.map(d => d.index))
       setDone({ kind: 'deleted', entries: result.deleted, backup: result.backup })
       setLibrary({
@@ -126,7 +129,7 @@ export function LutManager({ t }: { t: Translate }) {
 
   async function add() {
     if (!library || !ready.length || problems.length || (overwrites.length && !confirmOverwrite)) return
-    const items = ready.map(q => ({ cube: q.text, slot: q.slot!, name: q.name }))
+    const items = ready.map(q => ({ cube: q.text, slot: q.slot!, name: q.name, expected: library.entries[q.slot!]?.inUse ? library.entries[q.slot!].name : null }))
     setBusy({ kind: 'adding', indices: items.map(i => i.slot) }); setStep(null); setError(null); setDone(null)
     try {
       const result = await cameraRegisterMany(items, overwrites.length > 0, setStep)
@@ -142,6 +145,31 @@ export function LutManager({ t }: { t: Translate }) {
       setConfirmOverwrite(false)
     } catch (e) { fail(e) }
     finally { setBusy(null); setStep(null) }
+  }
+
+  async function showBackups() {
+    setError(null)
+    try { setBackups(await cameraListBackups()) } catch (e) { fail(e) }
+  }
+
+  async function restore(backup: CameraBackup) {
+    setBusy({ kind: 'restoring', indices: [] }); setStep(null); setError(null); setDone(null); setConfirmRestore(null)
+    try {
+      const result = await cameraRestoreBackup(backup.id, setStep)
+      setDone({ kind: 'restored', entries: [], backup: result.backup })
+      setBusy(null)
+      await read()
+      setDone({ kind: 'restored', entries: [], backup: result.backup })
+      setBackups(await cameraListBackups())
+    } catch (e) { fail(e) }
+    finally { setBusy(null); setStep(null) }
+  }
+
+  function actionLabel(action: string): string {
+    if (action.startsWith('before adding ')) return t("{0} 넣기 전", [action.slice('before adding '.length)])
+    if (action.startsWith('before deleting ')) return t("{0} 지우기 전", [action.slice('before deleting '.length)])
+    if (action === 'before restoring a backup') return t("백업 되돌리기 전")
+    return action
   }
 
   const canWrite = !!library?.camera.writeSupported
@@ -161,6 +189,7 @@ export function LutManager({ t }: { t: Translate }) {
   const checkedEntries = deletable.filter(e => checked.has(e.index))
   const allChecked = deletable.length > 0 && checkedEntries.length === deletable.length
   const doneText = !done ? ''
+    : done.kind === 'restored' ? t("백업 시점의 카메라 설정으로 되돌렸습니다. 카메라에서 설정을 확인해 주세요.")
     : done.kind === 'added' && done.entries.length === 1 ? t("{0}번 칸에 ‘{1}’을 등록했습니다. 카메라 메뉴의 LUT 라이브러리에서 확인하세요.", [done.entries[0].index, done.entries[0].name])
     : done.kind === 'added' ? t("LUT {0}개를 등록했습니다: {1}", [done.entries.length, done.entries.map(e => `${e.index} ${e.name}`).join(', ')])
     : done.entries.length === 1 ? t("{0}번 칸의 ‘{1}’을 지웠습니다.", [done.entries[0].index, done.entries[0].name])
@@ -176,6 +205,7 @@ export function LutManager({ t }: { t: Translate }) {
     </div>
 
     <p className="lut-manager-status" role="status" aria-live="polite">{progress}</p>
+    {busy && busy.kind !== 'reading' && <CameraBusyOverlay t={t} status={progress}/>}
     {done && <div className="lut-manager-done" role="status">
       <p>{doneText}</p>
       <small>{t("바꾸기 전 카메라 설정 백업: {0}", [done.backup])}</small>
@@ -236,6 +266,7 @@ export function LutManager({ t }: { t: Translate }) {
         {library.selected !== null && <p className="lut-manager-note">{t("카메라에서 선택된 LUT는 지울 수 없습니다. 카메라 메뉴에서 다른 LUT를 고른 뒤 목록을 다시 읽어 주세요.")}</p>}
       </section>
 
+      <div className="lut-manager-side">
       <section className="lut-manager-add" aria-labelledby="lut-add-title">
         <h2 id="lut-add-title">{t("내 LUT 넣기")}</h2>
         <p className="lut-manager-help">{t("33 × 33 × 33 격자 .cube 파일을 넣을 수 있습니다. 파일의 #LUMIXPHOTOSTYLE 태그가 STD면 Standard, VLOG나 태그가 없으면 V-Log 기준으로 등록됩니다. 여러 파일은 빈 칸에 차례로 배정되고, 한 번에 카메라에 씁니다.")}</p>
@@ -276,6 +307,22 @@ export function LutManager({ t }: { t: Translate }) {
           {busy?.kind === 'adding' ? t("등록 중…") : ready.length > 1 ? t("카메라에 {0}개 넣기 (약 25초)", [ready.length]) : t("카메라에 넣기 (약 25초)")}
         </button>
       </section>
+
+      <section className="lut-manager-backups" aria-labelledby="lut-backup-title">
+        <h2 id="lut-backup-title">{t("설정 백업")}</h2>
+        <p className="lut-manager-help">{t("LUT를 넣거나 지우기 전마다 카메라 설정 전체를 이 컴퓨터에 백업합니다. 되돌리면 그 시점 이후 바꾼 LUT와 설정이 모두 그때 상태로 돌아갑니다. 같은 카메라에만 되돌릴 수 있습니다.")}</p>
+        <button type="button" className="lut-manager-secondary" disabled={!!busy} onClick={() => void showBackups()}>{backups ? t("백업 목록 새로고침") : t("백업 목록 보기")}</button>
+        {!backups ? null
+          : !backups.length ? <p className="lut-manager-note">{t("되돌릴 수 있는 백업이 없습니다.")}</p>
+          : <ul className="lut-backup-list">{backups.slice(0, 30).map(b => <li key={b.id}>
+            <div><b>{new Date(b.created).toLocaleString()}</b><span>{actionLabel(b.action)}</span><small>{b.model} · {t("펌웨어 {0}", [b.firmware])}</small></div>
+            {confirmRestore === b.id ? <span className="lut-confirm">
+              <button type="button" className="danger" disabled={!!busy || !canWrite} onClick={() => void restore(b)}>{t("되돌리기")}</button>
+              <button type="button" disabled={!!busy} onClick={() => setConfirmRestore(null)}>{t("취소")}</button>
+            </span> : <button type="button" disabled={!!busy || !canWrite} onClick={() => { setConfirmRestore(b.id); setDone(null) }}>{t("이 시점으로")}</button>}
+          </li>)}</ul>}
+      </section>
+      </div>
     </div>}
   </div>
 }
