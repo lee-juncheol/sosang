@@ -133,3 +133,59 @@ fn registering_into_an_empty_entry_writes_the_same_title_as_the_camera() {
     let camera = &cam[TITLES + 39 * STRIDE..TITLES + 40 * STRIDE];
     assert_eq!(mine, camera, "title entry differs from the camera's own import");
 }
+
+#[test]
+fn deletes_several_entries_in_one_blob() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b.clone()).unwrap();
+    let out = s.without_luts(&[30, 37, 33]).unwrap();
+    // Same bytes as deleting them one after another.
+    let one_by_one = s.without_lut(30).unwrap().without_lut(33).unwrap().without_lut(37).unwrap();
+    assert!(out.as_bytes() == one_by_one.as_bytes());
+    assert_eq!(out.free_slots(), vec![30, 33, 37, 38, 39]);
+    let last = b.len() - 1;
+    let touched = |i: usize| [30, 33, 37].iter().any(|k| (TITLES + k * STRIDE..TITLES + (k + 1) * STRIDE).contains(&i)) || i == last;
+    assert!(out.as_bytes().iter().zip(&b).enumerate().all(|(i, (x, y))| x == y || touched(i)));
+}
+
+#[test]
+fn several_entry_delete_is_all_or_nothing() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    assert!(matches!(s.without_luts(&[30, 2]), Err(Error::Slot(_))), "entry 2 is selected");
+    assert!(matches!(s.without_luts(&[30, 38]), Err(Error::Slot(_))), "entry 38 is empty");
+    assert!(matches!(s.without_luts(&[30, 30]), Err(Error::Slot(_))), "listed twice");
+    assert!(matches!(s.without_luts(&[]), Err(Error::Slot(_))));
+}
+
+#[test]
+fn stores_several_luts_in_one_blob() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b.clone()).unwrap();
+    let mono = test01();
+    let flat = Lut33::from_fn(|r, g, b| [r, g, b]);
+    let items = [
+        lumix_lut::NewLut { index: 39, name: "B.cube", style: BaseStyle::VLog, lut: &flat },
+        lumix_lut::NewLut { index: 38, name: "A.cube", style: BaseStyle::Standard, lut: &mono },
+    ];
+    let out = s.with_luts(&items, false).unwrap();
+    let one_by_one = s.with_lut(39, "B.cube", BaseStyle::VLog, &flat, false).unwrap().with_lut(38, "A.cube", BaseStyle::Standard, &mono, false).unwrap();
+    assert!(out.as_bytes() == one_by_one.as_bytes());
+    assert_eq!(out.entries()[38].name, "A.cube");
+    assert_eq!(out.entries()[39].style_code, 49);
+    assert_eq!(out.lut(38).unwrap(), mono);
+    assert!(out.free_slots().is_empty());
+}
+
+#[test]
+fn several_lut_store_is_all_or_nothing() {
+    let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    let l = test01();
+    let item = |index, name| lumix_lut::NewLut { index, name, style: BaseStyle::Standard, lut: &l };
+    assert!(matches!(s.with_luts(&[item(38, "A"), item(38, "B")], false), Err(Error::Slot(_))), "same slot twice");
+    assert!(matches!(s.with_luts(&[item(38, "A"), item(37, "B")], false), Err(Error::Slot(_))), "37 is in use");
+    assert!(s.with_luts(&[item(38, "A"), item(37, "B")], true).is_ok(), "overwrite allowed");
+    assert!(matches!(s.with_luts(&[item(38, "A"), item(39, "명")], false), Err(Error::InvalidName(_))));
+    assert!(matches!(s.with_luts(&[], false), Err(Error::Slot(_))));
+}

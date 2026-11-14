@@ -10,7 +10,7 @@
 //! loop, so every call here must come from a thread other than the main thread, and the main
 //! thread must be running its run loop (a Tauri app does; the `probe` example shows a CLI).
 
-use lumix_lut::{BaseStyle, Lut33, SettingsBlob, SETTINGS_PROP};
+use lumix_lut::{BaseStyle, Lut33, NewLut, SettingsBlob, SETTINGS_PROP};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -177,15 +177,31 @@ pub fn register_lut(
     lut: &Lut33,
     allow_overwrite: bool,
     backup_dir: &Path,
-    mut progress: impl FnMut(&str),
+    progress: impl FnMut(&str),
 ) -> Result<RegisterReport, PtpError> {
+    let r = register_luts(camera, &[NewLut { index, name, style, lut }], allow_overwrite, backup_dir, progress)?;
+    Ok(RegisterReport { index, name: name.to_string(), backup: r.backup, other_changes: r.other_changes })
+}
+
+/// What [`register_luts`] did.
+#[derive(Debug, Clone)]
+pub struct RegisterManyReport {
+    /// Stored entries and their names, in the order given.
+    pub registered: Vec<(usize, String)>,
+    pub backup: PathBuf,
+    /// Bytes outside the target slots that differ after the camera re-saved its settings.
+    pub other_changes: usize,
+}
+
+/// Store several LUTs in a single write, with a backup and a read-back check of every entry.
+/// If any one is refused, nothing is written.
+pub fn register_luts(camera: &Camera, luts: &[NewLut<'_>], allow_overwrite: bool, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RegisterManyReport, PtpError> {
     if !camera.info.write_verified() {
         return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
     }
     progress("reading");
     let current = camera.read_settings()?;
-    let patched = current.with_lut(index, name, style, lut, allow_overwrite)?;
-
+    let patched = current.with_luts(luts, allow_overwrite)?;
     let backup = save_backup(camera, &current, backup_dir)?;
 
     progress("writing");
@@ -193,16 +209,19 @@ pub fn register_lut(
 
     progress("verifying");
     let after = camera.read_settings()?;
-    let entry = &after.entries()[index];
-    if !entry.in_use || entry.name != name {
-        return Err(PtpError::Verify(format!("entry {index} reads back as {:?}", entry.name)));
-    }
-    if after.lut(index).as_ref() != Some(lut) {
-        return Err(PtpError::Verify(format!("LUT data in entry {index} differs from what was sent")));
+    let entries = after.entries();
+    for l in luts {
+        let entry = &entries[l.index];
+        if !entry.in_use || entry.name != l.name {
+            return Err(PtpError::Verify(format!("entry {} reads back as {:?}", l.index, entry.name)));
+        }
+        if after.lut(l.index).as_ref() != Some(l.lut) {
+            return Err(PtpError::Verify(format!("LUT data in entry {} differs from what was sent", l.index)));
+        }
     }
     let other_changes = after.as_bytes().iter().zip(patched.as_bytes()).filter(|(a, b)| a != b).count();
     progress("done");
-    Ok(RegisterReport { index, name: name.to_string(), backup, other_changes })
+    Ok(RegisterManyReport { registered: luts.iter().map(|l| (l.index, l.name.to_string())).collect(), backup, other_changes })
 }
 
 fn save_backup(camera: &Camera, blob: &SettingsBlob, backup_dir: &Path) -> Result<PathBuf, PtpError> {
@@ -213,37 +232,39 @@ fn save_backup(camera: &Camera, blob: &SettingsBlob, backup_dir: &Path) -> Resul
     Ok(backup)
 }
 
-/// What [`delete_lut`] did.
+/// What [`delete_luts`] did.
 #[derive(Debug, Clone)]
 pub struct DeleteReport {
-    pub index: usize,
-    /// Name the entry had before it was emptied.
-    pub name: String,
+    /// Emptied entries and the names they had, in index order.
+    pub deleted: Vec<(usize, String)>,
     pub backup: PathBuf,
 }
 
-/// Empty Library entry `index`, with a backup and a read-back check. Only the title entry
-/// changes, as in the camera's own delete; the entry selected in the camera is refused.
-pub fn delete_lut(camera: &Camera, index: usize, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
+/// Empty one or more Library entries in a single write, with a backup and a read-back check.
+/// Only their title entries change, as in the camera's own delete; the entry selected in the
+/// camera is refused, and if any entry is refused nothing is written.
+pub fn delete_luts(camera: &Camera, indices: &[usize], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
     if !camera.info.write_verified() {
         return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
     }
     progress("reading");
     let current = camera.read_settings()?;
-    let name = current.entries().get(index).map(|e| e.name.clone()).unwrap_or_default();
-    let patched = current.without_lut(index)?;
+    let patched = current.without_luts(indices)?;
+    let entries = current.entries();
+    let mut deleted: Vec<(usize, String)> = indices.iter().map(|&i| (i, entries[i].name.clone())).collect();
+    deleted.sort_by_key(|(i, _)| *i);
     let backup = save_backup(camera, &current, backup_dir)?;
 
     progress("writing");
     camera.write_settings(&patched)?;
 
     progress("verifying");
-    let after = camera.read_settings()?;
-    if after.entries()[index].in_use {
-        return Err(PtpError::Verify(format!("entry {index} still holds {:?}", after.entries()[index].name)));
+    let after = camera.read_settings()?.entries();
+    if let Some((i, _)) = deleted.iter().find(|(i, _)| after[*i].in_use) {
+        return Err(PtpError::Verify(format!("entry {i} still holds {:?}", after[*i].name)));
     }
     progress("done");
-    Ok(DeleteReport { index, name, backup })
+    Ok(DeleteReport { deleted, backup })
 }
 
 /// Parse a PTP DeviceInfo dataset (data phase only).

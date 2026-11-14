@@ -11,7 +11,8 @@ pub fn run() {
             camera::camera_status,
             camera::camera_list_luts,
             camera::camera_register_lut,
-            camera::camera_delete_lut,
+            camera::camera_register_luts,
+            camera::camera_delete_luts,
             files::save_file,
             files::open_external
         ])

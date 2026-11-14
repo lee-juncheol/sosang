@@ -29,6 +29,14 @@
 .lut-manager tr.empty td{color:var(--faint)}
 .lut-manager tr.selected td{background:#9aff000a}
 .lut-manager tr.target td{background:#9aff0014}
+.lut-check{width:28px;padding-right:0}
+.lut-check input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+.lut-bulk{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:48px;margin-bottom:8px;padding:8px 12px;border:1px solid var(--line-faint);border-radius:7px}
+.lut-bulk.active{border-color:#ff7a7a55;background:#ff5a5a0d}
+.lut-bulk-hint{color:var(--faint)}
+.lut-bulk p{margin:0;font-size:13px;line-height:1.45;overflow-wrap:anywhere;flex:1 1 300px}
+.lut-bulk button{min-height:30px;padding:0 10px;border:1px solid #414249;border-radius:6px;font-size:12px;color:var(--text)}
+.lut-bulk button.danger{border-color:#ff7a7a;color:#ffb4b4}
 .lut-index{width:44px;font-family:var(--mono);color:var(--muted)}
 .lut-name{min-width:0;overflow-wrap:anywhere}
 .lut-name>span:first-child{margin-right:8px}
@@ -51,3 +59,20 @@
 .lut-manager-confirm input{margin-top:3px;accent-color:var(--accent)}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media(max-width:900px){.lut-manager-body{grid-template-columns:minmax(0,1fr)}.lut-manager-add{position:static}}
+.lut-manager.dragging .lut-manager-add{border-color:var(--accent)}
+.lut-drop{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 12px;border:1.5px dashed #4a4b52;border-radius:9px;text-align:center}
+.lut-drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.lut-drop p{margin:0;font-size:13px;font-weight:600}
+.lut-drop span{font-size:12px;color:var(--faint)}
+.lut-drop button{margin-top:4px;min-height:32px;padding:0 12px;border:1px solid #414249;border-radius:6px;font-size:12px;color:var(--text)}
+.lut-drop button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.lut-queue{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.lut-queue li{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--well);display:flex;flex-direction:column;gap:6px}
+.lut-queue li.invalid{border-color:#ffcf7055}
+.lut-queue-head{display:flex;align-items:center;gap:6px;min-width:0}
+.lut-queue-file{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lut-queue-remove{width:26px;height:26px;border-radius:6px;color:var(--muted);font-size:16px;line-height:1}
+.lut-queue-remove:hover:not(:disabled){color:#ffb4b4;background:#ff5a5a14}
+.lut-queue-fields{display:flex;flex-direction:column;gap:6px}
+.lut-queue .lut-manager-warning{margin:0;font-size:12px}
+.lut-queue-replace{margin:0;font-size:12px;color:#ffcf70}

@@ -3,7 +3,7 @@
 //! talk to the camera at the same time.
 
 use lumix_lut::parse_cube;
-use lumix_ptp::{delete_lut, register_lut, Camera, DeviceInfo, PtpError};
+use lumix_ptp::{delete_luts, register_lut, register_luts, Camera, DeviceInfo, PtpError};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -162,27 +162,87 @@ pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name
     .await
 }
 
+/// One file for `camera_register_luts`.
+#[derive(Debug, serde::Deserialize)]
+pub struct NewLutRequest {
+    cube: String,
+    slot: usize,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterManyResult {
+    registered: Vec<EntryName>,
+    backup: String,
+    other_changes: usize,
+}
+
+/// Register several .cube files in one write: read, back up, write, read back. About 25 s.
+/// Every file and slot is checked before the camera is touched; if one is refused, nothing
+/// is written. Emits `camera-progress` like `camera_register_lut`.
+#[tauri::command]
+pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, overwrite: bool) -> Result<RegisterManyResult, CommandError> {
+    let mut parsed = Vec::with_capacity(items.len());
+    for (i, item) in items.iter().enumerate() {
+        if item.slot < FIRST_USER_ENTRY {
+            return Err(CommandError::new("bad_slot", format!("file {}: entry {} came with the camera", i + 1, item.slot)));
+        }
+        let at = |e: lumix_lut::Error| {
+            let mut err = CommandError::from(e);
+            err.message = format!("file {} ({}): {}", i + 1, item.name, err.message);
+            err
+        };
+        let cube = parse_cube(&item.cube).map_err(at)?;
+        let style = cube.base_style().map_err(at)?;
+        lumix_lut::validate_name(&item.name).map_err(at)?;
+        parsed.push((item.slot, item.name.clone(), style, cube.lut));
+    }
+    with_camera(app, move |app, camera| {
+        let backups = backup_dir(app)?;
+        let luts: Vec<lumix_lut::NewLut> = parsed.iter().map(|(index, name, style, lut)| lumix_lut::NewLut { index: *index, name, style: *style, lut }).collect();
+        let report = register_luts(camera, &luts, overwrite, &backups, |step| {
+            let _ = app.emit("camera-progress", step);
+        })?;
+        Ok(RegisterManyResult {
+            registered: report.registered.into_iter().map(|(index, name)| EntryName { index, name }).collect(),
+            backup: report.backup.display().to_string(),
+            other_changes: report.other_changes,
+        })
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryName {
+    index: usize,
+    name: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteResult {
-    index: usize,
-    name: String,
+    deleted: Vec<EntryName>,
     backup: String,
 }
 
-/// Empty one Library slot: read, back up, write, read back. About 25 s.
+/// Empty one or more Library slots in one write: read, back up, write, read back. About 25 s.
 /// Emits `camera-progress` like `camera_register_lut`.
 #[tauri::command]
-pub async fn camera_delete_lut(app: AppHandle, slot: usize) -> Result<DeleteResult, CommandError> {
-    if slot < FIRST_USER_ENTRY {
+pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>) -> Result<DeleteResult, CommandError> {
+    if let Some(slot) = slots.iter().find(|&&s| s < FIRST_USER_ENTRY) {
         return Err(CommandError::new("bad_slot", format!("entry {slot} came with the camera")));
     }
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
-        let report = delete_lut(camera, slot, &backups, |step| {
+        let report = delete_luts(camera, &slots, &backups, |step| {
             let _ = app.emit("camera-progress", step);
         })?;
-        Ok(DeleteResult { index: report.index, name: report.name, backup: report.backup.display().to_string() })
+        Ok(DeleteResult {
+            deleted: report.deleted.into_iter().map(|(index, name)| EntryName { index, name }).collect(),
+            backup: report.backup.display().to_string(),
+        })
     })
     .await
 }

@@ -87,6 +87,15 @@ impl BaseStyle {
     }
 }
 
+/// A LUT to store with [`SettingsBlob::with_luts`].
+#[derive(Debug, Clone, Copy)]
+pub struct NewLut<'a> {
+    pub index: usize,
+    pub name: &'a str,
+    pub style: BaseStyle,
+    pub lut: &'a Lut33,
+}
+
 /// One entry of the LUT Library title table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryEntry {
@@ -268,46 +277,68 @@ impl SettingsBlob {
     /// The entry's link field is set to its own index — the camera does the same, and any
     /// other value makes it render a different record.
     pub fn with_lut(&self, index: usize, name: &str, style: BaseStyle, lut: &Lut33, allow_overwrite: bool) -> Result<SettingsBlob, Error> {
-        if index == 0 || index >= self.layout.title_count {
-            return Err(Error::Slot(format!("entry {index} is not a user slot (1..={})", self.layout.title_count - 1)));
+        self.with_luts(&[NewLut { index, name, style, lut }], allow_overwrite)
+    }
+
+    /// Store several LUTs in one go (one write to the camera). Each is checked as in
+    /// [`Self::with_lut`]; if any one is refused, nothing changes.
+    pub fn with_luts(&self, luts: &[NewLut<'_>], allow_overwrite: bool) -> Result<SettingsBlob, Error> {
+        if luts.is_empty() {
+            return Err(Error::Slot("no LUTs to store".into()));
         }
-        if self.entries()[index].in_use && !allow_overwrite {
-            return Err(Error::Slot(format!("entry {index} already holds a LUT")));
-        }
-        validate_name(name)?;
-        let mut b = self.bytes.clone();
-        let t = self.title_offset(index);
-        b[t..t + 4].copy_from_slice(&(index as u32).to_le_bytes());
-        b[t + 4..t + 6].copy_from_slice(&(index as u16).to_le_bytes());
-        b[t + 6..t + 8].copy_from_slice(&style.code().to_le_bytes());
-        let name_area = t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES;
-        b[name_area.clone()].fill(0);
-        for (i, u) in name.encode_utf16().enumerate() {
-            b[name_area.start + 2 * i..name_area.start + 2 * i + 2].copy_from_slice(&u.to_le_bytes());
-        }
-        let r = self.record_offset(index);
-        b[r + 4..r + 6].copy_from_slice(&(GRID as u16).to_le_bytes());
-        b[r + 6..r + 8].copy_from_slice(&style.code().to_le_bytes());
-        for (i, px) in lut.values().iter().enumerate() {
-            let q = r + 8 + i * 6;
-            for c in 0..3 {
-                b[q + 2 * c..q + 2 * c + 2].copy_from_slice(&px[c].to_le_bytes());
+        let entries = self.entries();
+        let mut seen = Vec::with_capacity(luts.len());
+        for l in luts {
+            if l.index == 0 || l.index >= self.layout.title_count {
+                return Err(Error::Slot(format!("entry {} is not a user slot (1..={})", l.index, self.layout.title_count - 1)));
             }
+            if seen.contains(&l.index) {
+                return Err(Error::Slot(format!("entry {} is listed twice", l.index)));
+            }
+            seen.push(l.index);
+            if entries[l.index].in_use && !allow_overwrite {
+                return Err(Error::Slot(format!("entry {} already holds a LUT", l.index)));
+            }
+            validate_name(l.name)?;
+        }
+        let mut b = self.bytes.clone();
+        let mut allowed = Vec::with_capacity(luts.len() * 2 + 1);
+        for l in luts {
+            let t = self.title_offset(l.index);
+            b[t..t + 4].copy_from_slice(&(l.index as u32).to_le_bytes());
+            b[t + 4..t + 6].copy_from_slice(&(l.index as u16).to_le_bytes());
+            b[t + 6..t + 8].copy_from_slice(&l.style.code().to_le_bytes());
+            let name_area = t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES;
+            b[name_area.clone()].fill(0);
+            for (i, u) in l.name.encode_utf16().enumerate() {
+                b[name_area.start + 2 * i..name_area.start + 2 * i + 2].copy_from_slice(&u.to_le_bytes());
+            }
+            let r = self.record_offset(l.index);
+            b[r + 4..r + 6].copy_from_slice(&(GRID as u16).to_le_bytes());
+            b[r + 6..r + 8].copy_from_slice(&l.style.code().to_le_bytes());
+            for (i, px) in l.lut.values().iter().enumerate() {
+                let q = r + 8 + i * 6;
+                for c in 0..3 {
+                    b[q + 2 * c..q + 2 * c + 2].copy_from_slice(&px[c].to_le_bytes());
+                }
+            }
+            debug_assert_eq!(&b[r + 8 + LUT_DATA_BYTES..r + 8 + LUT_DATA_BYTES + 2], &[0, 0]);
+            allowed.push(t..t + TITLE_STRIDE);
+            allowed.push(r..r + 4 + LUT_RECORD_LEN as usize);
         }
         let last = b.len() - 1;
         b[last] = checksum_for(&b);
+        allowed.push(last..last + 1);
 
-        // Guard: nothing outside the title entry, its record and the checksum may change.
-        let allowed = [t..t + TITLE_STRIDE, r..r + 4 + LUT_RECORD_LEN as usize, last..last + 1];
+        // Guard: nothing outside the chosen title entries, their records and the checksum may change.
         if let Some((i, _)) = b
             .iter()
             .zip(&self.bytes)
             .enumerate()
             .find(|(i, (x, y))| x != y && !allowed.iter().any(|a| a.contains(i)))
         {
-            return Err(Error::Guard(format!("byte {i:#x} would change outside the target slot")));
+            return Err(Error::Guard(format!("byte {i:#x} would change outside the target slots")));
         }
-        debug_assert_eq!(&b[r + 8 + LUT_DATA_BYTES..r + 8 + LUT_DATA_BYTES + 2], &[0, 0]);
         SettingsBlob::parse(b)
     }
 
@@ -327,32 +358,53 @@ impl SettingsBlob {
     /// does it: only the title entry changes (link 0xFFFF, V-Log style, no name); the LUT
     /// record is left as it is and is ignored while the entry is empty.
     pub fn without_lut(&self, index: usize) -> Result<SettingsBlob, Error> {
-        if index == 0 || index >= self.layout.title_count {
-            return Err(Error::Slot(format!("entry {index} is not a user slot (1..={})", self.layout.title_count - 1)));
+        self.without_luts(&[index])
+    }
+
+    /// Empty several entries in one go (one write to the camera). Each entry is checked as in
+    /// [`Self::without_lut`]; if any one is refused, nothing changes.
+    pub fn without_luts(&self, indices: &[usize]) -> Result<SettingsBlob, Error> {
+        if indices.is_empty() {
+            return Err(Error::Slot("no entries to delete".into()));
         }
-        if !self.entries()[index].in_use {
-            return Err(Error::Slot(format!("entry {index} is already empty")));
+        let mut unique = indices.to_vec();
+        unique.sort_unstable();
+        unique.dedup();
+        if unique.len() != indices.len() {
+            return Err(Error::Slot("an entry is listed twice".into()));
         }
-        if self.selected_entry() == Some(index) {
-            return Err(Error::Slot(format!("entry {index} is selected in the camera; choose another LUT there first")));
+        let entries = self.entries();
+        let selected = self.selected_entry();
+        for &index in &unique {
+            if index == 0 || index >= self.layout.title_count {
+                return Err(Error::Slot(format!("entry {index} is not a user slot (1..={})", self.layout.title_count - 1)));
+            }
+            if !entries[index].in_use {
+                return Err(Error::Slot(format!("entry {index} is already empty")));
+            }
+            if selected == Some(index) {
+                return Err(Error::Slot(format!("entry {index} is selected in the camera; choose another LUT there first")));
+            }
         }
         let mut b = self.bytes.clone();
-        let t = self.title_offset(index);
-        b[t..t + 4].copy_from_slice(&(index as u32).to_le_bytes());
-        b[t + 4..t + 6].copy_from_slice(&EMPTY_LINK.to_le_bytes());
-        b[t + 6..t + 8].copy_from_slice(&BaseStyle::VLog.code().to_le_bytes());
-        b[t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES].fill(0);
+        for &index in &unique {
+            let t = self.title_offset(index);
+            b[t..t + 4].copy_from_slice(&(index as u32).to_le_bytes());
+            b[t + 4..t + 6].copy_from_slice(&EMPTY_LINK.to_le_bytes());
+            b[t + 6..t + 8].copy_from_slice(&BaseStyle::VLog.code().to_le_bytes());
+            b[t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES].fill(0);
+        }
         let last = b.len() - 1;
         b[last] = checksum_for(&b);
 
-        let allowed = [t..t + TITLE_STRIDE, last..last + 1];
+        let titles: Vec<_> = unique.iter().map(|&i| self.title_offset(i)).map(|t| t..t + TITLE_STRIDE).collect();
         if let Some((i, _)) = b
             .iter()
             .zip(&self.bytes)
             .enumerate()
-            .find(|(i, (x, y))| x != y && !allowed.iter().any(|a| a.contains(i)))
+            .find(|(i, (x, y))| x != y && *i != last && !titles.iter().any(|a| a.contains(i)))
         {
-            return Err(Error::Guard(format!("byte {i:#x} would change outside the target slot")));
+            return Err(Error::Guard(format!("byte {i:#x} would change outside the target slots")));
         }
         SettingsBlob::parse(b)
     }
