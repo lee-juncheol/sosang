@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { Locale, Translate } from './i18n'
 import './lutUsageGuide.css'
 import './whiteBalanceGuide.css'
+import { serverUrl } from './platform.ts'
 
 const manuals = {
   ko: 'https://eww.pavc.panasonic.co.jp/dscoi/DC-S1M2/html/DC-S1M2_DVQP3242_kor/0075.html#00002',
@@ -39,14 +40,14 @@ export function WhiteBalanceGuide({ locale, t }: { locale: Locale; t: Translate 
             <div className="usage-step-title"><span>1</span><h3 id={`${titleId}-open`}>{t("화이트 밸런스 조정 화면 열기")}</h3></div>
             <p>{t("WB 버튼을 눌러 사용할 화이트 밸런스를 선택한 다음, 아래 방향 버튼(↓)을 누르세요.")}</p>
             <div className="wb-entry-screens">
-              <figure><img src={`/manual/s1ii/${locale}-wb-button.png`} width="390" height="260" alt={t("S1II 카메라의 WB 버튼 위치")} loading="lazy" decoding="async"/><figcaption>{t("WB 버튼")}</figcaption></figure>
-              <figure><img src={`/manual/s1ii/${locale}-wb-select.png`} width="394" height="264" alt={t("S1II 설명서의 화이트 밸런스 선택 화면")} loading="lazy" decoding="async"/><figcaption>{t("화이트 밸런스 선택 → ↓")}</figcaption></figure>
+              <figure><img src={serverUrl(`/manual/s1ii/${locale}-wb-button.png`)} width="390" height="260" alt={t("S1II 카메라의 WB 버튼 위치")} loading="lazy" decoding="async"/><figcaption>{t("WB 버튼")}</figcaption></figure>
+              <figure><img src={serverUrl(`/manual/s1ii/${locale}-wb-select.png`)} width="394" height="264" alt={t("S1II 설명서의 화이트 밸런스 선택 화면")} loading="lazy" decoding="async"/><figcaption>{t("화이트 밸런스 선택 → ↓")}</figcaption></figure>
             </div>
           </section>
           <section className="usage-section" aria-labelledby={`${titleId}-adjust`}>
             <div className="usage-step-title"><span>2</span><h3 id={`${titleId}-adjust`}>{t("원하는 색 방향으로 조정")}</h3></div>
             <div className="wb-adjust-layout">
-              <figure className="wb-adjust-screen"><img src={`/manual/s1ii/${locale}-wb-adjust.png`} width="391" height="261" alt={t("S1II 설명서의 A·B·G·M 화이트 밸런스 미세 조정 화면")} loading="lazy" decoding="async"/><figcaption>{t("공식 설명서 · 화이트 밸런스 조정하기")}</figcaption></figure>
+              <figure className="wb-adjust-screen"><img src={serverUrl(`/manual/s1ii/${locale}-wb-adjust.png`)} width="391" height="261" alt={t("S1II 설명서의 A·B·G·M 화이트 밸런스 미세 조정 화면")} loading="lazy" decoding="async"/><figcaption>{t("공식 설명서 · 화이트 밸런스 조정하기")}</figcaption></figure>
               <ul className="wb-directions">{directions.map(direction => <li key={direction.code}><span className="wb-arrow" role="img" aria-label={direction.direction}>{direction.arrow}</span><strong>{direction.code}</strong><span>{direction.label}</span></li>)}</ul>
             </div>
             <p>{t("방향 버튼으로 조정하거나 그래프를 터치하세요. 조이스틱으로는 대각선 조정도 가능합니다.")}</p>

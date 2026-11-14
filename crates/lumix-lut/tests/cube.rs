@@ -27,8 +27,9 @@ fn reads_tag_title_and_order() {
 }
 
 #[test]
-fn untagged_is_vlog_and_other_tags_are_refused() {
+fn untagged_and_vlog_are_vlog_and_other_tags_are_refused() {
     assert_eq!(parse_cube(&identity_cube("")).unwrap().base_style().unwrap(), BaseStyle::VLog);
+    assert_eq!(parse_cube(&identity_cube("#LUMIXPHOTOSTYLE VLOG\n")).unwrap().base_style().unwrap(), BaseStyle::VLog);
     let c = parse_cube(&identity_cube("#LUMIXPHOTOSTYLE VIVD\n")).unwrap();
     assert!(matches!(c.base_style(), Err(Error::UnsupportedPhotoStyle(_))));
 }

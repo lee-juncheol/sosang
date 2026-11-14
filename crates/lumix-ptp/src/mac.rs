@@ -6,7 +6,7 @@ use block2::RcBlock;
 use dispatch2::DispatchQueue;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{define_class, msg_send, AllocAnyThread, DefinedClass, MainThreadMarker, Message};
+use objc2::{define_class, msg_send, AllocAnyThread, MainThreadMarker, Message};
 use objc2_core_graphics::CGImage;
 use objc2_foundation::{NSArray, NSData, NSDictionary, NSError, NSObject, NSObjectProtocol};
 use objc2_image_capture_core::{
@@ -15,25 +15,31 @@ use objc2_image_capture_core::{
 };
 use std::cell::RefCell;
 
-use std::sync::mpsc::{channel, Sender};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Mutex;
 use std::time::Duration;
 
 enum Event {
-    Found,
     Opened(Result<(), String>),
+    Closed,
     Removed,
 }
 
-struct BrowserIvars {
-    hint: String,
-    events: Sender<Event>,
+/// Where delegate callbacks report to: the sender of the session currently being used.
+static EVENTS: Mutex<Option<Sender<Event>>> = Mutex::new(None);
+/// One session at a time across the process.
+static SESSION_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+fn send(e: Event) {
+    if let Some(tx) = EVENTS.lock().unwrap().as_ref() {
+        let _ = tx.send(e);
+    }
 }
 
 define_class!(
     #[unsafe(super(NSObject))]
     #[name = "LumixLutBrowserDelegate"]
-    #[ivars = BrowserIvars]
     struct BrowserDelegate;
 
     unsafe impl NSObjectProtocol for BrowserDelegate {}
@@ -42,45 +48,44 @@ define_class!(
         #[unsafe(method(deviceBrowser:didAddDevice:moreComing:))]
         fn did_add(&self, _browser: &ICDeviceBrowser, device: &ICDevice, _more: bool) {
             let Some(camera) = device.downcast_ref::<ICCameraDevice>() else { return };
-            let name = unsafe { camera.name() }.map(|n| n.to_string()).unwrap_or_default();
-            if !name.contains(&self.ivars().hint) {
-                return;
-            }
-            let found = STATE.with(|s| {
-                let mut s = s.borrow_mut();
-                let Some(state) = s.as_mut() else { return false };
-                if state.camera.is_some() {
-                    return false;
+            STATE.with(|s| {
+                if let Some(state) = s.borrow_mut().as_mut() {
+                    state.cameras.push(camera.retain());
                 }
-                unsafe { camera.setDelegate(Some(ProtocolObject::from_ref(&*state.device_delegate))) };
-                state.camera = Some(camera.retain());
-                true
             });
-            if found {
-                let _ = self.ivars().events.send(Event::Found);
-            }
+            try_open_pending();
         }
 
         #[unsafe(method(deviceBrowser:didRemoveDevice:moreGoing:))]
-        fn did_remove(&self, _browser: &ICDeviceBrowser, _device: &ICDevice, _more: bool) {}
+        fn did_remove(&self, _browser: &ICDeviceBrowser, device: &ICDevice, _more: bool) {
+            let ptr = device as *const ICDevice as *const ICCameraDevice;
+            let was_active = STATE.with(|s| {
+                let mut s = s.borrow_mut();
+                let Some(state) = s.as_mut() else { return false };
+                state.cameras.retain(|c| !std::ptr::eq(&**c, ptr));
+                if state.active.as_deref().is_some_and(|c| std::ptr::eq(c, ptr)) {
+                    state.active = None;
+                    return true;
+                }
+                false
+            });
+            if was_active {
+                send(Event::Removed);
+            }
+        }
     }
 );
 
 impl BrowserDelegate {
-    fn new(ivars: BrowserIvars) -> Retained<Self> {
-        let this = Self::alloc().set_ivars(ivars);
+    fn new() -> Retained<Self> {
+        let this = Self::alloc().set_ivars(());
         unsafe { msg_send![super(this), init] }
     }
-}
-
-struct DeviceIvars {
-    events: Sender<Event>,
 }
 
 define_class!(
     #[unsafe(super(NSObject))]
     #[name = "LumixLutDeviceDelegate"]
-    #[ivars = DeviceIvars]
     struct DeviceDelegate;
 
     unsafe impl NSObjectProtocol for DeviceDelegate {}
@@ -88,7 +93,7 @@ define_class!(
     unsafe impl ICDeviceDelegate for DeviceDelegate {
         #[unsafe(method(didRemoveDevice:))]
         fn did_remove_device(&self, _device: &ICDevice) {
-            let _ = self.ivars().events.send(Event::Removed);
+            send(Event::Removed);
         }
 
         #[unsafe(method(device:didOpenSessionWithError:))]
@@ -97,11 +102,13 @@ define_class!(
                 None => Ok(()),
                 Some(e) => Err(e.localizedDescription().to_string()),
             };
-            let _ = self.ivars().events.send(Event::Opened(r));
+            send(Event::Opened(r));
         }
 
         #[unsafe(method(device:didCloseSessionWithError:))]
-        fn did_close(&self, _device: &ICDevice, _error: Option<&NSError>) {}
+        fn did_close(&self, _device: &ICDevice, _error: Option<&NSError>) {
+            send(Event::Closed);
+        }
     }
 
     unsafe impl ICCameraDeviceDelegate for DeviceDelegate {
@@ -138,17 +145,24 @@ define_class!(
 );
 
 impl DeviceDelegate {
-    fn new(ivars: DeviceIvars) -> Retained<Self> {
-        let this = Self::alloc().set_ivars(ivars);
+    fn new() -> Retained<Self> {
+        let this = Self::alloc().set_ivars(());
         unsafe { msg_send![super(this), init] }
     }
 }
 
+/// Main-thread state. The browser keeps running for the life of the process: a browser that is
+/// stopped and started again does not report an already-connected camera a second time.
 struct MainState {
-    browser: Retained<ICDeviceBrowser>,
+    _browser: Retained<ICDeviceBrowser>,
     _browser_delegate: Retained<BrowserDelegate>,
     device_delegate: Retained<DeviceDelegate>,
-    camera: Option<Retained<ICCameraDevice>>,
+    /// Every camera the browser has reported and not yet removed.
+    cameras: Vec<Retained<ICCameraDevice>>,
+    /// Name hint of a session waiting for a camera.
+    pending: Option<String>,
+    /// The camera with an open (or opening) session.
+    active: Option<Retained<ICCameraDevice>>,
 }
 
 thread_local! {
@@ -161,9 +175,57 @@ fn on_main(f: impl FnOnce() + Send + 'static) {
     DispatchQueue::main().exec_async(f);
 }
 
-/// An open session. Dropping it closes the session and stops the browser.
+/// Main thread: start the browser once.
+fn ensure_browser() {
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        if s.is_some() {
+            return;
+        }
+        let browser_delegate = BrowserDelegate::new();
+        let browser = unsafe { ICDeviceBrowser::new() };
+        unsafe {
+            browser.setDelegate(Some(ProtocolObject::from_ref(&*browser_delegate)));
+            browser.setBrowsedDeviceTypeMask(ICDeviceTypeMask(ICDeviceTypeMask::Camera.0 | ICDeviceLocationTypeMask::Local.0));
+        }
+        *s = Some(MainState {
+            _browser: browser.clone(),
+            _browser_delegate: browser_delegate,
+            device_delegate: DeviceDelegate::new(),
+            cameras: Vec::new(),
+            pending: None,
+            active: None,
+        });
+        drop(s);
+        unsafe { browser.start() };
+    });
+}
+
+/// Start looking for cameras now, so the first session does not wait for a cold browser.
+pub(crate) fn start_discovery() {
+    on_main(ensure_browser);
+}
+
+/// Main thread: if a session is waiting and a matching camera is known, open it.
+fn try_open_pending() {
+    let camera = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let state = s.as_mut()?;
+        let hint = state.pending.as_ref()?;
+        let camera = state.cameras.iter().find(|c| unsafe { c.name() }.is_some_and(|n| n.to_string().contains(hint.as_str())))?.clone();
+        unsafe { camera.setDelegate(Some(ProtocolObject::from_ref(&*state.device_delegate))) };
+        state.pending = None;
+        state.active = Some(camera.clone());
+        Some(camera)
+    });
+    if let Some(camera) = camera {
+        unsafe { camera.requestOpenSession() };
+    }
+}
+
+/// An open session. Dropping it closes the session; the browser keeps running.
 pub(crate) struct Session {
-    events: std::sync::Mutex<std::sync::mpsc::Receiver<Event>>,
+    events: Mutex<Receiver<Event>>,
 }
 
 impl Session {
@@ -171,52 +233,41 @@ impl Session {
         if MainThreadMarker::new().is_some() {
             return Err(PtpError::Transport("camera calls must not run on the main thread".into()));
         }
+        if SESSION_ACTIVE.swap(true, Ordering::SeqCst) {
+            return Err(PtpError::Session("another camera session is already open".into()));
+        }
         let (tx, rx) = channel();
+        *EVENTS.lock().unwrap() = Some(tx);
+        // From here on, dropping `session` closes whatever was opened and releases SESSION_ACTIVE.
+        let session = Session { events: Mutex::new(rx) };
         let hint = hint.to_string();
-        let busy = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let busy2 = busy.clone();
         on_main(move || {
+            ensure_browser();
             STATE.with(|s| {
-                let mut s = s.borrow_mut();
-                if s.is_some() {
-                    busy2.store(true, Ordering::SeqCst);
-                    let _ = tx.send(Event::Removed);
-                    return;
+                if let Some(state) = s.borrow_mut().as_mut() {
+                    state.pending = Some(hint);
                 }
-                let device_delegate = DeviceDelegate::new(DeviceIvars { events: tx.clone() });
-                let browser_delegate = BrowserDelegate::new(BrowserIvars { hint, events: tx });
-                let browser = unsafe { ICDeviceBrowser::new() };
-                unsafe {
-                    browser.setDelegate(Some(ProtocolObject::from_ref(&*browser_delegate)));
-                    browser.setBrowsedDeviceTypeMask(ICDeviceTypeMask(ICDeviceTypeMask::Camera.0 | ICDeviceLocationTypeMask::Local.0));
-                }
-                *s = Some(MainState { browser: browser.clone(), _browser_delegate: browser_delegate, device_delegate, camera: None });
-                drop(s);
-                unsafe { browser.start() };
             });
+            try_open_pending();
         });
-        let session = Session { events: std::sync::Mutex::new(rx) };
-        match session.wait(timeout, "the camera to appear")? {
-            Event::Found => {}
-            _ if busy.load(Ordering::SeqCst) => return Err(PtpError::Session("another camera session is already open".into())),
-            _ => return Err(PtpError::NoCamera),
-        }
-        on_main(|| {
-            STATE.with(|s| {
-                if let Some(cam) = s.borrow().as_ref().and_then(|st| st.camera.clone()) {
-                    unsafe { cam.requestOpenSession() };
+        let got = session.events.lock().unwrap().recv_timeout(timeout + Duration::from_secs(20));
+        match got {
+            Ok(Event::Opened(Ok(()))) => Ok(session),
+            Ok(Event::Opened(Err(e))) => Err(PtpError::Session(e)),
+            Ok(_) => Err(PtpError::Session("camera disconnected".into())),
+            Err(_) => {
+                // Distinguish "never found" from "found but the session did not open".
+                let (found_tx, found_rx) = channel();
+                on_main(move || {
+                    let found = STATE.with(|s| s.borrow().as_ref().is_some_and(|st| st.active.is_some()));
+                    let _ = found_tx.send(found);
+                });
+                match found_rx.recv_timeout(Duration::from_secs(2)) {
+                    Ok(true) => Err(PtpError::Timeout("the session to open")),
+                    _ => Err(PtpError::NoCamera),
                 }
-            })
-        });
-        match session.wait(Duration::from_secs(20), "the session to open")? {
-            Event::Opened(Ok(())) => Ok(session),
-            Event::Opened(Err(e)) => Err(PtpError::Session(e)),
-            _ => Err(PtpError::Session("camera disconnected".into())),
+            }
         }
-    }
-
-    fn wait(&self, timeout: Duration, what: &'static str) -> Result<Event, PtpError> {
-        self.events.lock().unwrap().recv_timeout(timeout).map_err(|_| PtpError::Timeout(what))
     }
 
     /// Run one PTP transaction. Returns the response code and the data-in phase.
@@ -232,7 +283,7 @@ impl Session {
         }
         let (tx, rx) = channel::<Result<(u16, Vec<u8>), String>>();
         on_main(move || {
-            let camera = STATE.with(|s| s.borrow().as_ref().and_then(|st| st.camera.clone()));
+            let camera = STATE.with(|s| s.borrow().as_ref().and_then(|st| st.active.clone()));
             let Some(camera) = camera else {
                 let _ = tx.send(Err("camera is gone".into()));
                 return;
@@ -264,14 +315,20 @@ impl Session {
 impl Drop for Session {
     fn drop(&mut self) {
         on_main(|| {
-            STATE.with(|s| {
-                if let Some(st) = s.borrow_mut().take() {
-                    if let Some(cam) = &st.camera {
-                        unsafe { cam.requestCloseSession() };
-                    }
-                    unsafe { st.browser.stop() };
-                }
-            })
+            let camera = STATE.with(|s| {
+                let mut s = s.borrow_mut();
+                let state = s.as_mut()?;
+                state.pending = None;
+                state.active.take()
+            });
+            match camera {
+                Some(cam) => unsafe { cam.requestCloseSession() },
+                None => send(Event::Closed),
+            }
         });
+        // Wait for the close to finish so the next session can open the camera again.
+        let _ = self.events.lock().unwrap().recv_timeout(Duration::from_secs(5));
+        *EVENTS.lock().unwrap() = None;
+        SESSION_ACTIVE.store(false, Ordering::SeqCst);
     }
 }

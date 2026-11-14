@@ -15,6 +15,9 @@ import { WhatsNew } from './WhatsNew'
 import { usePrintTiming } from './usePrintTiming'
 import { EXPOSURE_SPAN, filmCastShift, formatShift, neutralControls, sameShift, shiftCode } from './printTiming'
 import './style.css'
+import { installAppLinkHandler, isApp, saveFile, serverUrl } from './platform.ts'
+import { LutManager } from './LutManager'
+import { CameraRegister } from './CameraRegister'
 
 const paths: Record<string, React.ReactNode> = {
   upload: <><path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v5h16v-5"/></>,
@@ -64,7 +67,7 @@ function Preview({ sample, combo, mode, resultPath, processingError, retry, look
   const error = blockedReason || (failed ? t("이미지를 불러오지 못했습니다. 다시 시도해 주세요.") : runtimeMessage(locale, processingError))
   const sampleName = sampleText(sample, 'name', locale)
   return <div className={`preview ${mode}`} aria-busy={(!ready || computing) && !error}>
-    <img className="preview-image" src={sample.path} alt={`${sampleName}: ${beforeLabel}`} onLoad={() => setSourceLoaded(true)} onError={() => setFailed(true)} />
+    <img className="preview-image" src={serverUrl(sample.path)} alt={`${sampleName}: ${beforeLabel}`} onLoad={() => setSourceLoaded(true)} onError={() => setFailed(true)} />
     {/* Kept mounted while hidden: an older layer's object URL may already be revoked, so it must not reload. */}
     {layers.length > 0 && <div className="result-image" style={{ clipPath: mode === 'compare' ? `inset(0 0 0 ${split}%)` : undefined, visibility: showResult ? undefined : 'hidden' }}>
       {layers.map(layer => <img key={layer.path} className={`preview-image result-layer${layer.loaded ? ' loaded' : ''}`} src={layer.path} alt={layer.path === resultPath ? t("{0}: {1} LUT 적용", [sampleName, lookLabel]) : ''} aria-hidden={layer.path !== resultPath || undefined} onLoad={() => layerLoaded(layer.path)} onError={() => { if (layer.path === resultPath) setFailed(true) }} />)}
@@ -85,9 +88,10 @@ function castDirection(hue: number) {
   return hue < 70 || hue >= 345 ? '따뜻한 주황·붉은' : hue < 110 ? '노란' : hue < 160 ? '연두' : hue < 200 ? '초록·청록' : hue < 260 ? '청록·푸른' : hue < 300 ? '보랏빛' : '분홍빛'
 }
 
-type View = 'studio' | 'gallery' | 'gallery/recommended'
+type View = 'studio' | 'gallery' | 'gallery/recommended' | 'luts'
 function viewFromHash(): View {
   if (window.location.hash === '#gallery/recommended') return 'gallery/recommended'
+  if (window.location.hash === '#luts' && isApp()) return 'luts'
   return window.location.hash === '#gallery' ? 'gallery' : 'studio'
 }
 
@@ -182,7 +186,7 @@ function App() {
   useEffect(() => {
     const controller = new AbortController()
     setLoadError('')
-    fetch('/catalog.json', { signal: controller.signal }).then(async r => {
+    fetch(serverUrl('/catalog.json'), { signal: controller.signal }).then(async r => {
       if (!r.ok) throw new Error(`카탈로그를 불러올 수 없습니다 (${r.status})`)
       const data = await r.json() as Catalog
       if (data.schemaVersion !== 2 || !data.films.length || !data.papers.length || !data.combinations.length) throw new Error('지원하지 않는 카탈로그입니다.')
@@ -237,12 +241,16 @@ function App() {
     try {
       if (format === 'zip') throw new Error('인화 필터를 조정한 LUT는 STD 또는 V-Log 파일로 내려받을 수 있습니다.')
       const text = await timing.bake(format, exportCameraId)
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }))
-      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      setNotice(`${filename} · 인화 필터 조정값으로 만든 파일을 다운로드했습니다.`)
+      if (await saveFile(filename, text, 'text/plain')) setNotice(`${filename} · 인화 필터 조정값으로 만든 파일을 다운로드했습니다.`)
     } catch (e) { setNotice(e instanceof Error ? e.message : '다운로드하지 못했습니다.') }
     finally { setDownloading(false) }
+  }
+
+  // Text of the selected STD or V-Log LUT, exactly what the download would save.
+  async function cameraCube(): Promise<string> {
+    if (format === 'zip' || !selectedAsset) throw new Error('STD 또는 V-Log 형식을 골라 주세요.')
+    if (timing.active) return timing.bake(format, exportCameraId)
+    return new TextDecoder().decode(await fetchVerifiedAsset(selectedAsset))
   }
 
   async function download(asset: Asset, filename: string) {
@@ -253,10 +261,7 @@ function App() {
         [selectStdAsset(combo, exportCameraId)!.name]: downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, 'std', exportCameraId, !!combo.castBaseId),
         [combo.files.vlog.name]: downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, 'vlog', exportCameraId, !!combo.castBaseId),
       }) : verified
-      const url = URL.createObjectURL(new Blob([buffer], { type: asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain' }))
-      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      setNotice(`${filename} · 검증된 파일을 다운로드했습니다.`)
+      if (await saveFile(filename, buffer, asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain')) setNotice(`${filename} · 검증된 파일을 다운로드했습니다.`)
     } catch (e) { setNotice(e instanceof Error ? e.message : '다운로드하지 못했습니다.') }
     finally { setDownloading(false) }
   }
@@ -309,9 +314,9 @@ function App() {
   }
 
   return <>
-    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view !== 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a></nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
-    <main className={view !== 'studio' ? 'gallery-main' : undefined}>
-      {view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
+    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}</nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
+    <main className={view.startsWith('gallery') ? 'gallery-main' : undefined}>
+      {view === 'luts' ? <LutManager t={t}/> : view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
       <div className="intro"><div className="studio-title"><h1>{t("스튜디오")}</h1><LutUsageGuide locale={locale} t={t}/></div><div className="catalog-stat"><b>{catalog.counts.ready + suppliedLooks.length}</b><span>{t("가지 컬러 조합")}<small>33³ LUT · sRGB</small></span></div></div>
       <div className="workspace">
         <aside id="film-library" className="film-library" ref={filmLibrary} tabIndex={-1} aria-label={t("필름 선택")}>
@@ -336,7 +341,7 @@ function App() {
             <span className="sr-only" role="status">{upload.loading ? t("사진을 읽고 있습니다.") : upload.photo ? t("{0} 사진을 불러왔습니다.", [upload.photo.sample.name]) : ''}</span>
           </div>
           <div className="samples-heading"><span className="section-label">{t("샘플로 둘러보기")}</span><span>{t("직접 촬영 · Standard / LUT OFF")}</span></div>
-          <div className="sample-grid">{catalog.samples.map(s => <button key={s.id} className={`sample-option ${sample.id === s.id ? 'selected' : ''}`} aria-pressed={sample.id === s.id} onClick={() => chooseSample(s.id)}><div><img src={s.thumbnailPath || s.path} alt="" loading="lazy"/>{sample.id === s.id && <span><Icon name="check" size={12}/></span>}</div><strong>{sampleText(s, 'name', locale)}</strong></button>)}</div>
+          <div className="sample-grid">{catalog.samples.map(s => <button key={s.id} className={`sample-option ${sample.id === s.id ? 'selected' : ''}`} aria-pressed={sample.id === s.id} onClick={() => chooseSample(s.id)}><div><img src={serverUrl(s.thumbnailPath || s.path)} alt="" loading="lazy"/>{sample.id === s.id && <span><Icon name="check" size={12}/></span>}</div><strong>{sampleText(s, 'name', locale)}</strong></button>)}</div>
           <div className="preview-note"><Icon name="info" size={15}/><p>{blockedReason ? t("카메라 입력을 확인하기 전에는 LUT를 적용하지 않습니다. 현재 사진은 원본입니다.") : activePhoto ? t("선택한 카메라의 STD LUT를 100% 적용합니다. 미리보기는 최대 2,048px입니다.") : sample.inputKind === 'synthetic-srgb' ? t("sRGB 테스트 패턴 · S1II STD 기준") : sample.inputKind === 'review-jpeg' ? t("리뷰 JPG에 선택한 다운로드용 STD LUT를 100% 적용합니다.") : t("Standard 샘플에는 S1II STD LUT를 100% 적용합니다.")} <button onClick={() => dialog.current?.showModal()}>{t("생성 방식")}</button></p></div>
           {sample.inputKind !== 'review-jpeg' && <div className="sample-credit">{sampleText(sample, 'credit', locale)}{sample.source && <a href={sample.source} target="_blank" rel="noreferrer">{t("출처")} <Icon name="external" size={10}/></a>}</div>}
         </section>
@@ -374,6 +379,7 @@ function App() {
             <button className="download-button" aria-label={t("{0} LUT 다운로드", [`${processLabel} · ${formatName}`])} title={selectedFilename} disabled={!selectedAsset || combo.status !== 'ready' || downloading} onClick={() => selectedAsset && void (timing.active ? downloadTiming(selectedFilename) : download(selectedAsset, selectedFilename))}><Icon name="download" size={18}/><span>{downloading ? t("파일 검증 중…") : combo.status === 'ready' ? t("LUT 다운로드") : t("다운로드 준비 전")}</span>{!downloading && <Icon name="arrow" size={17}/>}</button>
             <div className="download-meta">{selectedAsset ? <><span>{formatName}</span><span>{sizeLabel(selectedAsset.bytes)}</span></> : <span>{combo.status === 'unsupported' ? t("이 조합은 지원하지 않습니다.") : t("생성된 파일이 없습니다.")}</span>}</div>
             <p className="download-notice" role="status" aria-live="polite">{message(notice)}</p>
+            <CameraRegister t={t} filename={selectedFilename} format={format} ready={!!selectedAsset && combo.status === 'ready'} cameraAliases={camera?.aliases ?? []} cameraName={camera?.name || exportCameraId} getCube={cameraCube}/>
             <div className="camera-notice"><button onClick={() => dialog.current?.showModal()}><Icon name="info" size={16}/><span>{t("출처/라이선스")}</span></button></div>
           </div>
         </aside>
@@ -390,19 +396,20 @@ function App() {
         <h3>{t("후지 필름 시뮬레이션 · 제공된 STD LUT")}</h3><p>{t("ALL_FUJI_LUT 폴더에서 제공된 S1II Standard용 LUT입니다. RGB 데이터는 변경하지 않고 카메라 포토스타일과 기본 입력 범위 헤더만 명시했습니다.")}</p>
         <dl className="details-grid"><dt>{t("원본 LUT")}</dt><dd>{suppliedLook.sourceFile}</dd><dt>SHA-256</dt><dd><code>{suppliedLook.sourceSha256}</code></dd></dl>
         <p>{t("이 파일들은 사용자 제공 LUT이며 FUJIFILM 공식 원본 배포본으로 표시하지 않습니다. 별도 저작자·이용허락 정보는 제공되지 않았습니다.")}</p>
-        <div className="detail-links"><a href={catalog.suppliedFuji?.provenance.path} target="_blank" rel="noreferrer">{t("파일 출처 · 해시 ↗")}</a><a href={catalog.suppliedFuji?.notice.path} target="_blank" rel="noreferrer">{t("이용 안내 ↗")}</a></div>
+        <div className="detail-links"><a href={serverUrl(catalog.suppliedFuji?.provenance.path)} target="_blank" rel="noreferrer">{t("파일 출처 · 해시 ↗")}</a><a href={serverUrl(catalog.suppliedFuji?.notice.path)} target="_blank" rel="noreferrer">{t("이용 안내 ↗")}</a></div>
       </> : <>
         <h3>spektrafilm · Andrea Volpato</h3><p>{t("필름·인화지 프로파일은 spektrafilm에서 파생했습니다. 원본 라이선스와 생성 정보는 LUT 패키지에 포함됩니다.")}</p>
         <h3>V-Log Alchemy · shenmintao</h3><p>{t("선택한 카메라의 Standard → V-Log 변환과 필름·인화지 V-Log LUT를 합성합니다. 내보내는 STD 파일은 선택한 카메라에 맞춰집니다.")}</p><code>{catalog.cameraAdapters?.commit}</code>
         <p>{t("Standard의 클리핑과 색역 압축은 완전히 역변환할 수 없습니다. 잘린 하이라이트와 색은 복원하지 못합니다.")}</p>
         {combo.qa && <details><summary>{t("측정된 보간 오차")}</summary><p>{t("STD 합성 파일과 카메라 변환·V-Log 룩을 순서대로 적용한 결과의 출력 sRGB 오차입니다. 카메라나 실제 필름의 색 일치를 나타내는 점수가 아닙니다.")}</p><table><thead><tr><th>{t("비교")}</th><th>{t("평균")}</th><th>{t("99백분위")}</th><th>{t("최대")}</th></tr></thead><tbody>{[[`V-Log ↔ ${referenceLabel}`,combo.qa.vlogVsDirectEngine.tetrahedral],...(stdMetric ? [[t("STD 합성 ↔ 순차 적용 · 사면체"),stdMetric.tetrahedral],[t("STD 합성 ↔ 순차 적용 · 삼선형"),stdMetric.trilinear]] : [])].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{stdWarnings.map(w => <p key={w}>{message(w)}</p>)}</details>}
-        <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">spektrafilm ↗</a><a href={catalog.cameraAdapters?.sourceUrl} target="_blank" rel="noreferrer">V-Log Alchemy ↗</a><a href="/licenses/SPEKTRAFILM_LICENSE.txt" target="_blank" rel="noreferrer">{t("spektrafilm 라이선스 ↗")}</a><a href="/camera-adapters/V-Log-Alchemy-LICENSE.txt" target="_blank" rel="noreferrer">{t("카메라 변환 라이선스 ↗")}</a>{combo.files && <><a href={combo.files.qa.path} target="_blank" rel="noreferrer">{t("S1II 기본 QA 보고서 ↗")}</a><a href={combo.files.provenance.path} target="_blank" rel="noreferrer">{t("S1II 기본 생성 설정 · 해시 ↗")}</a></>}</div>
+        <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">spektrafilm ↗</a><a href={catalog.cameraAdapters?.sourceUrl} target="_blank" rel="noreferrer">V-Log Alchemy ↗</a><a href="/licenses/SPEKTRAFILM_LICENSE.txt" target="_blank" rel="noreferrer">{t("spektrafilm 라이선스 ↗")}</a><a href="/camera-adapters/V-Log-Alchemy-LICENSE.txt" target="_blank" rel="noreferrer">{t("카메라 변환 라이선스 ↗")}</a>{combo.files && <><a href={serverUrl(combo.files.qa.path)} target="_blank" rel="noreferrer">{t("S1II 기본 QA 보고서 ↗")}</a><a href={serverUrl(combo.files.provenance.path)} target="_blank" rel="noreferrer">{t("S1II 기본 생성 설정 · 해시 ↗")}</a></>}</div>
       </>}
       <h3>{t("사진과 미리보기")}</h3><p>{t("샘플과 갤러리 사진의 권리는 촬영자에게 있습니다. 샘플 미리보기는 S1II STD 기준이며, 갤러리는 촬영 당시 LUT가 적용된 JPG입니다.")}</p><p>{t("업로드 사진에는 내보내기에서 선택한 카메라의 STD LUT를 적용합니다. 사진은 브라우저 안에서 처리하며 서버에 저장하지 않습니다.")}</p>
-      {catalog.sourceCode && <div className="detail-links"><a href={catalog.sourceCode.path} download>{t("sosang 소스 코드 · GPLv3 ↓")}</a></div>}
+      {catalog.sourceCode && <div className="detail-links"><a href={serverUrl(catalog.sourceCode.path)} download>{t("sosang 소스 코드 · GPLv3 ↓")}</a></div>}
       </div>
     </dialog>
   </>
 }
 
+installAppLinkHandler()
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>)

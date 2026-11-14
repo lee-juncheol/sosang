@@ -1,0 +1,53 @@
+/* Desktop app only: the camera's LUT Library. */
+.lut-manager{max-width:1200px;margin:0 auto;padding:28px 0 60px;display:flex;flex-direction:column;gap:14px}
+.lut-manager-intro{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.lut-manager-intro h1{margin:0 0 6px;font-size:30px;letter-spacing:-.02em}
+.lut-manager-intro p{margin:0;max-width:640px;color:var(--muted);font-size:14px;line-height:1.55}
+.lut-manager-read,.lut-manager-primary{min-height:44px;padding:0 18px;border-radius:7px;font-size:14px;font-weight:600}
+.lut-manager-read{border:1px solid var(--accent);color:var(--accent)}
+.lut-manager-primary{background:var(--mint);color:#18291b;margin-top:6px}
+.lut-manager button:disabled{opacity:.45;cursor:default}
+.lut-manager button:focus-visible,.lut-manager input:focus-visible,.lut-manager select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lut-manager-status{margin:0;min-height:1.2em;font-size:13px;color:var(--accent)}
+.lut-manager-done,.lut-manager-error{padding:10px 14px;border-radius:7px;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.lut-manager-done{background:var(--accent-soft)}
+.lut-manager-error{background:#ff5a5a14;color:#ffb4b4}
+.lut-manager-done p,.lut-manager-error p{margin:0}
+.lut-manager-done small,.lut-manager-error small{display:block;margin-top:4px;color:var(--faint);font:11px var(--mono)}
+.lut-manager-body{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.lut-manager-list,.lut-manager-add{padding:18px 20px;background:var(--surface);border:1px solid var(--line-faint);border-radius:12px;min-width:0}
+.lut-manager-add{position:sticky;top:16px;display:flex;flex-direction:column;gap:8px}
+.lut-manager h2{margin:0;font-size:16px}
+.lut-manager-list-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.lut-manager-list-heading span{font-size:12px;color:var(--muted)}
+.lut-manager-warning{margin:0 0 8px;font-size:13px;line-height:1.5;color:#ffcf70}
+.lut-manager-note,.lut-manager-help{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--faint)}
+.lut-manager-help{margin:0 0 4px}
+.lut-manager table{width:100%;border-collapse:collapse;font-size:13px}
+.lut-manager th{text-align:left;font-weight:500;font-size:11px;color:var(--faint);padding:6px 8px;border-bottom:1px solid var(--line)}
+.lut-manager td{padding:5px 8px;border-bottom:1px solid var(--line-faint);vertical-align:middle;height:38px}
+.lut-manager tr.empty td{color:var(--faint)}
+.lut-manager tr.selected td{background:#9aff000a}
+.lut-manager tr.target td{background:#9aff0014}
+.lut-index{width:44px;font-family:var(--mono);color:var(--muted)}
+.lut-name{min-width:0;overflow-wrap:anywhere}
+.lut-name>span:first-child{margin-right:8px}
+.lut-empty{font-style:italic}
+.lut-badge{display:inline-block;margin-right:6px;padding:1px 7px;border-radius:999px;font-size:11px;background:var(--raised);color:var(--muted);white-space:nowrap}
+.lut-badge.selected{background:var(--accent-soft);color:var(--accent)}
+.lut-style{width:90px;color:var(--muted);white-space:nowrap}
+.lut-actions{width:150px;text-align:right;white-space:nowrap}
+.lut-actions button{min-height:30px;padding:0 10px;border:1px solid #414249;border-radius:6px;font-size:12px;color:var(--text)}
+.lut-actions button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.lut-actions button.danger{border-color:#ff7a7a;color:#ffb4b4}
+.lut-confirm{display:inline-flex;gap:6px}
+.lut-row-busy{font-size:12px;color:var(--accent)}
+.lut-manager-add select,.lut-manager-name{width:100%;min-height:42px;border:1px solid #414249;border-radius:6px;padding:0 10px;background:#17181b;color:var(--text);font-size:13px}
+.lut-manager-name{font-family:var(--mono)}
+.lut-manager-add input[type=file]{font-size:13px;color:var(--muted)}
+.lut-manager-add .output-label{display:block;margin:6px 0 0;font-size:12px;color:var(--muted)}
+.lut-manager-file{margin:0;font-size:12px;color:var(--accent);overflow-wrap:anywhere}
+.lut-manager-confirm{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;color:#ffcf70;cursor:pointer}
+.lut-manager-confirm input{margin-top:3px;accent-color:var(--accent)}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:900px){.lut-manager-body{grid-template-columns:minmax(0,1fr)}.lut-manager-add{position:static}}
