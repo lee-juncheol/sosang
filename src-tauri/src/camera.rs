@@ -6,7 +6,6 @@ use lumix_lut::parse_cube;
 use lumix_ptp::{delete_luts, register_luts, restore_settings, Camera, DeviceInfo, PtpError};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -17,8 +16,16 @@ const FIND_TIMEOUT: Duration = Duration::from_secs(5);
 /// Entries 0 (built-in Vlog_709) and 1 (ARRI 709) came with the camera; the app never changes them.
 const FIRST_USER_ENTRY: usize = 2;
 
+/// One camera operation at a time. An async-aware mutex so an app update can hold it across
+/// its download and keep camera writes out until the restart.
 #[derive(Default)]
-pub struct CameraLock(Mutex<()>);
+pub struct CameraLock(tauri::async_runtime::Mutex<()>);
+
+impl CameraLock {
+    pub(crate) fn try_lock(&self) -> Result<impl Send + '_, CommandError> {
+        self.0.try_lock().map_err(|_| CommandError::new("busy", "another camera operation is running"))
+    }
+}
 
 /// Error sent to the UI: a stable `code` to branch on and an English `message` for logs.
 #[derive(Debug, Serialize)]
@@ -120,7 +127,7 @@ pub struct RegisterResult {
 async fn with_camera<T: Send + 'static>(app: AppHandle, f: impl FnOnce(&AppHandle, &Camera) -> Result<T, CommandError> + Send + 'static) -> Result<T, CommandError> {
     tauri::async_runtime::spawn_blocking(move || {
         let lock = app.state::<CameraLock>();
-        let _guard = lock.0.try_lock().map_err(|_| CommandError::new("busy", "another camera operation is running"))?;
+        let _guard = lock.try_lock()?;
         let camera = Camera::open(NAME_HINT, FIND_TIMEOUT)?;
         f(&app, &camera)
     })

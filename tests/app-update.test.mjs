@@ -6,7 +6,7 @@ import path from 'node:path';
 import worker from '../server/worker.mjs';
 
 const APP_ORIGINS = ['tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost'];
-import { validateUpdateManifest, publishUpdateManifest } from '../scripts/app-update.mjs';
+import { validateUpdateManifest, publishUpdateManifest, hostedReleaseFiles } from '../scripts/app-update.mjs';
 
 const manifest = {
   version: '0.2.0',
@@ -73,6 +73,26 @@ test('update manifests need semver, signatures and https downloads', () => {
     { ...manifest, pub_date: 'yesterday' },
   ];
   for (const doc of bad) assert.throws(() => validateUpdateManifest(doc));
+});
+
+test('downloads on the sosang server must be release files, and are copied into the build', async () => {
+  const hosted = { ...manifest, platforms: { 'darwin-aarch64': { signature: 'c2ln', url: 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/sosang.app.tar.gz' } } };
+  assert.deepEqual(hostedReleaseFiles(hosted), ['releases/0.2.0/sosang.app.tar.gz']);
+  for (const url of ['https://sosang.film-lab-jc.workers.dev/catalog.json', 'https://sosang.film-lab-jc.workers.dev/app/releases/../latest.json', 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/a/b.tar.gz', 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/a.tar.gz?x=1']) {
+    assert.throws(() => validateUpdateManifest({ ...hosted, platforms: { 'darwin-aarch64': { signature: 'c2ln', url } } }), undefined, url);
+  }
+  const project = await fs.mkdtemp(path.join(os.tmpdir(), 'sosang-update-'));
+  const output = path.join(project, 'dist-cloudflare');
+  try {
+    await fs.mkdir(path.join(project, 'app-release/releases/0.2.0'), { recursive: true });
+    await fs.writeFile(path.join(project, 'app-release/latest.json'), JSON.stringify(hosted));
+    await assert.rejects(publishUpdateManifest(project, output), /ENOENT/, 'a missing download stops the build');
+    await fs.writeFile(path.join(project, 'app-release/releases/0.2.0/sosang.app.tar.gz'), 'bundle');
+    await fs.writeFile(path.join(project, 'app-release/releases/0.2.0/old.tar.gz'), 'not referenced');
+    assert.equal(await publishUpdateManifest(project, output), '0.2.0');
+    assert.equal(await fs.readFile(path.join(output, 'app/releases/0.2.0/sosang.app.tar.gz'), 'utf8'), 'bundle');
+    await assert.rejects(fs.access(path.join(output, 'app/releases/0.2.0/old.tar.gz')));
+  } finally { await fs.rm(project, { recursive: true, force: true }); }
 });
 
 test('the Cloudflare build publishes the release manifest only when there is one', async () => {

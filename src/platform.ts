@@ -62,7 +62,7 @@ export type CameraEntry = { index: number; name: string; styleCode: number; inUs
 export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number | null }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
-export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'internal'
+export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
 export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'restoring' | 'done'
 
 export class CameraError extends Error {
@@ -126,6 +126,25 @@ export const cameraListBackups = () => cameraCall<CameraBackup[]>('camera_list_b
 /** Write a backup back to the same camera (serial, model and firmware must match). */
 export function cameraRestoreBackup(id: string, onProgress?: (step: CameraProgress) => void): Promise<{ backup: string }> {
   return withProgress(() => cameraCall<{ backup: string }>('camera_restore_backup', { id }), onProgress)
+}
+
+// App updates (app only). Shapes match src-tauri/src/update.rs.
+export type AppUpdate = { version: string; currentVersion: string; notes: string | null }
+export type AppUpdateProgress = { downloaded: number; total: number | null }
+/** Newer version announced by the update server, or null when up to date. */
+export const appCheckUpdate = () => cameraCall<AppUpdate | null>('app_check_update')
+/** Download, verify and install the update, then restart the app (does not return on success). */
+export async function appInstallUpdate(onProgress?: (p: AppUpdateProgress) => void): Promise<void> {
+  let unlisten: (() => void) | undefined
+  if (onProgress) {
+    const { listen } = await import('@tauri-apps/api/event')
+    unlisten = await listen<AppUpdateProgress>('update-progress', event => onProgress(event.payload))
+  }
+  try {
+    await cameraCall<void>('app_install_update')
+  } finally {
+    unlisten?.()
+  }
 }
 
 /** Entries 0 (built-in Vlog_709) and 1 (ARRI 709) came with the camera and are never changed. */

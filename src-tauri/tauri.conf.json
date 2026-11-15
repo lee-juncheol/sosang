@@ -37,6 +37,7 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
     "category": "Photography",
     "copyright": "GPL-3.0-only",
     "icon": [
@@ -46,5 +47,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEyMzExRDU0ODA2QjlFRjIKUldUeW5tdUFWQjB4b3VFT0J2dUdKOEUyc3dnNm4vcTNua0tSOGlqVW5KVXltemZUaWtlM284aHEK",
+      "endpoints": ["https://sosang.film-lab-jc.workers.dev/app/latest.json"],
+      "requireSignedVersion": true
+    }
   }
 }
