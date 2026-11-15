@@ -19,7 +19,7 @@
 
 ## 진행 상황 (2026-11-05 Claude Code)
 
-- 배포 완료: https://sosang.film-lab-jc.workers.dev (현상 방법 ⓘ 레이어, Esc·바깥 클릭 닫힘, 슬라이더, 추천 현상 다운로드 확인).
+- 배포 완료: https://sosang.app (현상 방법 ⓘ 레이어, Esc·바깥 클릭 닫힘, 슬라이더, 추천 현상 다운로드 확인).
 - 임시 조각(`artifacts/print-timing/head.*`, `packs.part6`)과 백업 `artifacts/font-bump/`는 휴지통으로 옮김.
 - C200 추천 현상: 필름 데이터대로면 주황·노랑으로 남아 알려진 색과 반대여서, C200만 색상각 180°(초록~청록)로 방향을 지정함(`TARGET_HUE`, `docs/film-cast.md`). 다른 15종은 그대로.
 - 오래된 Python 테스트 정리(은퇴한 FUJI 공식 룩·이전 개수), 루트 `pytest.ini`로 napari 플러그인의 numba 충돌 해결. Python 327 통과·2 건너뜀, 웹 테스트 통과.

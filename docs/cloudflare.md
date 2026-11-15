@@ -31,7 +31,7 @@ npm run cloudflare:login -- --device --browser=false --scopes account:read user:
 
 `server/worker.mjs`는 언어 자동 선택을 위한 `GET /api/locale`과 데스크톱 앱 업데이트 정보 `GET /app/latest.json`만 처리한다. `wrangler.jsonc`의 `run_worker_first: ["/api/locale", "/app/latest.json"]`로 두 경로만 Worker를 먼저 실행하고, 그 외 요청은 기존 정적 자산 제공을 유지한다. Worker에 전달된 다른 경로도 `env.ASSETS.fetch(request)`로 넘긴다. 바인딩은 정적 파일용 `ASSETS` 하나이며 데이터베이스·KV·유료 서비스 바인딩은 추가하지 않는다. 기존 `workers_scripts:write` 배포 권한을 그대로 사용한다. 이 구성은 Cloudflare의 [선택 경로 Worker 실행 및 자산 바인딩](https://developers.cloudflare.com/workers/static-assets/binding/)을 따른다.
 
-기본 공개 주소는 **https://sosang.film-lab-jc.workers.dev/**이다. 새 Cloudflare 배포는 기존 Sites의 접근 권한이나 배포를 변경하지 않는다.
+기본 공개 주소는 **https://sosang.app/**이다. 이 도메인은 Cloudflare 대시보드에서 sosang Worker에 연결되어 있다(`wrangler.jsonc`에는 적지 않았다). 같은 Worker의 `https://sosang.film-lab-jc.workers.dev/`(`workers_dev: true`)도 그대로 둔다. 도메인은 만료 등으로 끊길 수 있으므로, 코드(데스크톱 앱의 화면 데이터와 업데이트 주소, 릴리스 스크립트, 구주소 리디렉션)는 일부러 workers.dev 주소를 쓴다. 문서와 공유 링크에만 sosang.app을 쓴다. 새 Cloudflare 배포는 기존 Sites의 접근 권한이나 배포를 변경하지 않는다.
 
 ## 데스크톱 앱
 
@@ -45,9 +45,9 @@ npm run cloudflare:login -- --device --browser=false --scopes account:read user:
 
 ## 주소 이전과 구주소 유지
 
-기존 `https://film-lab.film-lab-jc.workers.dev/`는 `wrangler.legacy.jsonc`의 `film-lab` Worker로 유지한다. 진입점은 `server/legacy-worker.mjs`이다. 구주소의 `/`와 `/index.html`에 대한 GET·HEAD 요청만 같은 경로의 새 호스트로 308 리디렉션하며 쿼리 문자열을 보존한다. `#studio` 같은 fragment는 서버에 전달되지 않으며 브라우저가 새 주소로 이어간다.
+기존 `https://film-lab.film-lab-jc.workers.dev/`는 `wrangler.legacy.jsonc`의 `film-lab` Worker로 유지한다. 진입점은 `server/legacy-worker.mjs`이다. 구주소의 `/`와 `/index.html`에 대한 GET·HEAD 요청만 같은 경로의 `sosang.film-lab-jc.workers.dev`로 308 리디렉션하며 쿼리 문자열을 보존한다. `#studio` 같은 fragment는 서버에 전달되지 않으며 브라우저가 새 주소로 이어간다.
 
-이미 열린 구주소 탭이 카탈로그·사진·LUT 파일을 계속 읽을 수 있도록 정적 자산과 `/api/locale`은 구주소에서도 제공한다. 구주소의 정적 자산 우선 처리는 의도된 구성이다. 공유한 파일 직접 링크도 유지하며, 새로 공유하는 사이트 주소에는 sosang 호스트를 사용한다.
+이미 열린 구주소 탭이 카탈로그·사진·LUT 파일을 계속 읽을 수 있도록 정적 자산과 `/api/locale`은 구주소에서도 제공한다. 구주소의 정적 자산 우선 처리는 의도된 구성이다. 공유한 파일 직접 링크도 유지하며, 새로 공유하는 사이트 주소에는 `sosang.app`을 사용한다.
 
 먼저 `npm run deploy:cloudflare`로 새 주소를 배포하고 홈페이지·언어 API·사진·LUT 다운로드를 확인한다. 확인이 끝난 뒤에만 같은 검증된 배포 자산으로 구주소 Worker를 별도로 배포한다. 다음 명령은 Node.js 22.12 이상에서 실행한다.
 

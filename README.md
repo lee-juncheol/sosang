@@ -57,7 +57,7 @@ npm run preview:cloudflare -- --port 4419
 npm run deploy:cloudflare
 ```
 
-기본 배포 대상은 `wrangler.jsonc`의 `sosang` Worker이며 공개 주소는 **https://sosang.film-lab-jc.workers.dev/**입니다. 기존 `https://film-lab.film-lab-jc.workers.dev/`의 홈페이지 접속은 새 주소로 이동합니다. 기존 탭과 직접 연결한 파일 링크가 계속 동작하도록 구주소의 정적 자산과 `/api/locale`은 유지합니다. 구주소 운영은 `wrangler.legacy.jsonc`로 분리하며, 새 주소 검증 후 별도로 배포합니다. [주소 이전과 배포 순서](docs/cloudflare.md#주소-이전과-구주소-유지)
+기본 배포 대상은 `wrangler.jsonc`의 `sosang` Worker이며 공개 주소는 **https://sosang.app/**입니다. 같은 Worker의 `https://sosang.film-lab-jc.workers.dev/`는 그대로 둡니다. 데스크톱 앱, 업데이트, 구주소 리디렉션은 도메인과 상관없이 이 주소를 씁니다. 기존 `https://film-lab.film-lab-jc.workers.dev/`의 홈페이지 접속은 workers.dev 주소로 이동합니다. 기존 탭과 직접 연결한 파일 링크가 계속 동작하도록 구주소의 정적 자산과 `/api/locale`은 유지합니다. 구주소 운영은 `wrangler.legacy.jsonc`로 분리하며, 새 주소 검증 후 별도로 배포합니다. [주소 이전과 배포 순서](docs/cloudflare.md#주소-이전과-구주소-유지)
 
 빌드와 배포는 별도 단계입니다. 카메라별 ZIP을 정적 자산으로 제공하며, 선택한 조합만 요청합니다. 브라우저는 ZIP과 내부 CUBE의 해시를 각각 검증하고 무손실 압축 해제합니다. 기본 기종의 개발용 raw CUBE 사본은 production에서 ZIP 참조로 바뀌며 색 데이터는 바뀌지 않습니다.
 
