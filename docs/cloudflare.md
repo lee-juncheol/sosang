@@ -40,6 +40,7 @@ npm run cloudflare:login -- --device --browser=false --scopes account:read user:
 - 정적 파일: `public/_headers`의 `/*` 규칙에 `Access-Control-Allow-Origin: *`를 둔다. 모두 공개 파일이고 쿠키나 인증을 쓰지 않으므로 출처를 가리지 않는다. 인증 정보를 함께 보내는 요청(`Allow-Credentials`)은 허용하지 않는다.
 - `/api/locale`: Worker가 앱 출처(`tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`)에만 `Access-Control-Allow-Origin`을 붙이고 `Vary: Origin`을 둔다.
 - `/app/latest.json`: Tauri 업데이터가 읽는 업데이트 정보다. 릴리스 단계가 `app-release/latest.json`을 만들면 `build:cloudflare`가 형식(버전, 플랫폼별 https 주소와 서명)을 검사한 뒤 `app/latest.json`으로 싣는다. 파일이 없으면 Worker가 `204 No Content`를 돌려주고, 업데이터는 이를 업데이트 없음으로 처리한다. `Cache-Control: no-cache`라서 새 릴리스가 바로 보인다.
+- 설치 파일(`sosang.app.tar.gz`, 약 6MB)은 같은 Worker의 `/app/releases/<버전>/`에 둔다. 빌드 검증은 `app/` 아래에 `latest.json`과 그것이 가리키는 파일만 있는지 확인한다.
 - `server/worker.mjs`는 함수와 기본 처리기만 내보낸다. 상수를 내보내면 Cloudflare 런타임이 진입점으로 잘못 읽어 Worker가 시작되지 않는다(`tests/app-update.test.mjs`에서 확인).
 
 ## 주소 이전과 구주소 유지
@@ -67,4 +68,21 @@ Worker는 Cloudflare가 제공하는 [`request.cf.country`](https://developers.c
 `public/_headers`는 내용 해시가 파일명에 들어간 `/assets/*`에만 1년 immutable 캐시를 설정한다. 고정 이름인 카탈로그·LUT ZIP·사진·소스 패키지는 Cloudflare 기본 ETag 재검증을 유지한다. 새 LUT와 오래된 ZIP의 혼합을 막기 위해 고정 경로에는 immutable을 사용하지 않는다. 압축과 캐시 응답 헤더는 실제 배포 후 확인한다.
 
 `scripts/package-source.mjs`는 허용한 소스와 라이선스만 묶어 `/source/film-lab-source.tar.gz`로 제공한다. 브라우저 코드와 함께 `server/worker.mjs`도 포함하고 필수 파일로 확인한다. 사진·LUT 데이터·인증 정보·개인용 배포 설정을 넣지 않는다. 사이트의 제작 정보에서 소스를 내려받을 수 있으며, 카탈로그에 패키지 크기와 SHA-256을 기록한다.
+
+## 앱 릴리스
+
+```
+npm run release:app -- --version 0.2.0 --notes "바뀐 점" --deploy
+```
+
+1. `--version`을 주면 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`의 버전을 함께 바꾼다. 세 값이 다르면 멈춘다.
+2. `tauri build --bundles app`으로 앱을 만들고 업데이트 서명 키로 서명한다. 키는 저장소 밖 `~/.tauri/sosang-updater.key`(또는 `TAURI_SIGNING_PRIVATE_KEY_PATH`)이고, 비밀번호는 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`가 없으면 실행 중에 묻는다. 공개 키는 `tauri.conf.json`의 `plugins.updater.pubkey`에 있다.
+3. 서명된 파일을 `app-release/releases/<버전>/`에, 업데이트 정보를 `app-release/latest.json`에 쓴다(`app-release/`는 git에서 제외).
+4. `--deploy`면 사이트를 다시 빌드해 함께 배포한다.
+
+- 서명에는 버전이 기록되고(`version:0.1.0`), 앱은 `requireSignedVersion`으로 업데이트 정보의 버전과 서명의 버전이 같은지 확인한다. 예전 서명 파일을 더 높은 버전으로 속여 내려보내는 것을 막는다.
+- 개인 키나 비밀번호를 잃으면 이미 설치된 앱에 업데이트를 보낼 수 없다. 따로 백업한다.
+- 앱은 시작 3초 뒤 한 번 확인하고, 카메라 작업 중에는 설치하지 않는다. 설치가 시작되면 다시 시작할 때까지 카메라 작업을 막는다.
+- macOS 공증은 아직 하지 않는다. 처음 설치할 때 경고가 뜨지만 설치된 앱의 자동 업데이트에는 영향이 없다.
+- 2026-11-15 확인: 0.0.9 시험 앱이 로컬 서버의 0.1.0을 알리고, 내려받아 서명을 확인한 뒤 설치하고 다시 시작했다.
 

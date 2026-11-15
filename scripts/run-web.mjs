@@ -30,5 +30,6 @@ else if (action==='test') { run(['--experimental-strip-types','--test','tests/lu
 else if (action==='build:app') { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build','--config','vite.app.config.ts']); }
 else if (action==='dev:app') { run(['node_modules/vite/bin/vite.js','--config','vite.app.config.ts']); }
 else if (action==='app:dev' || action==='app:build') { process.env.PATH=`${resolve(homedir(),'.cargo/bin')}:${process.env.PATH}`; run(['node_modules/@tauri-apps/cli/tauri.js',action==='app:dev'?'dev':'build',...process.argv.slice(3)]); }
+else if (action==='release:app') { run(['scripts/release-app.mjs',...process.argv.slice(3)]); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }

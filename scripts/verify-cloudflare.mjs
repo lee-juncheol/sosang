@@ -9,7 +9,7 @@ import { verifyCameraStd } from './verify-camera-std.mjs';
 import { verifyPrintTiming } from './verify-print-timing.mjs';
 import { verifyGallery } from './verify-gallery.mjs';
 import { verifySuppliedFuji } from './verify-supplied-fuji.mjs';
-import { validateUpdateManifest, APP_UPDATE_TARGET } from './app-update.mjs';
+import { validateUpdateManifest, hostedReleaseFiles, APP_UPDATE_TARGET } from './app-update.mjs';
 
 export const MAX_FILES = 20_000;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -126,8 +126,19 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
     const bytes = await fs.readFile(path.join(root, assetRelativePath(sample.path)));
     assert.equal(hash(bytes), sample.preparedSha256, `Changed sample: ${sample.id}`);
   }
-  for (const name of files.keys()) assert(!name.startsWith('app/') || name === APP_UPDATE_TARGET, `Unexpected file under app/: ${name}`);
-  const appVersion = files.has(APP_UPDATE_TARGET) ? validateUpdateManifest(JSON.parse(await fs.readFile(path.join(root, APP_UPDATE_TARGET), 'utf8'))) : null;
+  // app/ holds the update manifest and exactly the downloads it points at on this server.
+  let appVersion = null;
+  const appFiles = new Set();
+  if (files.has(APP_UPDATE_TARGET)) {
+    const manifest = JSON.parse(await fs.readFile(path.join(root, APP_UPDATE_TARGET), 'utf8'));
+    appVersion = validateUpdateManifest(manifest);
+    appFiles.add(APP_UPDATE_TARGET);
+    for (const file of hostedReleaseFiles(manifest)) {
+      assert(files.has(`app/${file}`), `Update download missing from the build: app/${file}`);
+      appFiles.add(`app/${file}`);
+    }
+  }
+  for (const name of files.keys()) assert(!name.startsWith('app/') || appFiles.has(name), `Unexpected file under app/: ${name}`);
   const headers = await fs.readFile(path.join(root, '_headers'), 'utf8');
   assert.match(headers, /^\/\*\n(?:  .+\n)*  Access-Control-Allow-Origin: \*$/m, 'Static files must allow cross-origin reads for the desktop app');
   assert(!/Access-Control-Allow-Credentials/i.test(headers), 'Static files must not allow credentialed cross-origin reads');
