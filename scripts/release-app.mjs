@@ -5,8 +5,12 @@
 // 1. Optionally set the version in package.json, src-tauri/Cargo.toml and tauri.conf.json
 //    (they must match: the updater compares against the version built into the app).
 // 2. `tauri build` with the updater signing key (outside the repository, see below), which
-//    makes sosang.app.tar.gz and its .sig.
-// 3. Copy the archive to app-release/releases/<version>/ and write app-release/latest.json.
+//    makes the signed update for this machine: sosang.app.tar.gz on macOS, the NSIS
+//    setup .exe on 64-bit Windows, each with its .sig.
+// 3. Copy it to app-release/releases/<version>/ and write app-release/latest.json. Platforms
+//    of the same version already in app-release/latest.json or published on the server are
+//    kept (their downloads are fetched), so macOS and Windows can be released one after the
+//    other from different machines with the same key.
 // 4. With --deploy, build and deploy the site, which publishes both under /app/.
 //
 // Signing key: TAURI_SIGNING_PRIVATE_KEY_PATH, default ~/.tauri/sosang-updater.key. Its
@@ -59,10 +63,49 @@ async function setVersion(version) {
   await swap(files.tauri, /("version":\s*")[^"]+(")/, `$1${version}$2`);
 }
 
-function platformKey() {
+/** What this machine builds: updater platform key, bundle type and the signed file it makes. */
+function target(version) {
   const arch = { arm64: 'aarch64', x64: 'x86_64' }[process.arch];
-  assert(process.platform === 'darwin' && arch, 'Releases are built on macOS for now');
-  return `darwin-${arch}`;
+  assert(arch, `Unsupported architecture: ${process.arch}`);
+  if (process.platform === 'darwin') {
+    // The updater needs sosang.app.tar.gz, not the DMG installer.
+    return { key: `darwin-${arch}`, bundle: 'app', file: path.join(root, 'target/release/bundle/macos/sosang.app.tar.gz'), name: `sosang_${version}_darwin-${arch}.app.tar.gz` };
+  }
+  if (process.platform === 'win32' && arch === 'x86_64') {
+    // The NSIS installer is both the first download and the update the updater runs.
+    return { key: 'windows-x86_64', bundle: 'nsis', file: path.join(root, `target/release/bundle/nsis/sosang_${version}_x64-setup.exe`), name: `sosang_${version}_windows-x86_64-setup.exe` };
+  }
+  assert.fail(`Releases are built on macOS or 64-bit Windows, not ${process.platform}-${process.arch}`);
+}
+
+/** Entries for the other platforms of the same version, so a release from one machine does not
+ *  drop what another machine already published. Their downloads are copied into releaseDir,
+ *  because the site build publishes only what app-release/ holds. */
+async function otherPlatforms(version, ownKey, releaseDir) {
+  const sources = [];
+  const local = await fs.readFile(path.join(root, APP_UPDATE_SOURCE), 'utf8').catch(() => null);
+  if (local) sources.push({ from: APP_UPDATE_SOURCE, doc: JSON.parse(local) });
+  const response = await fetch(`${APP_SERVER}/app/latest.json`, { cache: 'no-store' }).catch(() => null);
+  if (response?.status === 200) sources.push({ from: `${APP_SERVER}/app/latest.json`, doc: await response.json() });
+  const kept = {};
+  for (const { from, doc } of sources) {
+    if (doc.version !== version) continue;
+    validateUpdateManifest(doc);
+    for (const [key, entry] of Object.entries(doc.platforms)) {
+      if (key === ownKey || kept[key]) continue;
+      const url = new URL(entry.url);
+      const file = path.join(releaseDir, path.basename(url.pathname));
+      if (!existsSync(file)) {
+        assert.equal(url.origin, APP_SERVER, `${key} download is not on ${APP_SERVER}: ${url.href}`);
+        const got = await fetch(url);
+        assert(got.ok, `Could not download the published ${key} update (${got.status}): ${url.href}`);
+        await fs.writeFile(file, Buffer.from(await got.arrayBuffer()));
+      }
+      kept[key] = entry;
+      console.log(`Keeping ${key} ${version} from ${from}`);
+    }
+  }
+  return kept;
 }
 
 const requested = option('--version');
@@ -75,29 +118,28 @@ const keyPath = process.env.TAURI_SIGNING_PRIVATE_KEY_PATH || path.join(os.homed
 assert(existsSync(keyPath), `Updater signing key not found: ${keyPath}`);
 assert(!path.resolve(keyPath).startsWith(root + path.sep), 'Keep the signing key outside the repository');
 
-console.log(`Building sosang ${version} (${platformKey()})…`);
+const own = target(version);
+console.log(`Building sosang ${version} (${own.key})…`);
 process.env.PATH = `${path.join(os.homedir(), '.cargo', 'bin')}${path.delimiter}${process.env.PATH}`;
-// Only the .app bundle: the updater needs sosang.app.tar.gz, not the DMG installer.
-run(['node_modules/@tauri-apps/cli/tauri.js', 'build', '--bundles', 'app'], { TAURI_SIGNING_PRIVATE_KEY: keyPath });
+run(['node_modules/@tauri-apps/cli/tauri.js', 'build', '--bundles', own.bundle], { TAURI_SIGNING_PRIVATE_KEY: keyPath });
 
-const bundle = path.join(root, 'target/release/bundle/macos');
-const archive = path.join(bundle, 'sosang.app.tar.gz');
-const signature = (await fs.readFile(archive + '.sig', 'utf8')).trim();
-const fileName = `sosang_${version}_${platformKey()}.app.tar.gz`;
+const signature = (await fs.readFile(own.file + '.sig', 'utf8')).trim();
 const releaseDir = path.join(root, APP_RELEASE_DIR, 'releases', version);
 await fs.mkdir(releaseDir, { recursive: true });
-await fs.copyFile(archive, path.join(releaseDir, fileName));
+await fs.copyFile(own.file, path.join(releaseDir, own.name));
 
+const others = await otherPlatforms(version, own.key, releaseDir);
 const manifest = {
   version,
   notes: option('--notes') || '',
   pub_date: new Date().toISOString(),
-  platforms: { [platformKey()]: { signature, url: `${APP_SERVER}/app/releases/${version}/${fileName}` } },
+  platforms: { ...others, [own.key]: { signature, url: `${APP_SERVER}/app/releases/${version}/${own.name}` } },
 };
 validateUpdateManifest(manifest);
 await fs.writeFile(path.join(root, APP_UPDATE_SOURCE), JSON.stringify(manifest, null, 2) + '\n');
-const size = (await fs.stat(archive)).size;
-console.log(`Update ${version}: ${path.relative(root, path.join(releaseDir, fileName))} (${(size / 1024 / 1024).toFixed(1)} MB), ${APP_UPDATE_SOURCE}`);
+const size = (await fs.stat(own.file)).size;
+console.log(`Update ${version}: ${path.relative(root, path.join(releaseDir, own.name))} (${(size / 1024 / 1024).toFixed(1)} MB), ${APP_UPDATE_SOURCE}`);
+console.log(`Platforms in this release: ${Object.keys(manifest.platforms).sort().join(', ')}`);
 
 if (process.argv.includes('--deploy')) run(['scripts/run-web.mjs', 'deploy:cloudflare']);
 else console.log('Publish it with: npm run deploy:cloudflare');
