@@ -2,8 +2,9 @@
 //!
 //! The blob is what PTP vendor operation `0x9421` returns for property `0x080000A2`, and what
 //! `0x9422` accepts back. Layout facts were recovered from a DC-S1M2 on firmware 1.5 and are
-//! documented in `docs/camera-lut-library.md`. Only DC-S1M2 is accepted until other bodies are
-//! checked by reading their blobs.
+//! documented in `docs/camera-lut-library.md`. Other LUMIX bodies are accepted when their blob
+//! passes the same structure checks (items found by number, record sizes, checksum); which
+//! bodies may be written to is decided by the caller (`lumix-ptp`).
 //!
 //! Every write goes through [`SettingsBlob::with_lut`], which returns a new blob and refuses
 //! to produce one whose changes reach outside the chosen title entry, its LUT record and the
@@ -26,14 +27,17 @@ const TITLE_HEADER: usize = 8;
 const TITLE_NAME_BYTES: usize = 512;
 /// Link value of an empty title entry.
 const EMPTY_LINK: u16 = 0xFFFF;
-/// Selected Library entry + 1, stored three times. Observed on DC-S1M2 firmware 1.5 only
-/// (settings length 9,197,673): it follows the LUT chosen in the camera menu.
-const SELECTED_OFFSETS: [usize; 3] = [0x8B_FC84, 0x8B_FCA0, 0x8B_FCBC];
-const SELECTED_LAYOUT_LEN: usize = 9_197_673;
+/// Item holding the Library entry chosen in the camera menu, stored three times (item
+/// indices 0, 1, 2; payload 28 bytes; entry + 1 at payload byte 4). Observed on DC-S1M2
+/// firmware 1.5, where it follows the LUT chosen in the camera menu.
+const ITEM_SELECTED: u16 = 0x052F;
+const SELECTED_PAYLOAD: usize = 28;
+const SELECTED_AT: usize = 4;
 const LUT_RECORD_LEN: u32 = 0x34A4C; // grid u16 + flag u16 + 33^3*3 u16 + 2 pad bytes
 const LUT_DATA_BYTES: usize = LUT_ENTRIES * 6;
 const MODEL_OFFSET: usize = 0x1E;
-const SUPPORTED_MODELS: &[&str] = &["DC-S1M2"];
+/// Panasonic interchangeable-lens bodies report models like "DC-S1M2" or "DC-GH7".
+const MODEL_PREFIX: &str = "DC-";
 /// Longest title accepted, matching LUMIX Lab's file-name limit.
 pub const MAX_NAME_CHARS: usize = 95;
 
@@ -124,6 +128,7 @@ pub struct SettingsBlob {
     bytes: Vec<u8>,
     layout: Layout,
     model: String,
+    selected_at: Option<[usize; 3]>,
 }
 
 impl std::fmt::Debug for SettingsBlob {
@@ -147,10 +152,15 @@ fn checksum_for(bytes: &[u8]) -> u8 {
 
 /// Find exactly one item header `[id u16][index 0 u16][len u32]` whose payload passes `check`.
 fn find_item(b: &[u8], id: u16, check: impl Fn(usize, usize) -> bool) -> Result<usize, Error> {
+    find_item_at(b, id, 0, check)
+}
+
+/// Like [`find_item`] for item index `seq` (some items are stored several times).
+fn find_item_at(b: &[u8], id: u16, seq: u16, check: impl Fn(usize, usize) -> bool) -> Result<usize, Error> {
     let pat = id.to_le_bytes();
     let mut found = Vec::new();
     for o in 0x40..b.len().saturating_sub(8) {
-        if b[o] == pat[0] && b[o + 1] == pat[1] && u16_at(b, o + 2) == 0 {
+        if b[o] == pat[0] && b[o + 1] == pat[1] && u16_at(b, o + 2) == seq {
             let len = u32_at(b, o + 4) as usize;
             if o + 8 + len < b.len() && check(o + 8, len) {
                 found.push(o + 8);
@@ -183,7 +193,7 @@ impl SettingsBlob {
         }
         let model_raw = &bytes[MODEL_OFFSET..MODEL_OFFSET + 16];
         let model: String = model_raw.iter().take_while(|c| **c != 0).map(|c| *c as char).collect();
-        if !SUPPORTED_MODELS.contains(&model.as_str()) {
+        if !model.starts_with(MODEL_PREFIX) || model.len() <= MODEL_PREFIX.len() || !model.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
             return Err(Error::UnsupportedModel(model));
         }
 
@@ -210,7 +220,18 @@ impl SettingsBlob {
         if title_count != record_count {
             return Err(Error::Format(format!("{title_count} titles but {record_count} LUT records")));
         }
-        Ok(Self { bytes, layout, model })
+        let selected_at = Self::find_selected(&bytes);
+        Ok(Self { bytes, layout, model, selected_at })
+    }
+
+    /// Offsets of the three copies of the selected-entry byte, when the item is present.
+    fn find_selected(bytes: &[u8]) -> Option<[usize; 3]> {
+        let mut at = [0usize; 3];
+        for (seq, slot) in at.iter_mut().enumerate() {
+            let p = find_item_at(bytes, ITEM_SELECTED, seq as u16, |_, len| len == SELECTED_PAYLOAD).ok()?;
+            *slot = p + SELECTED_AT;
+        }
+        Some(at)
     }
 
     pub fn model(&self) -> &str {
@@ -364,11 +385,9 @@ impl SettingsBlob {
 
     /// Library entry selected in the camera menu, when it can be read for this layout.
     pub fn selected_entry(&self) -> Option<usize> {
-        if self.bytes.len() != SELECTED_LAYOUT_LEN || self.model != "DC-S1M2" {
-            return None;
-        }
-        let v = self.bytes[SELECTED_OFFSETS[0]];
-        if SELECTED_OFFSETS.iter().any(|&o| self.bytes[o] != v) || v == 0 || v as usize > self.layout.title_count {
+        let at = self.selected_at?;
+        let v = self.bytes[at[0]];
+        if at.iter().any(|&o| self.bytes[o] != v) || v == 0 || v as usize > self.layout.title_count {
             return None;
         }
         Some(v as usize - 1)
@@ -394,7 +413,11 @@ impl SettingsBlob {
             return Err(Error::Slot("an entry is listed twice".into()));
         }
         let entries = self.entries();
-        let selected = self.selected_entry();
+        // The camera changes its selection when the selected LUT is deleted, by a rule not yet
+        // known, so the selected entry is never deleted, and nothing is when it can't be read.
+        let Some(selected) = self.selected_entry() else {
+            return Err(Error::Slot("the LUT selected in the camera can't be read on this body, so deleting is not supported yet".into()));
+        };
         for &index in &unique {
             if index == 0 || index >= self.layout.title_count {
                 return Err(Error::Slot(format!("entry {index} is not a user slot (1..={})", self.layout.title_count - 1)));
@@ -402,7 +425,7 @@ impl SettingsBlob {
             if !entries[index].in_use {
                 return Err(Error::Slot(format!("entry {index} is already empty")));
             }
-            if selected == Some(index) {
+            if selected == index {
                 return Err(Error::Slot(format!("entry {index} is selected in the camera; choose another LUT there first")));
             }
         }

@@ -10,7 +10,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Empty hint: take the first USB camera; writes are still limited to verified models.
+/// Empty hint: take the first USB camera. Writes need a verified model and firmware, or the
+/// user's consent to an experimental write (`experimental`) on another Panasonic body.
 const NAME_HINT: &str = "";
 const FIND_TIMEOUT: Duration = Duration::from_secs(5);
 /// Entries 0 (built-in Vlog_709) and 1 (ARRI 709) came with the camera; the app never changes them.
@@ -40,11 +41,13 @@ impl From<PtpError> for CommandError {
             PtpError::Session(_) => "session",
             PtpError::NotVerified { .. } => "not_verified",
             PtpError::Settings(lumix_lut::Error::UnsupportedModel(_)) => "unsupported_model",
+            PtpError::Settings(lumix_lut::Error::Format(_)) => "unknown_layout",
             PtpError::Settings(lumix_lut::Error::Cube(_) | lumix_lut::Error::UnsupportedPhotoStyle(_)) => "bad_cube",
             PtpError::Settings(lumix_lut::Error::InvalidName(_)) => "bad_name",
             PtpError::Settings(lumix_lut::Error::Slot(_)) => "bad_slot",
             PtpError::Settings(lumix_lut::Error::Changed(_)) => "slot_changed",
             PtpError::Verify(_) => "verify_failed",
+            PtpError::RolledBack(_) => "rolled_back",
             PtpError::Unsupported => "unsupported_platform",
             _ => "camera_error",
         };
@@ -66,12 +69,21 @@ pub struct CameraStatus {
     firmware: String,
     /// Model and firmware are on the verified list, so registering is allowed.
     write_supported: bool,
+    /// Not verified, but a Panasonic body: writing is allowed as an experiment after consent.
+    write_experimental: bool,
 }
 
 impl From<&DeviceInfo> for CameraStatus {
     fn from(i: &DeviceInfo) -> Self {
         // The serial number stays in Rust; the UI has no use for it.
-        CameraStatus { manufacturer: i.manufacturer.clone(), model: i.model.clone(), firmware: i.version.clone(), write_supported: i.write_verified() }
+        let write_supported = i.write_verified();
+        CameraStatus {
+            manufacturer: i.manufacturer.clone(),
+            model: i.model.clone(),
+            firmware: i.version.clone(),
+            write_supported,
+            write_experimental: !write_supported && i.is_panasonic(),
+        }
     }
 }
 
@@ -91,7 +103,7 @@ pub struct Library {
     camera: CameraStatus,
     entries: Vec<LibraryEntry>,
     free_slots: Vec<usize>,
-    /// Entry chosen in the camera menu, when it can be read (DC-S1M2 firmware 1.5).
+    /// Entry chosen in the camera menu, when it can be read (deleting needs it).
     selected: Option<usize>,
 }
 
@@ -127,6 +139,13 @@ pub async fn camera_status(app: AppHandle) -> Result<CameraStatus, CommandError>
     with_camera(app, |_, camera| Ok(camera.info().into())).await
 }
 
+/// The user agreed to write to a body that is not verified.
+fn consent(camera: &Camera, experimental: bool) {
+    if experimental {
+        camera.allow_unverified_writes();
+    }
+}
+
 /// Read the LUT Library. Reads the whole settings file, about 6 s on DC-S1M2.
 #[tauri::command]
 pub async fn camera_list_luts(app: AppHandle) -> Result<Library, CommandError> {
@@ -148,7 +167,7 @@ pub async fn camera_list_luts(app: AppHandle) -> Result<Library, CommandError> {
 ///
 /// `expected` is what the caller last saw in the slot (`null` = empty); the write stops if
 /// the camera no longer matches.
-pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name: String, overwrite: bool, expected: Option<String>) -> Result<RegisterResult, CommandError> {
+pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name: String, overwrite: bool, expected: Option<String>, experimental: bool) -> Result<RegisterResult, CommandError> {
     if slot < FIRST_USER_ENTRY {
         return Err(CommandError::new("bad_slot", format!("entry {slot} came with the camera")));
     }
@@ -158,6 +177,7 @@ pub async fn camera_register_lut(app: AppHandle, cube: String, slot: usize, name
     lumix_lut::validate_name(&name)?;
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
+        consent(camera, experimental);
         let lut = lumix_lut::NewLut { index: slot, name: &name, style, lut: &cube.lut };
         let report = register_luts(camera, &[lut], overwrite, &[(slot, expected)], &backups, |step| {
             let _ = app.emit("camera-progress", step);
@@ -189,7 +209,7 @@ pub struct RegisterManyResult {
 /// Every file and slot is checked before the camera is touched; if one is refused, nothing
 /// is written. Emits `camera-progress` like `camera_register_lut`.
 #[tauri::command]
-pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, overwrite: bool) -> Result<RegisterManyResult, CommandError> {
+pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, overwrite: bool, experimental: bool) -> Result<RegisterManyResult, CommandError> {
     let mut parsed = Vec::with_capacity(items.len());
     let mut expected = Vec::with_capacity(items.len());
     for (i, item) in items.iter().enumerate() {
@@ -209,6 +229,7 @@ pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, ove
     }
     with_camera(app, move |app, camera| {
         let backups = backup_dir(app)?;
+        consent(camera, experimental);
         let luts: Vec<lumix_lut::NewLut> = parsed.iter().map(|(index, name, style, lut)| lumix_lut::NewLut { index: *index, name, style: *style, lut }).collect();
         let report = register_luts(camera, &luts, overwrite, &expected, &backups, |step| {
             let _ = app.emit("camera-progress", step);
@@ -242,7 +263,7 @@ pub struct DeleteResult {
 ///
 /// `names` are the names the caller saw in those slots, in the same order; the write stops if
 /// the camera no longer matches.
-pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>, names: Vec<String>) -> Result<DeleteResult, CommandError> {
+pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>, names: Vec<String>, experimental: bool) -> Result<DeleteResult, CommandError> {
     if let Some(slot) = slots.iter().find(|&&s| s < FIRST_USER_ENTRY) {
         return Err(CommandError::new("bad_slot", format!("entry {slot} came with the camera")));
     }
@@ -251,6 +272,7 @@ pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>, names: Vec<St
     }
     let expected: Vec<lumix_ptp::Expected> = slots.iter().copied().zip(names.into_iter().map(Some)).collect();
     with_camera(app, move |app, camera| {
+        consent(camera, experimental);
         let backups = backup_dir(app)?;
         let report = delete_luts(camera, &slots, &expected, &backups, |step| {
             let _ = app.emit("camera-progress", step);
