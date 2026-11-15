@@ -29,9 +29,18 @@ Node.js 22.12 이상을 사용한다. 첫 명령은 전용 출력 폴더 `dist-c
 npm run cloudflare:login -- --device --browser=false --scopes account:read user:read workers_scripts:write
 ```
 
-`server/worker.mjs`는 언어 자동 선택을 위한 `GET /api/locale`만 처리한다. `wrangler.jsonc`의 `run_worker_first: ["/api/locale"]`로 해당 경로만 Worker를 먼저 실행하고, 그 외 요청은 기존 정적 자산 제공을 유지한다. Worker에 전달된 다른 경로도 `env.ASSETS.fetch(request)`로 넘긴다. 바인딩은 정적 파일용 `ASSETS` 하나이며 데이터베이스·KV·유료 서비스 바인딩은 추가하지 않는다. 기존 `workers_scripts:write` 배포 권한을 그대로 사용한다. 이 구성은 Cloudflare의 [선택 경로 Worker 실행 및 자산 바인딩](https://developers.cloudflare.com/workers/static-assets/binding/)을 따른다.
+`server/worker.mjs`는 언어 자동 선택을 위한 `GET /api/locale`과 데스크톱 앱 업데이트 정보 `GET /app/latest.json`만 처리한다. `wrangler.jsonc`의 `run_worker_first: ["/api/locale", "/app/latest.json"]`로 두 경로만 Worker를 먼저 실행하고, 그 외 요청은 기존 정적 자산 제공을 유지한다. Worker에 전달된 다른 경로도 `env.ASSETS.fetch(request)`로 넘긴다. 바인딩은 정적 파일용 `ASSETS` 하나이며 데이터베이스·KV·유료 서비스 바인딩은 추가하지 않는다. 기존 `workers_scripts:write` 배포 권한을 그대로 사용한다. 이 구성은 Cloudflare의 [선택 경로 Worker 실행 및 자산 바인딩](https://developers.cloudflare.com/workers/static-assets/binding/)을 따른다.
 
 기본 공개 주소는 **https://sosang.film-lab-jc.workers.dev/**이다. 새 Cloudflare 배포는 기존 Sites의 접근 권한이나 배포를 변경하지 않는다.
+
+## 데스크톱 앱
+
+데스크톱 앱(`src-tauri`)은 화면 코드만 담고, 카탈로그·LUT·사진은 이 서버에서 읽는다. 앱 화면의 출처는 `tauri://localhost`(Windows는 `http://tauri.localhost`)라서 서버가 다른 출처의 읽기를 허용해야 한다.
+
+- 정적 파일: `public/_headers`의 `/*` 규칙에 `Access-Control-Allow-Origin: *`를 둔다. 모두 공개 파일이고 쿠키나 인증을 쓰지 않으므로 출처를 가리지 않는다. 인증 정보를 함께 보내는 요청(`Allow-Credentials`)은 허용하지 않는다.
+- `/api/locale`: Worker가 앱 출처(`tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`)에만 `Access-Control-Allow-Origin`을 붙이고 `Vary: Origin`을 둔다.
+- `/app/latest.json`: Tauri 업데이터가 읽는 업데이트 정보다. 릴리스 단계가 `app-release/latest.json`을 만들면 `build:cloudflare`가 형식(버전, 플랫폼별 https 주소와 서명)을 검사한 뒤 `app/latest.json`으로 싣는다. 파일이 없으면 Worker가 `204 No Content`를 돌려주고, 업데이터는 이를 업데이트 없음으로 처리한다. `Cache-Control: no-cache`라서 새 릴리스가 바로 보인다.
+- `server/worker.mjs`는 함수와 기본 처리기만 내보낸다. 상수를 내보내면 Cloudflare 런타임이 진입점으로 잘못 읽어 Worker가 시작되지 않는다(`tests/app-update.test.mjs`에서 확인).
 
 ## 주소 이전과 구주소 유지
 
