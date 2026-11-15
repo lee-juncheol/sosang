@@ -9,7 +9,7 @@
 //!       # write the .json record for an older backup of THIS camera (serial is not printed)
 //!
 //! Backups go to ./camera-backups/. ImageCaptureCore needs the main run loop, so the work runs
-//! on a second thread while the main thread spins NSRunLoop.
+//! on a second thread while the main thread spins NSRunLoop (on Windows it just waits).
 
 use lumix_lut::{parse_cube, BaseStyle, Lut33};
 use lumix_ptp::{register_lut, Camera};
@@ -94,4 +94,9 @@ fn main() {
     });
     #[cfg(target_os = "macos")]
     objc2_foundation::NSRunLoop::mainRunLoop().run();
+    // Elsewhere the main thread only waits; the worker thread exits the process.
+    #[cfg(not(target_os = "macos"))]
+    loop {
+        std::thread::park();
+    }
 }
