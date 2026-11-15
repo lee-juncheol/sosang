@@ -9,6 +9,7 @@ import { verifyCameraStd } from './verify-camera-std.mjs';
 import { verifyPrintTiming } from './verify-print-timing.mjs';
 import { verifyGallery } from './verify-gallery.mjs';
 import { verifySuppliedFuji } from './verify-supplied-fuji.mjs';
+import { validateUpdateManifest, APP_UPDATE_TARGET } from './app-update.mjs';
 
 export const MAX_FILES = 20_000;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -125,12 +126,17 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
     const bytes = await fs.readFile(path.join(root, assetRelativePath(sample.path)));
     assert.equal(hash(bytes), sample.preparedSha256, `Changed sample: ${sample.id}`);
   }
+  for (const name of files.keys()) assert(!name.startsWith('app/') || name === APP_UPDATE_TARGET, `Unexpected file under app/: ${name}`);
+  const appVersion = files.has(APP_UPDATE_TARGET) ? validateUpdateManifest(JSON.parse(await fs.readFile(path.join(root, APP_UPDATE_TARGET), 'utf8'))) : null;
+  const headers = await fs.readFile(path.join(root, '_headers'), 'utf8');
+  assert.match(headers, /^\/\*\n(?:  .+\n)*  Access-Control-Allow-Origin: \*$/m, 'Static files must allow cross-origin reads for the desktop app');
+  assert(!/Access-Control-Allow-Credentials/i.test(headers), 'Static files must not allow credentialed cross-origin reads');
   const gallery = await verifyGallery(root, catalog);
   const suppliedFuji = await verifySuppliedFuji(root, catalog);
   const cameraStd = await verifyCameraStd(root, catalog);
   const printTiming = await verifyPrintTiming(root, catalog);
   const largest = [...files].sort((a, b) => b[1] - a[1])[0];
-  return { passed: true, combinations: publicLooks, luts: cameraStd.luts + suppliedFuji.luts, assets, cameraStd, printTiming, suppliedFuji, gallery, jsonAssetReferences: references, files: files.size, bytes: [...files.values()].reduce((sum, size) => sum + size, 0), largestFile: { path: largest[0], bytes: largest[1] } };
+  return { passed: true, appVersion, combinations: publicLooks, luts: cameraStd.luts + suppliedFuji.luts, assets, cameraStd, printTiming, suppliedFuji, gallery, jsonAssetReferences: references, files: files.size, bytes: [...files.values()].reduce((sum, size) => sum + size, 0), largestFile: { path: largest[0], bytes: largest[1] } };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
