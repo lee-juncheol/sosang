@@ -1,7 +1,7 @@
 [package]
 name = "lumix-ptp"
 version = "0.1.0"
-description = "PTP transport for LUMIX cameras (macOS: ImageCaptureCore)."
+description = "PTP transport for LUMIX cameras (macOS: ImageCaptureCore, Windows: WPD)."
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,9 @@ objc2 = "0.6"
 objc2-core-graphics = { version = "0.3", default-features = false, features = ["CGImage"] }
 objc2-foundation = { version = "0.3", features = ["NSData", "NSError", "NSArray", "NSDictionary", "NSString", "NSRunLoop", "NSDate", "NSObject"] }
 objc2-image-capture-core = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Devices_PortableDevices", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 objc2-foundation = { version = "0.3", features = ["NSRunLoop"] }

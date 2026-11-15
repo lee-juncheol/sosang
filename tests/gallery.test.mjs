@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { assertPhotoContract, assertRecommendedContract, inspectWebp, verifyGallery, RECOMMENDED_MANIFEST } from '../scripts/verify-gallery.mjs';
 
-const root = path.resolve(new URL('../public', import.meta.url).pathname);
+const root = fileURLToPath(new URL('../public', import.meta.url));
 async function current() {
   return {
     gallery: JSON.parse(await fs.readFile(path.join(root, 'gallery/manifest.json'), 'utf8')),

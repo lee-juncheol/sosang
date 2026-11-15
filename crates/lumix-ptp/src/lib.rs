@@ -9,6 +9,9 @@
 //! (raw USB access is blocked by it). ImageCaptureCore delivers callbacks on the main run
 //! loop, so every call here must come from a thread other than the main thread, and the main
 //! thread must be running its run loop (a Tauri app does; the `probe` example shows a CLI).
+//!
+//! On Windows the camera stays on the built-in MTP driver and is reached through Windows
+//! Portable Devices (WPD) vendor-extension commands, from a worker thread per session.
 
 use lumix_lut::{BaseStyle, Lut33, NewLut, SettingsBlob, SETTINGS_PROP};
 use std::path::{Path, PathBuf};
@@ -16,6 +19,12 @@ use std::time::Duration;
 
 #[cfg(target_os = "macos")]
 mod mac;
+#[cfg(target_os = "macos")]
+use self::mac as backend;
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use self::windows as backend;
 
 const OP_GET_DEVICE_INFO: u16 = 0x1001;
 const OP_READ_SETTINGS: u16 = 0x9421;
@@ -55,7 +64,7 @@ impl std::fmt::Display for PtpError {
             PtpError::Verify(m) => write!(f, "read-back check failed: {m}"),
             PtpError::RolledBack(m) => write!(f, "read-back check failed ({m}); the settings from before the write were written back"),
             PtpError::Io(e) => write!(f, "{e}"),
-            PtpError::Unsupported => write!(f, "camera access is only implemented on macOS so far"),
+            PtpError::Unsupported => write!(f, "camera access is only implemented on macOS and Windows so far"),
         }
     }
 }
@@ -93,14 +102,14 @@ impl DeviceInfo {
 /// Start USB camera discovery in the background (call once at app start; safe to call again).
 /// A freshly started browser can take a while to report a camera that is already connected.
 pub fn start_discovery() {
-    #[cfg(target_os = "macos")]
-    mac::start_discovery();
+    #[cfg(any(target_os = "macos", windows))]
+    backend::start_discovery();
 }
 
 /// An open PTP session with one camera.
 pub struct Camera {
-    #[cfg(target_os = "macos")]
-    inner: mac::Session,
+    #[cfg(any(target_os = "macos", windows))]
+    inner: backend::Session,
     info: DeviceInfo,
     /// The user accepted writing to a model/firmware that is not on [`VERIFIED_FOR_WRITE`].
     unverified_ok: std::cell::Cell<bool>,
@@ -109,15 +118,15 @@ pub struct Camera {
 impl Camera {
     /// Find the first USB camera whose name contains `name_hint` and open a session.
     pub fn open(name_hint: &str, timeout: Duration) -> Result<Camera, PtpError> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
-            let inner = mac::Session::open(name_hint, timeout)?;
+            let inner = backend::Session::open(name_hint, timeout)?;
             let (code, data) = inner.transaction(OP_GET_DEVICE_INFO, &[], None, Duration::from_secs(10))?;
             check(OP_GET_DEVICE_INFO, code)?;
             let info = parse_device_info(&data).ok_or_else(|| PtpError::Transport("malformed DeviceInfo".into()))?;
             Ok(Camera { inner, info, unverified_ok: std::cell::Cell::new(false) })
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         {
             let _ = (name_hint, timeout);
             Err(PtpError::Unsupported)
@@ -146,13 +155,13 @@ impl Camera {
 
     /// Read the whole settings file (about 9 MB on DC-S1M2; takes a few seconds).
     pub fn read_settings(&self) -> Result<SettingsBlob, PtpError> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
             let (code, data) = self.inner.transaction(OP_READ_SETTINGS, &[SETTINGS_PROP], None, Duration::from_secs(60))?;
             check(OP_READ_SETTINGS, code)?;
             Ok(SettingsBlob::parse(data)?)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         Err(PtpError::Unsupported)
     }
 
@@ -170,12 +179,12 @@ impl Camera {
         if blob.model() != self.info.model {
             return Err(PtpError::Verify(format!("settings are for {}, the camera is {}", blob.model(), self.info.model)));
         }
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
             let (code, _) = self.inner.transaction(OP_WRITE_SETTINGS, &[SETTINGS_PROP], Some(blob.as_bytes().to_vec()), Duration::from_secs(120))?;
             check(OP_WRITE_SETTINGS, code)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         Err(PtpError::Unsupported)
     }
 }
