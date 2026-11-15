@@ -40,6 +40,7 @@ function run(args, env = {}) {
 
 const files = {
   package: path.join(root, 'package.json'),
+  lock: path.join(root, 'package-lock.json'),
   cargo: path.join(root, 'src-tauri/Cargo.toml'),
   tauri: path.join(root, 'src-tauri/tauri.conf.json'),
 };
@@ -61,6 +62,11 @@ async function setVersion(version) {
   await swap(files.package, /("version":\s*")[^"]+(")/, `$1${version}$2`);
   await swap(files.cargo, /^version = "[^"]+"/m, `version = "${version}"`);
   await swap(files.tauri, /("version":\s*")[^"]+(")/, `$1${version}$2`);
+  // package-lock.json repeats the root version at the top and under packages[""].
+  const lock = JSON.parse(await fs.readFile(files.lock, 'utf8'));
+  lock.version = version;
+  if (lock.packages?.['']) lock.packages[''].version = version;
+  await fs.writeFile(files.lock, JSON.stringify(lock, null, 2) + '\n');
 }
 
 /** What this machine builds: updater platform key, bundle type and the signed file it makes. */
