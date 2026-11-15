@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react'
 import type { Translate } from './i18n'
-import { errorText } from './CameraRegister'
+import { errorText, ExperimentalConsent } from './CameraRegister'
 import { CameraBusyOverlay } from './CameraBusyOverlay'
 import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
 import './lutManager.css'
@@ -33,6 +33,7 @@ export function LutManager({ t }: { t: Translate }) {
   const [preferSlot, setPreferSlot] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
   const [confirmOverwrite, setConfirmOverwrite] = useState(false)
+  const [experimentalOk, setExperimentalOk] = useState(false)
   const nextId = useRef(1)
   const [backups, setBackups] = useState<CameraBackup[] | null>(null)
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
@@ -46,6 +47,7 @@ export function LutManager({ t }: { t: Translate }) {
     setBusy({ kind: 'reading' }); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false); setChecked(new Set())
     try {
       const next = await cameraListLuts()
+      if (!library || library.camera.model !== next.camera.model || library.camera.firmware !== next.camera.firmware) setExperimentalOk(false)
       setLibrary(next)
       setQueue(current => assignSlots(current.map(q => ({ ...q, slot: null })), next, null))
     } catch (e) { fail(e) }
@@ -56,7 +58,7 @@ export function LutManager({ t }: { t: Translate }) {
     if (!library || !indices.length) return
     setBusy({ kind: 'deleting', indices }); setStep(null); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false)
     try {
-      const result = await cameraDelete(indices, indices.map(i => library.entries[i].name), setStep)
+      const result = await cameraDelete(indices, indices.map(i => library.entries[i].name), experimental, setStep)
       const gone = new Set(result.deleted.map(d => d.index))
       setDone({ kind: 'deleted', entries: result.deleted, backup: result.backup })
       setLibrary({
@@ -132,7 +134,7 @@ export function LutManager({ t }: { t: Translate }) {
     const items = ready.map(q => ({ cube: q.text, slot: q.slot!, name: q.name, expected: library.entries[q.slot!]?.inUse ? library.entries[q.slot!].name : null }))
     setBusy({ kind: 'adding', indices: items.map(i => i.slot) }); setStep(null); setError(null); setDone(null)
     try {
-      const result = await cameraRegisterMany(items, overwrites.length > 0, setStep)
+      const result = await cameraRegisterMany(items, overwrites.length > 0, experimental, setStep)
       setDone({ kind: 'added', entries: result.registered, backup: result.backup })
       const styles = new Map(ready.map(q => [q.slot!, q.style === 'STD' ? 0 : 49]))
       const names = new Map(result.registered.map(r => [r.index, r.name]))
@@ -172,7 +174,10 @@ export function LutManager({ t }: { t: Translate }) {
     return action
   }
 
-  const canWrite = !!library?.camera.writeSupported
+  const experimental = !!library && !library.camera.writeSupported && library.camera.writeExperimental
+  const canWrite = !!library && (library.camera.writeSupported || (experimental && experimentalOk))
+  /** Deleting needs to know which LUT the camera has selected (it is never deleted). */
+  const canDeleteAny = canWrite && library?.selected != null
   const ready = queue.filter(q => !q.error)
   const slotCounts = new Map<number, number>()
   for (const q of ready) if (q.slot !== null) slotCounts.set(q.slot, (slotCounts.get(q.slot) ?? 0) + 1)
@@ -182,10 +187,11 @@ export function LutManager({ t }: { t: Translate }) {
   const progress = busy?.kind === 'reading' ? t("카메라의 LUT 목록을 읽는 중… (약 6초)")
     : busy && step === 'writing' ? t("카메라에 쓰는 중… 케이블을 빼거나 카메라를 끄지 마세요.")
     : busy && step === 'verifying' ? t("다시 읽어 확인하는 중…")
+    : busy && step === 'restoring' ? t("확인에 실패해 이전 설정으로 되돌리는 중… 케이블을 빼지 마세요.")
     : busy ? t("카메라 설정을 읽고 백업하는 중…")
     : ''
   const used = library ? library.entries.filter(e => e.inUse).length : 0
-  const deletable = library ? library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && e.index !== library.selected) : []
+  const deletable = library && canDeleteAny ? library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && e.index !== library.selected) : []
   const checkedEntries = deletable.filter(e => checked.has(e.index))
   const allChecked = deletable.length > 0 && checkedEntries.length === deletable.length
   const doneText = !done ? ''
@@ -218,8 +224,10 @@ export function LutManager({ t }: { t: Translate }) {
           <h2 id="lut-list-title">{t("카메라 LUT 목록")}</h2>
           <span>{library.camera.model} · {t("펌웨어 {0}", [library.camera.firmware])} · {t("{0}개 사용 · 빈 칸 {1}개", [used, library.freeSlots.length])}</span>
         </div>
-        {!canWrite && <p className="lut-manager-warning">{t("{0} 펌웨어 {1}에는 아직 등록하거나 지울 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])}</p>}
-        {canWrite && deletable.length > 0 && <div className={`lut-bulk${checkedEntries.length ? ' active' : ''}`} role="region" aria-label={t("여러 개 지우기")}>
+        {experimental ? <ExperimentalConsent t={t} camera={library.camera} checked={experimentalOk} disabled={!!busy} onChange={setExperimentalOk} className="lut-manager-confirm lut-manager-experimental"/>
+          : !canWrite && <p className="lut-manager-warning">{t("{0} 펌웨어 {1}에는 아직 등록하거나 지울 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])}</p>}
+        {canWrite && library.selected == null && <p className="lut-manager-note">{t("이 카메라에서는 선택된 LUT를 읽지 못해 지우기를 막아 두었습니다. 넣기는 할 수 있습니다.")}</p>}
+        {canDeleteAny && deletable.length > 0 && <div className={`lut-bulk${checkedEntries.length ? ' active' : ''}`} role="region" aria-label={t("여러 개 지우기")}>
           {confirmBulk ? <>
             <p>{t("선택한 LUT {0}개를 지웁니다: {1}", [checkedEntries.length, checkedEntries.map(e => `${e.index} ${e.name}`).join(', ')])}</p>
             <span className="lut-confirm">
@@ -235,13 +243,13 @@ export function LutManager({ t }: { t: Translate }) {
           </>}
         </div>}
         <table>
-          <thead><tr><th scope="col" className="lut-check">{canWrite && deletable.length > 0 && <input type="checkbox" aria-label={t("지울 수 있는 LUT 모두 선택")} checked={allChecked} disabled={!!busy}
+          <thead><tr><th scope="col" className="lut-check">{canDeleteAny && deletable.length > 0 && <input type="checkbox" aria-label={t("지울 수 있는 LUT 모두 선택")} checked={allChecked} disabled={!!busy}
             onChange={e => { setChecked(e.target.checked ? new Set(deletable.map(d => d.index)) : new Set()); setConfirmBulk(false); setDone(null) }}/>}</th><th scope="col">{t("번호")}</th><th scope="col">{t("이름")}</th><th scope="col">{t("기준")}</th><th scope="col"><span className="visually-hidden">{t("작업")}</span></th></tr></thead>
           <tbody>{library.entries.map(entry => {
             const builtIn = entry.index < FIRST_USER_ENTRY
             const selected = library.selected === entry.index
             const rowBusy = busy && busy.kind !== 'reading' && busy.indices.includes(entry.index)
-            const canDelete = canWrite && entry.inUse && !builtIn && !selected
+            const canDelete = canDeleteAny && entry.inUse && !builtIn && !selected
             return <tr key={entry.index} className={`${entry.inUse ? '' : 'empty'}${selected ? ' selected' : ''}${queuedSlots.has(entry.index) ? ' target' : ''}`}>
               <td className="lut-check">{canDelete && <input type="checkbox" aria-label={t("{0}번 ‘{1}’ 선택", [entry.index, entry.name])} checked={checked.has(entry.index)} disabled={!!busy} onChange={e => toggle(entry.index, e.target.checked)}/>}</td>
               <td className="lut-index">{entry.index}</td>
@@ -255,7 +263,7 @@ export function LutManager({ t }: { t: Translate }) {
                     <button type="button" className="danger" disabled={!!busy} onClick={() => void remove([entry.index])}>{t("지우기")}</button>
                     <button type="button" disabled={!!busy} onClick={() => setConfirmDelete(null)}>{t("취소")}</button>
                   </span>
-                  : entry.inUse && !builtIn ? <button type="button" disabled={!!busy || !canWrite || selected} title={selected ? t("카메라에서 다른 LUT를 고른 뒤 지울 수 있습니다.") : undefined}
+                  : entry.inUse && !builtIn ? <button type="button" disabled={!!busy || !canDeleteAny || selected} title={selected ? t("카메라에서 다른 LUT를 고른 뒤 지울 수 있습니다.") : undefined}
                     aria-label={t("{0}번 ‘{1}’ 지우기", [entry.index, entry.name])} onClick={() => { setConfirmDelete(entry.index); setConfirmBulk(false); setDone(null) }}>{t("삭제")}</button>
                   : !entry.inUse ? <button type="button" disabled={!!busy || !canWrite} aria-label={t("{0}번 칸에 넣기", [entry.index])} onClick={() => { setPreferSlot(entry.index); fileInput.current?.click() }}>{t("여기에 넣기")}</button>
                   : null}

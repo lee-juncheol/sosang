@@ -36,6 +36,8 @@ pub enum PtpError {
     Settings(lumix_lut::Error),
     NotVerified { model: String, version: String },
     Verify(String),
+    /// The read-back check failed and the settings read before the write were written back.
+    RolledBack(String),
     Io(std::io::Error),
     Unsupported,
 }
@@ -51,6 +53,7 @@ impl std::fmt::Display for PtpError {
             PtpError::Settings(e) => write!(f, "{e}"),
             PtpError::NotVerified { model, version } => write!(f, "writing to {model} firmware {version} has not been verified"),
             PtpError::Verify(m) => write!(f, "read-back check failed: {m}"),
+            PtpError::RolledBack(m) => write!(f, "read-back check failed ({m}); the settings from before the write were written back"),
             PtpError::Io(e) => write!(f, "{e}"),
             PtpError::Unsupported => write!(f, "camera access is only implemented on macOS so far"),
         }
@@ -80,6 +83,11 @@ impl DeviceInfo {
     pub fn write_verified(&self) -> bool {
         VERIFIED_FOR_WRITE.iter().any(|(m, v)| *m == self.model && *v == self.version)
     }
+
+    /// A Panasonic body; writes to one that is not verified need [`Camera::allow_unverified_writes`].
+    pub fn is_panasonic(&self) -> bool {
+        self.manufacturer.to_ascii_lowercase().contains("panasonic")
+    }
 }
 
 /// Start USB camera discovery in the background (call once at app start; safe to call again).
@@ -94,6 +102,8 @@ pub struct Camera {
     #[cfg(target_os = "macos")]
     inner: mac::Session,
     info: DeviceInfo,
+    /// The user accepted writing to a model/firmware that is not on [`VERIFIED_FOR_WRITE`].
+    unverified_ok: std::cell::Cell<bool>,
 }
 
 impl Camera {
@@ -105,7 +115,7 @@ impl Camera {
             let (code, data) = inner.transaction(OP_GET_DEVICE_INFO, &[], None, Duration::from_secs(10))?;
             check(OP_GET_DEVICE_INFO, code)?;
             let info = parse_device_info(&data).ok_or_else(|| PtpError::Transport("malformed DeviceInfo".into()))?;
-            Ok(Camera { inner, info })
+            Ok(Camera { inner, info, unverified_ok: std::cell::Cell::new(false) })
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -116,6 +126,22 @@ impl Camera {
 
     pub fn info(&self) -> &DeviceInfo {
         &self.info
+    }
+
+    /// Allow LUT writes to this Panasonic body although its model and firmware are not on
+    /// [`VERIFIED_FOR_WRITE`] (experimental; the user must agree first). Every write still
+    /// backs up, passes the scope guard and is read back, and a failed read-back is undone.
+    pub fn allow_unverified_writes(&self) {
+        self.unverified_ok.set(true);
+    }
+
+    /// LUT writes are allowed: a verified body, or a Panasonic body the user accepted.
+    pub fn may_write(&self) -> bool {
+        self.info.write_verified() || (self.unverified_ok.get() && self.info.is_panasonic())
+    }
+
+    fn not_verified(&self) -> PtpError {
+        PtpError::NotVerified { model: self.info.model.clone(), version: self.info.version.clone() }
     }
 
     /// Read the whole settings file (about 9 MB on DC-S1M2; takes a few seconds).
@@ -132,8 +158,17 @@ impl Camera {
 
     /// Write a validated settings file back (about 11 s on DC-S1M2).
     pub fn write_settings(&self, blob: &SettingsBlob) -> Result<(), PtpError> {
-        if !self.info.write_verified() || blob.model() != self.info.model {
-            return Err(PtpError::NotVerified { model: self.info.model.clone(), version: self.info.version.clone() });
+        if !self.may_write() {
+            return Err(self.not_verified());
+        }
+        self.write_camera_settings(blob)
+    }
+
+    /// Write settings of this camera's model without the write-permission check: used to put
+    /// back settings the camera itself produced (a backup or the state before a failed write).
+    fn write_camera_settings(&self, blob: &SettingsBlob) -> Result<(), PtpError> {
+        if blob.model() != self.info.model {
+            return Err(PtpError::Verify(format!("settings are for {}, the camera is {}", blob.model(), self.info.model)));
         }
         #[cfg(target_os = "macos")]
         {
@@ -212,8 +247,8 @@ pub fn register_luts(
     backup_dir: &Path,
     mut progress: impl FnMut(&str),
 ) -> Result<RegisterManyReport, PtpError> {
-    if !camera.info.write_verified() {
-        return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
+    if !camera.may_write() {
+        return Err(camera.not_verified());
     }
     progress("reading");
     let current = camera.read_settings()?;
@@ -228,18 +263,35 @@ pub fn register_luts(
     progress("verifying");
     let after = camera.read_settings()?;
     let entries = after.entries();
-    for l in luts {
-        let entry = &entries[l.index];
+    let mismatch = luts.iter().find_map(|l| {
+        let entry = entries.get(l.index)?;
         if !entry.in_use || entry.name != l.name {
-            return Err(PtpError::Verify(format!("entry {} reads back as {:?}", l.index, entry.name)));
+            Some(format!("entry {} reads back as {:?}", l.index, entry.name))
+        } else if after.lut(l.index).as_ref() != Some(l.lut) {
+            Some(format!("LUT data in entry {} differs from what was sent", l.index))
+        } else {
+            None
         }
-        if after.lut(l.index).as_ref() != Some(l.lut) {
-            return Err(PtpError::Verify(format!("LUT data in entry {} differs from what was sent", l.index)));
-        }
+    });
+    let mismatch = mismatch.or_else(|| (entries.len() != current.entries().len()).then(|| "the Library size changed".to_string()));
+    if let Some(m) = mismatch {
+        return Err(roll_back(camera, &current, m, &mut progress));
     }
     let other_changes = after.as_bytes().iter().zip(patched.as_bytes()).filter(|(a, b)| a != b).count();
     progress("done");
     Ok(RegisterManyReport { registered: luts.iter().map(|l| (l.index, l.name.to_string())).collect(), backup, other_changes })
+}
+
+/// After a failed read-back, write the settings read before the write (`original`, which the
+/// camera itself produced) back and check the Library matches it again.
+fn roll_back(camera: &Camera, original: &SettingsBlob, why: String, progress: &mut impl FnMut(&str)) -> PtpError {
+    progress("restoring");
+    let restored = camera.write_camera_settings(original).and_then(|_| camera.read_settings());
+    match restored {
+        Ok(now) if now.entries() == original.entries() => PtpError::RolledBack(why),
+        Ok(_) => PtpError::Verify(format!("{why}; writing the earlier settings back did not restore the Library, restore the backup")),
+        Err(e) => PtpError::Verify(format!("{why}; writing the earlier settings back failed ({e}), restore the backup")),
+    }
 }
 
 /// Save `blob` as `{model}-settings-{millis}.bin` with a `.json` beside it that records the
@@ -294,10 +346,9 @@ pub struct RestoreReport {
 /// Write a saved settings file back to the camera, after backing up the current one, and
 /// check that the camera then reads back exactly that file. The caller checks that the file
 /// came from this camera (serial, model, firmware) before calling.
+///
+/// No write permission is needed: the file is settings this camera produced.
 pub fn restore_settings(camera: &Camera, saved: &SettingsBlob, backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RestoreReport, PtpError> {
-    if !camera.info.write_verified() {
-        return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
-    }
     progress("reading");
     let current = camera.read_settings()?;
     if current.as_bytes().len() != saved.as_bytes().len() {
@@ -306,7 +357,7 @@ pub fn restore_settings(camera: &Camera, saved: &SettingsBlob, backup_dir: &Path
     let backup = save_backup(camera, &current, backup_dir, "before restoring a backup")?;
 
     progress("writing");
-    camera.write_settings(saved)?;
+    camera.write_camera_settings(saved)?;
 
     progress("verifying");
     let after = camera.read_settings()?;
@@ -330,8 +381,8 @@ pub struct DeleteReport {
 /// Only their title entries change, as in the camera's own delete; the entry selected in the
 /// camera is refused, and if any entry is refused nothing is written.
 pub fn delete_luts(camera: &Camera, indices: &[usize], expected: &[Expected], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<DeleteReport, PtpError> {
-    if !camera.info.write_verified() {
-        return Err(PtpError::NotVerified { model: camera.info.model.clone(), version: camera.info.version.clone() });
+    if !camera.may_write() {
+        return Err(camera.not_verified());
     }
     progress("reading");
     let current = camera.read_settings()?;
@@ -348,8 +399,9 @@ pub fn delete_luts(camera: &Camera, indices: &[usize], expected: &[Expected], ba
 
     progress("verifying");
     let after = camera.read_settings()?.entries();
-    if let Some((i, _)) = deleted.iter().find(|(i, _)| after[*i].in_use) {
-        return Err(PtpError::Verify(format!("entry {i} still holds {:?}", after[*i].name)));
+    if let Some((i, _)) = deleted.iter().find(|(i, _)| after.get(*i).map_or(true, |e| e.in_use)) {
+        let m = format!("entry {i} still holds {:?}", after.get(*i).map(|e| e.name.as_str()).unwrap_or("?"));
+        return Err(roll_back(camera, &current, m, &mut progress));
     }
     progress("done");
     Ok(DeleteReport { deleted, backup })

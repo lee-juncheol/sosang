@@ -200,3 +200,43 @@ fn expected_state_must_match_the_camera() {
     assert!(matches!(s.check_expected(&[(40, Some("OTHER"))]), Err(Error::Changed(_))), "40 holds TEST01");
     assert!(matches!(s.check_expected(&[(41, None)]), Err(Error::Slot(_))));
 }
+
+/// Recompute the trailing checksum byte after editing a capture.
+fn reseal(b: &mut [u8]) {
+    let last = b.len() - 1;
+    let sum = b[0x0C..last].iter().fold(0u8, |a, c| a.wrapping_add(*c));
+    b[last] = sum.wrapping_neg();
+}
+
+#[test]
+fn other_lumix_bodies_are_read_when_the_structure_matches() {
+    let Some(mut b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    // Same layout under another model string (as an S5II would report it).
+    b[0x1E..0x1E + 8].copy_from_slice(b"DC-S5M2\0");
+    reseal(&mut b);
+    let s = SettingsBlob::parse(b.clone()).unwrap();
+    assert_eq!(s.model(), "DC-S5M2");
+    assert_eq!(s.entries().len(), 41);
+    assert_eq!(s.selected_entry(), Some(2));
+
+    // Not a LUMIX model string.
+    let mut other = b.clone();
+    other[0x1E..0x1E + 8].copy_from_slice(b"XX-1234\0");
+    reseal(&mut other);
+    assert!(matches!(SettingsBlob::parse(other), Err(Error::UnsupportedModel(_))));
+}
+
+#[test]
+fn delete_is_refused_when_the_selected_entry_cannot_be_read() {
+    let Some(mut b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
+    // Hide the selected-entry item (id 0x052F, index 1) by renumbering it.
+    let pat = [0x2F, 0x05, 0x01, 0x00, 0x1C, 0x00, 0x00, 0x00];
+    let at = b.windows(8).position(|w| w == pat).expect("selected item index 1");
+    b[at] = 0x30;
+    reseal(&mut b);
+    let s = SettingsBlob::parse(b).unwrap();
+    assert_eq!(s.selected_entry(), None);
+    assert!(matches!(s.without_lut(37), Err(Error::Slot(_))));
+    // Registering does not depend on it.
+    assert!(s.with_lut(38, "TEST", BaseStyle::VLog, &test01(), false).is_ok());
+}

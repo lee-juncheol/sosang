@@ -57,13 +57,13 @@ export async function saveFile(filename: string, data: BlobPart, type: string): 
 }
 
 // Camera commands (app only). Shapes match src-tauri/src/camera.rs.
-export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean }
+export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean; writeExperimental: boolean }
 export type CameraEntry = { index: number; name: string; styleCode: number; inUse: boolean }
 export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number | null }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
-export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'unsupported_platform' | 'busy' | 'camera_error' | 'internal'
-export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'done'
+export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'internal'
+export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'restoring' | 'done'
 
 export class CameraError extends Error {
   readonly code: CameraErrorCode
@@ -100,23 +100,24 @@ async function withProgress<T>(run: () => Promise<T>, onProgress?: (step: Camera
 
 /** Register a .cube text in one Library slot; `onProgress` receives the steps as they happen.
  *  `expected` is what the slot held when the list was read (`null` = empty); the camera
- *  refuses the write if that changed meanwhile. */
-export function cameraRegister(cube: string, slot: number, name: string, overwrite: boolean, expected: string | null, onProgress?: (step: CameraProgress) => void): Promise<CameraRegisterResult> {
-  return withProgress(() => cameraCall<CameraRegisterResult>('camera_register_lut', { cube, slot, name, overwrite, expected }), onProgress)
+ *  refuses the write if that changed meanwhile. `experimental` = the user agreed to write to a
+ *  body that is not verified (`writeExperimental`). */
+export function cameraRegister(cube: string, slot: number, name: string, overwrite: boolean, expected: string | null, experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRegisterResult> {
+  return withProgress(() => cameraCall<CameraRegisterResult>('camera_register_lut', { cube, slot, name, overwrite, expected, experimental }), onProgress)
 }
 
 export type CameraRegisterManyResult = { registered: { index: number; name: string }[]; backup: string; otherChanges: number }
 
 /** Register several .cube texts in one write. Every file and slot is checked first; if one is
  *  refused, nothing is written. */
-export function cameraRegisterMany(items: { cube: string; slot: number; name: string; expected: string | null }[], overwrite: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRegisterManyResult> {
-  return withProgress(() => cameraCall<CameraRegisterManyResult>('camera_register_luts', { items, overwrite }), onProgress)
+export function cameraRegisterMany(items: { cube: string; slot: number; name: string; expected: string | null }[], overwrite: boolean, experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRegisterManyResult> {
+  return withProgress(() => cameraCall<CameraRegisterManyResult>('camera_register_luts', { items, overwrite, experimental }), onProgress)
 }
 
 /** Empty one or more Library slots in one write. The entry selected in the camera is refused,
  *  and if any slot is refused nothing changes. */
-export function cameraDelete(slots: number[], names: string[], onProgress?: (step: CameraProgress) => void): Promise<CameraDeleteResult> {
-  return withProgress(() => cameraCall<CameraDeleteResult>('camera_delete_luts', { slots, names }), onProgress)
+export function cameraDelete(slots: number[], names: string[], experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraDeleteResult> {
+  return withProgress(() => cameraCall<CameraDeleteResult>('camera_delete_luts', { slots, names, experimental }), onProgress)
 }
 
 /** A settings backup taken before a change; `action` says which change (English, from Rust). */

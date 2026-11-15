@@ -32,9 +32,20 @@ export function errorText(t: Translate, error: unknown): string {
     case 'slot_changed': return t("목록을 읽은 뒤 카메라의 LUT가 바뀌었습니다. 아무것도 쓰지 않았습니다. 목록을 다시 읽어 주세요.")
     case 'other_camera': return t("이 백업은 다른 카메라나 다른 펌웨어에서 만든 것이라 되돌릴 수 없습니다.")
     case 'bad_backup': return t("백업 파일을 읽지 못했습니다.")
+    case 'unknown_layout': return t("이 카메라의 설정 형식은 아직 읽을 수 없습니다. 지원하는 기종인지 확인해 주세요.")
+    case 'rolled_back': return t("쓰기 후 확인에 실패해, 쓰기 전 카메라 설정으로 되돌렸습니다. 이 기종에서는 아직 등록이 잘 되지 않습니다.")
     case 'verify_failed': return t("쓰기 후 다시 읽은 내용이 보낸 내용과 다릅니다. 카메라의 LUT 라이브러리를 확인해 주세요.")
     default: return t("카메라와 통신하지 못했습니다. 케이블과 카메라 전원을 확인한 뒤 다시 시도해 주세요.")
   }
+}
+
+/** Shown for a Panasonic body whose model and firmware were not verified: writing needs the
+ *  user's consent. */
+export function ExperimentalConsent({ t, camera, checked, disabled, onChange, className }: { t: Translate; camera: CameraLibrary['camera']; checked: boolean; disabled: boolean; onChange: (on: boolean) => void; className: string }) {
+  return <label className={className}>
+    <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)}/>
+    <span>{t("{0} 펌웨어 {1}은 아직 확인하지 않은 조합입니다. 실험적으로 쓰기를 허용합니다. 쓰기 전에 설정을 백업하고, 다시 읽어 확인에 실패하면 이전 설정으로 되돌립니다.", [camera.model, camera.firmware])}</span>
+  </label>
 }
 
 export function CameraRegister({ t, filename, format, ready, cameraAliases, cameraName, getCube }: Props) {
@@ -44,6 +55,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
   const [slot, setSlot] = useState<number | null>(null)
   const [name, setName] = useState(() => cameraLutName(filename))
   const [confirmOverwrite, setConfirmOverwrite] = useState(false)
+  const [experimentalOk, setExperimentalOk] = useState(false)
   const [result, setResult] = useState<CameraRegisterResult | null>(null)
   const [error, setError] = useState<{ text: string; detail: string } | null>(null)
 
@@ -59,6 +71,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
     setPhase('reading'); setError(null); setResult(null)
     try {
       const next = await cameraListLuts()
+      if (!library || library.camera.model !== next.camera.model || library.camera.firmware !== next.camera.firmware) setExperimentalOk(false)
       setLibrary(next)
       setSlot(current => current !== null && next.entries[current] && (next.freeSlots.includes(current) || current >= FIRST_USER_ENTRY) ? current : next.freeSlots[0] ?? null)
     } catch (e) { fail(e) }
@@ -67,10 +80,12 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
 
   const entry = library && slot !== null ? library.entries[slot] : undefined
   const overwrite = !!entry?.inUse
+  const experimental = !!library && !library.camera.writeSupported && library.camera.writeExperimental
   const modelMismatch = !!library && format === 'std' && !cameraAliases.includes(library.camera.model)
   const blocked = format === 'zip' ? t("ZIP은 카메라에 등록할 수 없습니다. STD 또는 V-Log 형식을 골라 주세요.")
     : !ready ? t("이 조합은 등록할 파일이 없습니다.")
-    : library && !library.camera.writeSupported ? t("{0} 펌웨어 {1}에는 아직 등록할 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])
+    : experimental && !experimentalOk ? t("확인하지 않은 기종이라, 아래에서 실험적 쓰기에 동의해야 등록할 수 있습니다.")
+    : library && !library.camera.writeSupported && !experimental ? t("{0} 펌웨어 {1}에는 아직 등록할 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])
     : modelMismatch ? t("선택한 카메라({0})와 연결된 카메라({1})가 다릅니다. LUT 내보내기에서 카메라를 바꿔 주세요.", [cameraName, library!.camera.model])
     : ''
 
@@ -79,7 +94,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
     setPhase('registering'); setStep(null); setError(null); setResult(null)
     try {
       const cube = await getCube()
-      const done = await cameraRegister(cube, slot, name, overwrite, library.entries[slot]?.inUse ? library.entries[slot].name : null, setStep)
+      const done = await cameraRegister(cube, slot, name, overwrite, library.entries[slot]?.inUse ? library.entries[slot].name : null, experimental, setStep)
       setResult(done)
       const freeSlots = library.freeSlots.filter(s => s !== done.index)
       setLibrary({
@@ -97,6 +112,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
   const progress = phase === 'reading' ? t("카메라의 LUT 목록을 읽는 중… (약 6초)")
     : step === 'writing' ? t("카메라에 쓰는 중… 케이블을 빼거나 카메라를 끄지 마세요.")
     : step === 'verifying' ? t("다시 읽어 확인하는 중…")
+    : step === 'restoring' ? t("확인에 실패해 이전 설정으로 되돌리는 중… 케이블을 빼지 마세요.")
     : phase === 'registering' ? t("카메라 설정을 읽고 백업하는 중…")
     : ''
   const userEntries = library?.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY) ?? []
@@ -122,6 +138,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
         onChange={e => setName(e.target.value.replace(/[^\x20-\x7e]/g, ''))}/>
       {overwrite && <label className="camera-register-confirm"><input type="checkbox" checked={confirmOverwrite} disabled={busy} onChange={e => setConfirmOverwrite(e.target.checked)}/>
         <span>{t("{0}번 칸의 ‘{1}’을 지우고 덮어씁니다.", [entry!.index, entry!.name])}</span></label>}
+      {experimental && <ExperimentalConsent t={t} camera={library.camera} checked={experimentalOk} disabled={busy} onChange={setExperimentalOk} className="camera-register-confirm"/>}
       {blocked && <p className="camera-register-blocked">{blocked}</p>}
       <button type="button" className="camera-register-primary" disabled={busy || !!blocked || slot === null || !name.trim() || (overwrite && !confirmOverwrite)} onClick={() => void register()}>
         {phase === 'registering' ? t("등록 중…") : t("카메라에 등록 (약 25초)")}
