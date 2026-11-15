@@ -32,7 +32,7 @@ USB로 연결한 LUMIX와 PTP로 통신해서, SD 카드 없이 LUT 라이브러
 - `docs/camera-lut-library.md`: 설정 파일 구조, 안전 장치, 실기 확인 기록
 - `docs/cloudflare.md`: 서버, 앱 릴리스 절차
 
-## 지금까지 된 것 (브랜치 `feat/camera-lut-core`)
+## 지금까지 된 것 (`main`에 합침, 2026-11-16)
 
 - macOS와 Windows 카메라 통신이 모두 끝났습니다. DC-S1M2 펌웨어 1.5, USB로 두 운영체제에서 확인했습니다.
   - 읽기를 확인했습니다.
@@ -69,7 +69,7 @@ Windows에서 필요한 것:
 macOS에서는 Git, Node.js 22.12 이상, Rust, Xcode Command Line Tools가 필요합니다.
 
 ```bash
-git clone -b feat/camera-lut-core https://github.com/lee-juncheol/sosang.git
+git clone -c core.autocrlf=false https://github.com/lee-juncheol/sosang.git
 cd sosang
 npm ci
 node scripts/run-web.mjs test
@@ -83,7 +83,7 @@ cargo test -p lumix-lut -p lumix-ptp
 - macOS판 0.1.1을 Mac에서 `release:app -- --version 0.1.1 --deploy`로 배포합니다. 그러면 업데이트 정보에 두 플랫폼이 모두 들어갑니다.
 - Windows 코드 서명이 없어서 처음 설치할 때 SmartScreen 경고가 뜹니다. 서명할지는 사용자와 정합니다.
 - macOS 공증과 웹사이트용 DMG는 아직 하지 않았습니다.
-- `main`으로 보내는 PR #1(https://github.com/lee-juncheol/sosang/pull/1)을 만들었습니다. 아직 합치지 않았습니다. 저장소에 CI가 없어서 테스트는 손으로 돌립니다.
+- 저장소에 CI가 없어서 테스트는 손으로 돌립니다.
 - macOS 0.1.1이 나오면 GitHub 릴리스를 두 운영체제 같은 버전으로 정리합니다(아래 작업 기록 참고).
 
 ## 작업 기록
@@ -121,7 +121,7 @@ cargo test -p lumix-lut -p lumix-ptp
 - 릴리스 v0.1.0을 "sosang for Mac & Windows"로 고쳤습니다.
   - Windows 0.1.1 설치 파일(`sosang_0.1.1_x64-setup.exe`)을 첨부했습니다.
   - 그래서 지금 한 릴리스에 Mac 0.1.0 DMG와 Windows 0.1.1이 섞여 있습니다. macOS 0.1.1이 나오면 v0.1.1 릴리스를 새로 만들어 맞춥니다.
-- PR #1(`feat/camera-lut-core` → `main`)을 만들었습니다.
+- PR #1(https://github.com/lee-juncheol/sosang/pull/1, `feat/camera-lut-core` → `main`)을 만들고 2026-11-16에 머지 커밋으로 합쳤습니다. `feat/camera-lut-core` 브랜치는 지우지 않았고, 합친 뒤의 `main`과 같게 맞춰 두었습니다.
 
 ## 보류한 것
 
