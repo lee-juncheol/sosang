@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Asset, Sample } from './types'
 import type { Cube } from './lut'
+import { serverUrl } from './platform.ts'
 
 /** A catalog asset, or a cube baked in the page with a stable identity key. */
 export type LookSource = Asset | { key: string; cube: Cube }
@@ -80,7 +81,7 @@ export function useSamplePhoto(sample: Sample | null) {
     void (async () => {
       let bitmap: ImageBitmap | undefined
       try {
-        const response = await fetch(sample.path, { signal: controller.signal })
+        const response = await fetch(serverUrl(sample.path), { signal: controller.signal })
         if (!response.ok) throw new Error(`샘플 사진을 불러오지 못했습니다 (${response.status}).`)
         const blob = await response.blob()
         if (!blob.size || blob.size > MAX_BYTES) throw new Error('샘플 이미지의 크기를 확인해 주세요.')

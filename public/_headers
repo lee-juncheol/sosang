@@ -1,7 +1,10 @@
 # Fixed catalog, LUT and sample URLs retain Cloudflare's ETag revalidation.
+# Every file here is public; the desktop app (origin tauri://localhost) reads them with fetch,
+# so any origin may read them. No cookies or credentials are involved.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Access-Control-Allow-Origin: *
 
 # Only Vite assets with content hashes may be cached without revalidation.
 /assets/*

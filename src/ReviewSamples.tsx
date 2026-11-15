@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ExternalSamples, Sample } from './types'
 import { sampleText, type Locale, type Translate } from './i18n'
+import { serverUrl } from './platform.ts'
 
 export function ReviewSamples({ collection, selected, onSelect, locale, t }: {
   collection: ExternalSamples; selected: string; onSelect: (id: string) => void; locale: Locale; t: Translate
@@ -36,7 +37,7 @@ export function ReviewSamples({ collection, selected, onSelect, locale, t }: {
       {scenes.map(item => <option key={item.id} value={item.id}>{locale === 'en' ? item.nameEn : item.name}</option>)}
     </select></label><span>{visible.length === 1 ? t('사진 1장') : t('{0}장', [visible.length])}</span></div>
     <div key={`${camera}-${scene}`} className="sample-grid review-sample-grid">{visible.map(sample => <button key={sample.id} className={`sample-option ${selected === sample.id ? 'selected' : ''}`} aria-pressed={selected === sample.id} onClick={() => onSelect(sample.id)}>
-      <div><img src={sample.thumbnailPath || sample.path} alt="" loading="lazy"/>{selected === sample.id && <span aria-hidden="true">✓</span>}</div><strong>{sampleText(sample, 'name', locale)}</strong>
+      <div><img src={serverUrl(sample.thumbnailPath || sample.path)} alt="" loading="lazy"/>{selected === sample.id && <span aria-hidden="true">✓</span>}</div><strong>{sampleText(sample, 'name', locale)}</strong>
     </button>)}</div>
     {!!missing.length && <p className="sample-missing">{t('미확보 조건')}: {missing.map(item => { const label = collection.scenes.find(s => s.id === item.scene); return label ? (locale === 'en' ? label.nameEn : label.name) : item.scene }).join(' · ')}</p>}
     <p className="sample-library-note">{t('리뷰 원본을 이용한 로컬 비교입니다. 날씨·조명은 사진과 원문 설명으로 분류했으며, 추정 여부는 각 사진에 표시합니다.')}</p>

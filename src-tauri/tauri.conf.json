@@ -1,0 +1,58 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "sosang",
+  "version": "0.1.1",
+  "identifier": "dev.filmlab.sosang",
+  "build": {
+    "frontendDist": "../dist-app",
+    "devUrl": "http://127.0.0.1:5174",
+    "beforeDevCommand": "node scripts/run-web.mjs dev:app",
+    "beforeBuildCommand": "node scripts/run-web.mjs build:app"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "sosang",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 600,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost https://sosang.film-lab-jc.workers.dev",
+        "img-src": "'self' data: blob: https://sosang.film-lab-jc.workers.dev",
+        "media-src": "'self' blob: https://sosang.film-lab-jc.workers.dev",
+        "font-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self' blob:"
+      },
+      "devCsp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "nsis"],
+    "createUpdaterArtifacts": true,
+    "category": "Photography",
+    "copyright": "GPL-3.0-only",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEyMzExRDU0ODA2QjlFRjIKUldUeW5tdUFWQjB4b3VFT0J2dUdKOEUyc3dnNm4vcTNua0tSOGlqVW5KVXltemZUaWtlM284aHEK",
+      "endpoints": ["https://sosang.film-lab-jc.workers.dev/app/latest.json"],
+      "requireSignedVersion": true
+    }
+  }
+}

@@ -3,6 +3,7 @@ import type { Catalog } from './types'
 import type { Translate } from './i18n'
 import { PAPER_CODES, paperLabel } from './lutNames'
 import './filmGallery.css'
+import { serverUrl } from './platform.ts'
 
 export interface GalleryPhoto {
   id: string; sourceFilename: string; filmId: string; paperId: string | null; combinationId: string
@@ -26,7 +27,7 @@ const safePath = (path: unknown, collection: Collection): path is string =>
 
 function GalleryImage({ photo, full, t }: { photo: GalleryPhoto; full?: boolean; t: Translate }) {
   const [failed, setFailed] = useState(false)
-  return failed ? <span className="gallery-image-error" role="status">{t("사진을 불러오지 못했습니다.")}</span> : <img src={full ? photo.path : photo.thumbnailPath} alt={full ? photo.sourceFilename : ''} width={photo.width} height={photo.height} loading={full ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)}/>
+  return failed ? <span className="gallery-image-error" role="status">{t("사진을 불러오지 못했습니다.")}</span> : <img src={serverUrl(full ? photo.path : photo.thumbnailPath)} alt={full ? photo.sourceFilename : ''} width={photo.width} height={photo.height} loading={full ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)}/>
 }
 
 export function FilmGallery({ catalog, t, collection, onSelectCollection, onUseLook }: {
@@ -49,7 +50,7 @@ export function FilmGallery({ catalog, t, collection, onSelectCollection, onUseL
     if (manifest) return
     const controller = new AbortController()
     setFailedCollection(null)
-    fetch(manifestPaths[collection], { signal: controller.signal }).then(async response => {
+    fetch(serverUrl(manifestPaths[collection]), { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Gallery unavailable')
       const data = await response.json() as GalleryManifest
       if (data.schemaVersion !== 1 || !Array.isArray(data.items) || data.items.length !== data.counts?.photos ||

@@ -25,8 +25,9 @@ function localPath(root, url, prefix) {
   assert(typeof url === 'string' && url.startsWith(prefix) && !/[\\?#]/.test(url), `Invalid photo path: ${url}`);
   const decoded = decodeURIComponent(url);
   assert(!decoded.split('/').includes('..'), `Unsafe photo path: ${url}`);
-  const filename = path.resolve(root, '.' + decoded);
-  assert(filename.startsWith(root + path.sep), `Unsafe photo path: ${url}`);
+  const base = path.resolve(root);
+  const filename = path.resolve(base, '.' + decoded);
+  assert(filename.startsWith(base + path.sep), `Unsafe photo path: ${url}`);
   return filename;
 }
 

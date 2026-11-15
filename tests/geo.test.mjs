@@ -56,11 +56,11 @@ test('other routes fall through to static assets without response or request mut
   }
 });
 
-test('Wrangler invokes the Worker first only for locale lookup and keeps static asset routing', async () => {
+test('Wrangler invokes the Worker first only for locale lookup and app updates and keeps static asset routing', async () => {
   const configuration = JSON.parse(await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
   assert.equal(configuration.main, 'server/worker.mjs');
   assert.equal(configuration.assets.binding, 'ASSETS');
   assert.equal(configuration.assets.directory, './dist-cloudflare');
-  assert.deepEqual(configuration.assets.run_worker_first, ['/api/locale']);
+  assert.deepEqual(configuration.assets.run_worker_first, ['/api/locale', '/app/latest.json']);
   assert.equal(configuration.assets.not_found_handling, 'none');
 });

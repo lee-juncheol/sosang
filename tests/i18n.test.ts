@@ -76,7 +76,7 @@ test('dynamic request errors and network errors are translated at display time',
 })
 
 test('active Korean interface copy has English translations', () => {
-  for (const file of ['main.tsx', 'ReviewSamples.tsx', 'FilmGallery.tsx', 'LutUsageGuide.tsx', 'WhiteBalanceGuide.tsx']) {
+  for (const file of ['main.tsx', 'ReviewSamples.tsx', 'FilmGallery.tsx', 'LutUsageGuide.tsx', 'WhiteBalanceGuide.tsx', 'CameraRegister.tsx', 'LutManager.tsx', 'CameraBusyOverlay.tsx', 'UpdateBanner.tsx']) {
     const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
     for (const match of source.matchAll(/\bt\(("(?:[^"\\]|\\.)*")/g)) {
       const key = JSON.parse(match[1]) as string

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Locale, Translate } from './i18n'
 import './lutUsageGuide.css'
+import { serverUrl } from './platform.ts'
 
 const manuals = {
   ko: 'https://eww.pavc.panasonic.co.jp/dscoi/DC-S1M2/html/DC-S1M2_DVQP3242_kor/',
@@ -46,7 +47,7 @@ export function LutUsageGuide({ locale, t }: { locale: Locale; t: Translate }) {
           </section>
           <section className="usage-section" aria-labelledby={`${titleId}-register`}><div className="usage-step-title"><span>2</span><h3 id={`${titleId}-register`}>{t("카메라에 LUT 등록")}</h3></div>
             <p>{t("카드를 카메라에 넣은 뒤 아래 순서로 진행하세요.")}</p>
-            <ol className="usage-screens">{screens.map(screen => <li key={screen.number}><figure><img src={`/manual/s1ii/${locale}-library-${screen.number}.png`} alt={t("S1II 설명서 화면: {0}", [screen.title])} width="390" height="260" loading="lazy" decoding="async"/><figcaption><span>{screen.number}</span><div><h4>{screen.title}</h4><p>{screen.detail}</p></div></figcaption></figure></li>)}</ol>
+            <ol className="usage-screens">{screens.map(screen => <li key={screen.number}><figure><img src={serverUrl(`/manual/s1ii/${locale}-library-${screen.number}.png`)} alt={t("S1II 설명서 화면: {0}", [screen.title])} width="390" height="260" loading="lazy" decoding="async"/><figcaption><span>{screen.number}</span><div><h4>{screen.title}</h4><p>{screen.detail}</p></div></figcaption></figure></li>)}</ol>
             <a className="usage-source" href={`${manuals[locale]}0079.html`} target="_blank" rel="noreferrer">{t("이미지·등록 절차 출처: Panasonic S1II 공식 설명서 ↗")}</a>
           </section>
           <section className="usage-section" aria-labelledby={`${titleId}-shoot`}><div className="usage-step-title"><span>3</span><h3 id={`${titleId}-shoot`}>{t("등록한 LUT로 촬영")}</h3></div>
@@ -54,7 +55,7 @@ export function LutUsageGuide({ locale, t }: { locale: Locale; t: Translate }) {
             <p>{t("LUT 항목에서 AF 모드 버튼을 누르고 등록한 파일을 고른 뒤 MENU/SET으로 확정하세요.")}</p>
             <div className="usage-recommendation"><strong>{t("sosang 권장 설정")}</strong><p>{t("STD 파일의 기본 사진 스타일은 표준입니다. 사이트 룩의 원래 강도로 보려면 LUT 불투명도를 100%로 두세요.")}</p></div>
             <p>{t("색이 적용된 JPG를 남기려면 JPEG 또는 RAW+JPEG로 촬영하세요. RAW 데이터 자체에는 LUT가 적용되지 않습니다.")}</p>
-            <figure className="usage-realtime"><img src={`/manual/s1ii/${locale}-realtime-lut.png`} width="394" height="264" alt={t("S1II 설명서의 Fn 실시간 LUT 선택 화면")} loading="lazy" decoding="async"/><figcaption>{t("실시간 LUT를 지정한 Fn 버튼으로도 불러올 수 있습니다. 이미지는 Fn 버튼으로 연 선택 화면입니다.")} <a href={`${manuals[locale]}0078.html`} target="_blank" rel="noreferrer">{t("Fn 사용 안내 ↗")}</a></figcaption></figure>
+            <figure className="usage-realtime"><img src={serverUrl(`/manual/s1ii/${locale}-realtime-lut.png`)} width="394" height="264" alt={t("S1II 설명서의 Fn 실시간 LUT 선택 화면")} loading="lazy" decoding="async"/><figcaption>{t("실시간 LUT를 지정한 Fn 버튼으로도 불러올 수 있습니다. 이미지는 Fn 버튼으로 연 선택 화면입니다.")} <a href={`${manuals[locale]}0078.html`} target="_blank" rel="noreferrer">{t("Fn 사용 안내 ↗")}</a></figcaption></figure>
             <a className="usage-source" href={`${manuals[locale]}0076.html`} target="_blank" rel="noreferrer">{t("사진 스타일·실시간 LUT 공식 안내 ↗")}</a>
           </section>
           <details className="usage-help"><summary>{t("파일이 목록에 보이지 않나요?")}</summary><p>{t("압축을 푼 .cube인지, 카드의 최상위에 있는지, 영문·숫자로 된 짧은 이름인지 확인하세요. FAT32는 확장자 제외 8자, exFAT는 확장자 포함 255자까지 지원합니다.")}</p></details>

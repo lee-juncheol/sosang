@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { english } from './translations/en.ts'
 import type { Sample } from './types.ts'
+import { serverUrl } from './platform.ts'
 
 export type Locale = 'ko' | 'en'
 export type Translate = (message: string | undefined, values?: readonly unknown[]) => string
@@ -93,7 +94,7 @@ export function useLocale() {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 2000)
     void preference.current!.resolve(async () => {
-      const response = await fetch('/api/locale', { cache: 'no-store', signal: controller.signal })
+      const response = await fetch(serverUrl('/api/locale'), { cache: 'no-store', signal: controller.signal })
       if (!response.ok) throw new Error('Locale unavailable')
       return response.json()
     }, navigator.language).then(next => {
