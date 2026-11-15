@@ -186,8 +186,10 @@ try {
   assert(archive.length < maxArchiveBytes, 'Source archive must be smaller than 25 MiB');
   const archivePath = path.join(temporary, archiveName);
   await fs.writeFile(archivePath, archive);
-  const actualEntries = runTar(['-tzf', archivePath]).trim().split('\n');
-  assert(JSON.stringify(actualEntries) === JSON.stringify(entries), 'Source archive contains unexpected or missing entries');
+  // Windows' bsdtar ends listed lines with CRLF.
+  const actualEntries = runTar(['-tzf', archivePath]).trim().split(/\r?\n/);
+  const firstDifference = actualEntries.findIndex((entry, i) => entry !== entries[i]);
+  assert(JSON.stringify(actualEntries) === JSON.stringify(entries), `Source archive contains unexpected or missing entries (${actualEntries.length} listed, ${entries.length} expected; first difference: ${JSON.stringify(actualEntries[firstDifference] ?? entries[actualEntries.length])})`);
 
   // Avoid replacing a catalog that another generation process changed while
   // source packaging was in progress.
