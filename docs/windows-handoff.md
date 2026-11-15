@@ -5,6 +5,26 @@
 
 **답변은 항상 한국어로 합니다.** 코드, 명령어, 식별자는 그대로 둡니다.
 
+## 먼저 할 일: Windows PC 저장소 다시 맞추기 (2026-11-16)
+
+- 2026-11-16에 GitHub 저장소의 기록을 다시 썼습니다.
+  - 문서의 민감한 내용을 옛 커밋에서도 지우려고 한 작업입니다.
+  - `main`, `feat/camera-lut-core`, `v0.1.0` 태그의 커밋 번호가 모두 바뀌었습니다.
+  - 파일 내용은 바뀌지 않았습니다.
+- Windows PC의 저장소는 아직 옛 기록입니다. 그대로 `git pull`하면 옛 기록과 새 기록이 섞입니다.
+- 할 일:
+  1. `git status`와 `git log origin/feat/camera-lut-core..HEAD`로 아직 올리지 않은 변경이 있는지 봅니다.
+     - 있으면 멈추고 사용자에게 알립니다. 아래 명령을 실행하면 그 변경이 사라집니다.
+  2. 없으면 아래 명령을 차례로 실행합니다.
+     ```bash
+     git fetch origin --force --tags
+     git checkout feat/camera-lut-core
+     git reset --hard origin/feat/camera-lut-core
+     git branch -f main origin/main
+     ```
+  3. `git log --oneline -1`이 GitHub의 `feat/camera-lut-core`와 같은 커밋인지 확인합니다.
+- **이 작업을 마치면 이 절 전체를 이 문서에서 지우고, 커밋해서 올립니다.** 올리는 것도 사용자에게 허락을 받습니다.
+
 ## 기술 개요
 
 - sosang 웹앱을 바탕으로 만든 데스크톱 앱입니다.
