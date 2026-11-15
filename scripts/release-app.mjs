@@ -76,7 +76,7 @@ assert(existsSync(keyPath), `Updater signing key not found: ${keyPath}`);
 assert(!path.resolve(keyPath).startsWith(root + path.sep), 'Keep the signing key outside the repository');
 
 console.log(`Building sosang ${version} (${platformKey()})…`);
-process.env.PATH = `${path.join(os.homedir(), '.cargo/bin')}:${process.env.PATH}`;
+process.env.PATH = `${path.join(os.homedir(), '.cargo', 'bin')}${path.delimiter}${process.env.PATH}`;
 // Only the .app bundle: the updater needs sosang.app.tar.gz, not the DMG installer.
 run(['node_modules/@tauri-apps/cli/tauri.js', 'build', '--bundles', 'app'], { TAURI_SIGNING_PRIVATE_KEY: keyPath });
 

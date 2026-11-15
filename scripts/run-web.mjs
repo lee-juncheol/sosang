@@ -2,7 +2,7 @@
 // Other environments use their installed Node 22.12+ or 24+ normally.
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +29,7 @@ else if (action==='verify:assets') { run(['--experimental-strip-types','scripts/
 else if (action==='test') { run(['--experimental-strip-types','--test','tests/lut.test.ts','tests/look-selection.test.ts','tests/lut-names.test.ts','tests/print-timing.test.ts','tests/download-zip.test.ts','tests/cloudflare.test.mjs','tests/geo.test.mjs','tests/legacy-redirect.test.mjs','tests/i18n.test.ts','tests/pack-static.test.mjs','tests/gallery.test.mjs','tests/supplied-fuji.test.mjs','tests/platform.test.ts','tests/app-update.test.mjs']); }
 else if (action==='build:app') { run(['node_modules/typescript/bin/tsc','-b']); run(['node_modules/vite/bin/vite.js','build','--config','vite.app.config.ts']); }
 else if (action==='dev:app') { run(['node_modules/vite/bin/vite.js','--config','vite.app.config.ts']); }
-else if (action==='app:dev' || action==='app:build') { process.env.PATH=`${resolve(homedir(),'.cargo/bin')}:${process.env.PATH}`; run(['node_modules/@tauri-apps/cli/tauri.js',action==='app:dev'?'dev':'build',...process.argv.slice(3)]); }
+else if (action==='app:dev' || action==='app:build') { process.env.PATH=`${resolve(homedir(),'.cargo','bin')}${delimiter}${process.env.PATH}`; run(['node_modules/@tauri-apps/cli/tauri.js',action==='app:dev'?'dev':'build',...process.argv.slice(3)]); }
 else if (action==='release:app') { run(['scripts/release-app.mjs',...process.argv.slice(3)]); }
 else if (action==='dev' || action==='preview') { run(['node_modules/vite/bin/vite.js',...(action==='preview'?['preview']:[]),'--host','127.0.0.1',...process.argv.slice(3)]); }
 else { console.error('Unknown command:',action); process.exit(1); }
