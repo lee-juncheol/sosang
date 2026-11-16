@@ -1,8 +1,18 @@
 [workspace]
 resolver = "2"
-members = ["crates/lumix-lut", "crates/lumix-ptp", "src-tauri"]
+members = ["crates/lumix-lut", "crates/lumix-ptp", "crates/photo-courier", "src-tauri"]
 
 [workspace.package]
 edition = "2021"
 license = "GPL-3.0-only"
 rust-version = "1.80"
+
+# Photo decoding and encoding are unbearably slow unoptimized; keep them fast in dev builds too.
+[profile.dev.package.jpeg-decoder]
+opt-level = 3
+[profile.dev.package.jpeg-encoder]
+opt-level = 3
+[profile.dev.package.libwebp-sys]
+opt-level = 3
+[profile.dev.package.photo-courier]
+opt-level = 3

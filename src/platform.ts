@@ -160,3 +160,54 @@ export function cubeSummary(text: string): { size: number | null; style: string 
 export function cameraLutName(filename: string): string {
   return filename.replace(/[^\x20-\x7e]/g, '_').trim().slice(0, 95)
 }
+
+// Photo sending (app only). Shapes match src-tauri/src/courier.rs.
+export type CourierPhoto = { path: string; name: string; subfolder: string; modified: number | null }
+export type CourierInfo = { make: string | null; model: string | null; lens: string | null; exposure: [number, number] | null; fNumber: number | null; focalLength: number | null; iso: number | null; taken: string | null }
+export type CourierPreview = { width: number; height: number; info: CourierInfo; jpeg: Blob }
+export type CourierErrorCode = 'courier_unreadable' | 'courier_unsupported' | 'courier_encode' | 'courier_read' | 'courier_write' | 'unsupported_platform' | 'internal'
+
+export class CourierError extends Error {
+  readonly code: CourierErrorCode
+  constructor(code: CourierErrorCode, message: string) { super(message); this.code = code }
+}
+
+async function courierCall<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const app = tauri()
+  if (!app) throw new CourierError('unsupported_platform', 'Photo sending needs the sosang app')
+  try {
+    return await app.invoke(cmd, args) as T
+  } catch (e) {
+    const err = e as { code?: CourierErrorCode; message?: string } | string
+    if (typeof err === 'object' && err && err.code) throw new CourierError(err.code, err.message || err.code)
+    throw new CourierError('internal', String(typeof err === 'object' ? err?.message : err))
+  }
+}
+
+/** Folder picker; null when cancelled. */
+export const courierPickFolder = () => courierCall<string | null>('courier_pick_folder')
+/** JPG photos in a folder; `exclude` skips one folder tree (the destination inside the source). */
+export const courierList = (folder: string, recursive: boolean, exclude: string | null) => courierCall<CourierPhoto[]>('courier_list', { folder, recursive, exclude })
+/** Photos already in the destination folder. */
+export const courierListSaved = (folder: string) => courierCall<CourierPhoto[]>('courier_list_saved', { folder })
+/** Small upright JPEG for the list. */
+export async function courierThumbnail(path: string): Promise<Blob> {
+  const bytes = await courierCall<ArrayBuffer>('courier_thumbnail', { path })
+  return new Blob([bytes], { type: 'image/jpeg' })
+}
+/** Upright preview at most `edge` pixels long, with the full upright size and capture details. */
+export async function courierPreview(path: string, edge: number): Promise<CourierPreview> {
+  const bytes = new Uint8Array(await courierCall<ArrayBuffer>('courier_preview', { path, edge }))
+  const length = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, true)
+  const header = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + length))) as Omit<CourierPreview, 'jpeg'>
+  return { ...header, jpeg: new Blob([bytes.subarray(4 + length)], { type: 'image/jpeg' }) }
+}
+/** Send one photo; returns the saved path. `webp` = WebP quality, null keeps JPG. */
+export const courierExport = (source: string, destination: string, level: number, webp: number | null) => courierCall<string>('courier_export', { source, destination, level, webp })
+
+/** Same value as `level_zoom` in crates/photo-courier: the enlargement that hides the corners a
+ *  level rotation would expose. */
+export function levelZoom(width: number, height: number, degrees: number): number {
+  const angle = Math.max(-15, Math.min(15, degrees)) * Math.PI / 180
+  return Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)) * Math.max(width / height, height / width)
+}

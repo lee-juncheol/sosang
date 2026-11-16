@@ -1,0 +1,14 @@
+[package]
+name = "photo-courier"
+version = "0.1.0"
+description = "Picks JPG photos from a folder, levels them, and sends copies to another folder."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+jpeg-decoder = "0.3"
+jpeg-encoder = "0.7"
+webp = { version = "0.3", default-features = false }
+serde = { version = "1.0", features = ["derive"] }

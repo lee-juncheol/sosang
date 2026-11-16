@@ -1,4 +1,5 @@
 mod camera;
+mod courier;
 mod files;
 mod update;
 
@@ -17,6 +18,12 @@ pub fn run() {
             camera::camera_delete_luts,
             camera::camera_list_backups,
             camera::camera_restore_backup,
+            courier::courier_pick_folder,
+            courier::courier_list,
+            courier::courier_list_saved,
+            courier::courier_thumbnail,
+            courier::courier_preview,
+            courier::courier_export,
             files::save_file,
             files::open_external,
             update::app_check_update,

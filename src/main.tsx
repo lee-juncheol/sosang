@@ -17,6 +17,7 @@ import { EXPOSURE_SPAN, filmCastShift, formatShift, neutralControls, sameShift, 
 import './style.css'
 import { installAppLinkHandler, isApp, saveFile, serverUrl } from './platform.ts'
 import { LutManager } from './LutManager'
+import { PhotoCourier } from './PhotoCourier'
 import { CameraRegister } from './CameraRegister'
 import { UpdateBanner } from './UpdateBanner'
 
@@ -89,10 +90,11 @@ function castDirection(hue: number) {
   return hue < 70 || hue >= 345 ? '따뜻한 주황·붉은' : hue < 110 ? '노란' : hue < 160 ? '연두' : hue < 200 ? '초록·청록' : hue < 260 ? '청록·푸른' : hue < 300 ? '보랏빛' : '분홍빛'
 }
 
-type View = 'studio' | 'gallery' | 'gallery/recommended' | 'luts'
+type View = 'studio' | 'gallery' | 'gallery/recommended' | 'luts' | 'send'
 function viewFromHash(): View {
   if (window.location.hash === '#gallery/recommended') return 'gallery/recommended'
   if (window.location.hash === '#luts' && isApp()) return 'luts'
+  if (window.location.hash === '#send' && isApp()) return 'send'
   return window.location.hash === '#gallery' ? 'gallery' : 'studio'
 }
 
@@ -315,10 +317,10 @@ function App() {
   }
 
   return <>
-    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}</nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
+    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}{isApp() && <a href="#send" aria-current={view === 'send' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('send') }}>{t("사진 보내기")}</a>}</nav></div><div className="topbar-right"><div className="locale-switch" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
     {isApp() && <UpdateBanner t={t}/>}
-    <main className={view.startsWith('gallery') ? 'gallery-main' : undefined}>
-      {view === 'luts' ? <LutManager t={t}/> : view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
+    <main className={view.startsWith('gallery') ? 'gallery-main' : view === 'send' ? 'courier-main' : undefined}>
+      {view === 'luts' ? <LutManager t={t}/> : view === 'send' ? <PhotoCourier t={t}/> : view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
       <div className="intro"><div className="studio-title"><h1>{t("스튜디오")}</h1><LutUsageGuide locale={locale} t={t}/></div><div className="catalog-stat"><b>{catalog.counts.ready + suppliedLooks.length}</b><span>{t("가지 컬러 조합")}<small>33³ LUT · sRGB</small></span></div></div>
       <div className="workspace">
         <aside id="film-library" className="film-library" ref={filmLibrary} tabIndex={-1} aria-label={t("필름 선택")}>
