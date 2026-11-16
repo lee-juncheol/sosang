@@ -72,13 +72,18 @@ Worker는 Cloudflare가 제공하는 [`request.cf.country`](https://developers.c
 ## 앱 릴리스
 
 ```
-npm run release:app -- --version 0.2.0 --notes "바뀐 점" --deploy
+npm run release:app -- --version 0.2.0 --notes "바뀐 점" --deploy --github
 ```
 
 1. `--version`을 주면 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`의 버전을 함께 바꾼다. 세 값이 다르면 멈춘다.
 2. 실행한 컴퓨터의 앱을 만들고 업데이트 서명 키로 서명한다. macOS는 `tauri build --bundles app`(`sosang.app.tar.gz`), 64비트 Windows는 `tauri build --bundles nsis`(설치 파일 `sosang_<버전>_x64-setup.exe`, 업데이트에도 같은 파일을 쓴다)다. 키는 저장소 밖 `~/.tauri/sosang-updater.key`(또는 `TAURI_SIGNING_PRIVATE_KEY_PATH`)이고, 비밀번호는 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`가 없으면 실행 중에 묻는다. 공개 키는 `tauri.conf.json`의 `plugins.updater.pubkey`에 있다. macOS와 Windows는 같은 키로 서명한다.
 3. 서명된 파일을 `app-release/releases/<버전>/`에, 업데이트 정보를 `app-release/latest.json`에 쓴다(`app-release/`는 git에서 제외). 같은 버전의 다른 플랫폼 항목이 로컬 `app-release/latest.json`이나 서버의 `/app/latest.json`에 이미 있으면 그대로 두고, 그 파일을 서버에서 받아 `app-release/releases/<버전>/`에 함께 둔다. 그래서 macOS에서 먼저 배포한 뒤 Windows에서 같은 버전을 배포해도(또는 그 반대) 한쪽이 빠지지 않는다. 버전이 다르면 이번에 만든 플랫폼만 들어가므로, 두 컴퓨터에서 같은 버전을 차례로 배포한다.
 4. `--deploy`면 사이트를 다시 빌드해 함께 배포한다.
+5. `--github`면 GitHub의 앱 릴리스 페이지를 갱신한다(`scripts/github-release.mjs`, `gh` 로그인 필요).
+   - 릴리스 페이지는 태그 `app` 하나뿐이다(https://github.com/lee-juncheol/sosang/releases/tag/app). 버전마다 새 릴리스를 만들지 않는다.
+   - 설치 파일은 버전 없는 고정 이름으로 덮어 올린다: macOS `sosang-mac-apple-silicon.dmg`(이때 `--bundles app,dmg`로 DMG도 만든다), Windows `sosang-windows-x64-setup.exe`. 그래서 `…/releases/download/app/<이름>` 링크가 바뀌지 않는다.
+   - 본문에서는 그 플랫폼의 `<!--windows-x86_64-->…<!--/windows-x86_64-->`(버전·크기·날짜)와 `<!--windows-x86_64:sha-->…`(SHA-256) 표시만 바꾼다. 영어·한국어 두 곳 모두 바뀌고 다른 플랫폼 줄은 그대로다. 표시를 지우면 갱신이 멈추므로 본문을 손으로 고칠 때 남겨 둔다.
+   - 바뀐 점 설명은 손으로 고친다.
 
 - 서명에는 버전이 기록되고(`version:0.1.0`), 앱은 `requireSignedVersion`으로 업데이트 정보의 버전과 서명의 버전이 같은지 확인한다. 예전 서명 파일을 더 높은 버전으로 속여 내려보내는 것을 막는다.
 - 개인 키나 비밀번호를 잃으면 이미 설치된 앱에 업데이트를 보낼 수 없다. 따로 백업한다.

@@ -54,7 +54,9 @@ export async function updateGithubRelease(platform, version, installer) {
     const asset = path.join(dir, name);
     await fs.writeFile(asset, bytes);
     gh(['release', 'upload', TAG, asset, '--clobber']);
-    const date = new Date().toISOString().slice(0, 10);
+    // Local calendar date of the machine releasing (UTC can be a day off).
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     let body = JSON.parse(gh(['release', 'view', TAG, '--json', 'body'])).body;
     body = replaceSpan(body, platform, `**${version}** · ${(bytes.length / 1024 / 1024).toFixed(1)} MB · ${date}`);
     body = replaceSpan(body, `${platform}:sha`, createHash('sha256').update(bytes).digest('hex'));

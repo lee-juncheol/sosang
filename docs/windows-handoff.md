@@ -5,26 +5,6 @@
 
 **답변은 항상 한국어로 합니다.** 코드, 명령어, 식별자는 그대로 둡니다.
 
-## 먼저 할 일: Windows PC 저장소 다시 맞추기 (2026-11-16)
-
-- 2026-11-16에 GitHub 저장소의 기록을 다시 썼습니다.
-  - 문서의 민감한 내용을 옛 커밋에서도 지우려고 한 작업입니다.
-  - `main`, `feat/camera-lut-core`, `v0.1.0` 태그의 커밋 번호가 모두 바뀌었습니다.
-  - 파일 내용은 바뀌지 않았습니다.
-- Windows PC의 저장소는 아직 옛 기록입니다. 그대로 `git pull`하면 옛 기록과 새 기록이 섞입니다.
-- 할 일:
-  1. `git status`와 `git log origin/feat/camera-lut-core..HEAD`로 아직 올리지 않은 변경이 있는지 봅니다.
-     - 있으면 멈추고 사용자에게 알립니다. 아래 명령을 실행하면 그 변경이 사라집니다.
-  2. 없으면 아래 명령을 차례로 실행합니다.
-     ```bash
-     git fetch origin --force --tags
-     git checkout feat/camera-lut-core
-     git reset --hard origin/feat/camera-lut-core
-     git branch -f main origin/main
-     ```
-  3. `git log --oneline -1`이 GitHub의 `feat/camera-lut-core`와 같은 커밋인지 확인합니다.
-- **이 작업을 마치면 이 절 전체를 이 문서에서 지우고, 커밋해서 올립니다.** 올리는 것도 사용자에게 허락을 받습니다.
-
 ## 기술 개요
 
 - sosang 웹앱을 바탕으로 만든 데스크톱 앱입니다.
@@ -62,8 +42,12 @@ USB로 연결한 LUMIX와 PTP로 통신해서, SD 카드 없이 LUT 라이브러
 - 배포: macOS는 `.app` 업데이트, Windows는 NSIS 설치 파일입니다. 둘 다 업데이트 서명을 붙입니다.
   - `scripts/release-app.mjs`가 실행한 컴퓨터의 플랫폼(`darwin-aarch64` 또는 `windows-x86_64`)을 만듭니다.
   - 같은 버전의 다른 플랫폼 항목은 그대로 둡니다.
-- 0.1.1(sosang 워드마크 아이콘)은 Windows판만 배포했습니다.
-  - 2026-11-16에 서버 `/app/latest.json`을 확인했을 때 `windows-x86_64`만 있었습니다.
+- 사진 보내기(`#send`, `docs/photo-sending.md`). Windows에서도 빌드와 테스트가 통과했고, 실제 사진으로는 아직 시험하지 않았습니다.
+- 카메라에서 고른 LUT는 사진 모드와 영상 모드를 모두 읽고, 어느 쪽에서든 고른 칸은 지우지 않습니다. 사진 모드에 LUT가 없을 때 지우기가 모두 막히던 문제를 고쳤습니다.
+- LUT 위치 바꾸기: 화면에서 순서를 다 바꾼 뒤 한 번에 씁니다(`docs/camera-lut-library.md`의 "위치 바꾸기"). Windows 실기로 확인했습니다.
+- 여러 개 지우기 확인 창은 체크하면 표 아래에 붙어 화면 하단을 따라옵니다.
+- 배포 현황(2026-11-17): **Windows 0.1.2**까지 배포했습니다(위 세 가지와 사진 보내기 포함). **macOS는 0.1.0**에 머물러 있고, 서버 `/app/latest.json`에는 `windows-x86_64`만 있습니다.
+- GitHub 릴리스는 버전 없는 대표 페이지 하나(태그 `app`)로 바꿨습니다. 배포할 때 `--github`를 붙이면 그 페이지의 설치 파일과 버전 줄이 갱신됩니다(`docs/cloudflare.md`의 "앱 릴리스").
 
 ## 지켜야 할 규칙
 
@@ -98,13 +82,32 @@ cargo test -p lumix-lut -p lumix-ptp
 
 `lumix-lut`의 실기 캡처 테스트는 `tests/fixtures/local/`이 없으면 건너뜁니다. 정상입니다.
 
+## macOS에서 할 일 (Windows 0.1.2까지 반영)
+
+Mac 세션은 이 절부터 처리하고, 끝난 항목은 지웁니다.
+
+1. `git pull`(브랜치 `feat/camera-lut-core`). `gh`가 없으면 설치하고 `gh auth login`으로 저장소 주인 계정에 로그인합니다.
+2. 테스트: `node scripts/run-web.mjs test`, `cargo test -p lumix-lut -p lumix-ptp -p photo-courier`.
+   - 새 실기 테스트(사진·영상 선택, 위치 바꾸기)는 Windows에서 만든 캡처(`s1m2_fw15_photo37_video_none.bin` 등)를 쓰므로 Mac에서는 건너뜁니다. Mac의 기존 캡처로 도는 테스트는 `selected_entries()`(목록)로 바뀐 검사를 통과해야 합니다.
+3. 실기 확인(쓰기는 사용자 허락 후). Windows에서 확인한 것을 macOS 전송(`mac.rs`)으로 다시 봅니다.
+   - 사진 모드를 스탠더드(LUT 없음)로 두고 목록을 읽으면 지우기가 열리는지, 영상 모드에서 고른 칸에 "카메라에서 선택됨"이 붙는지(읽기만).
+   - 위치 바꾸기로 두 칸을 맞바꾸고 카메라에서 적용되는지.
+   - 사진 보내기는 macOS 디버그 앱에서 이미 확인했습니다.
+4. 배포: `npm run release:app -- --version 0.1.2 --notes "<바뀐 점>" --deploy --github`
+   - 버전이 이미 0.1.2라 `--version`은 빼도 됩니다. 서버의 Windows 0.1.2 항목을 받아 함께 싣기 때문에 두 플랫폼이 모두 들어갑니다.
+   - `--github`가 DMG를 만들어 릴리스 페이지의 `sosang-mac-apple-silicon.dmg`를 바꾸고, Mac 버전 줄을 0.1.2로 고칩니다. 지금 그 파일은 0.1.0 DMG입니다.
+   - 배포 뒤 `/app/latest.json`에 `darwin-aarch64`와 `windows-x86_64`가 모두 있는지 확인합니다.
+5. Mac 0.1.1은 배포하지 않고 건너뜁니다. 설치된 Mac 0.1.0은 0.1.2로 바로 업데이트됩니다.
+
 ## 남은 일
 
-- macOS판 0.1.1을 Mac에서 `release:app -- --version 0.1.1 --deploy`로 배포합니다. 그러면 업데이트 정보에 두 플랫폼이 모두 들어갑니다.
+- 위 "macOS에서 할 일".
 - Windows 코드 서명이 없어서 처음 설치할 때 SmartScreen 경고가 뜹니다. 서명할지는 사용자와 정합니다.
-- macOS 공증과 웹사이트용 DMG는 아직 하지 않았습니다.
+- macOS 공증은 아직 하지 않았습니다.
 - 저장소에 CI가 없어서 테스트는 손으로 돌립니다.
-- macOS 0.1.1이 나오면 GitHub 릴리스를 두 운영체제 같은 버전으로 정리합니다(아래 작업 기록 참고).
+- 사진 보내기를 Windows에서 실제 JPG로 시험합니다.
+- 사용자 피드백: 파일 검증(쓰기 뒤 다시 읽기)이 가끔 1분쯤 걸린다고 합니다. Windows에서 같은 내용을 3번 다시 쓸 때는 매번 5.5초였고 재현되지 않았습니다. 내용이 바뀌는 쓰기에서 늦어지는지, macOS 카메라 찾기가 늦은지 데이터를 더 모은 뒤 다시 봅니다.
+- 스튜디오의 "카메라에 바로 등록"은 한 번에 LUT 하나라, 여러 개를 넣으면 매번 25초와 백업 하나가 생깁니다. 백업은 지워지지 않고 쌓입니다(8.8MB씩). 묶어 넣기와 백업 개수 제한은 아직 하지 않았습니다.
 
 ## 작업 기록
 
@@ -119,12 +122,12 @@ cargo test -p lumix-lut -p lumix-ptp
 - 커밋 작성자는 macOS와 같은 `dlwnscjf11`입니다(저장소 설정).
 
 **코드**
-- Windows 경로 문제를 고쳤습니다(`1d405a5c`, `4f75b2a7`).
+- Windows 경로 문제를 고쳤습니다(`5f6b8417`, `d31dddcd`).
   - `URL.pathname`을 파일 경로로 쓰면 `C:\C:\...`가 됩니다. `fileURLToPath`를 씁니다.
   - `/public` 같은 가짜 루트는 `path.resolve`에서 `C:\public`이 됩니다.
   - Windows `tar` 목록은 줄 끝이 CRLF입니다.
-- `windows.rs`를 WPD로 만들었습니다(`1d405a5c`). 저장소 안의 `windows` 모듈과 `windows` 크레이트 이름이 겹치므로, 모듈 안에서는 `::windows::`로 크레이트를 부릅니다.
-- `release-app.mjs`에 Windows(NSIS)를 추가했고, 같은 버전의 다른 플랫폼을 서버에서 받아 함께 싣게 했습니다(`ad4ed986`). `--version`은 `package-lock.json`도 고칩니다(`7736cf87`).
+- `windows.rs`를 WPD로 만들었습니다(`5f6b8417`). 저장소 안의 `windows` 모듈과 `windows` 크레이트 이름이 겹치므로, 모듈 안에서는 `::windows::`로 크레이트를 부릅니다.
+- `release-app.mjs`에 Windows(NSIS)를 추가했고, 같은 버전의 다른 플랫폼을 서버에서 받아 함께 싣게 했습니다(`e1529974`). `--version`은 `package-lock.json`도 고칩니다(`3bd47b45`).
 
 **실기 확인**
 - 결과는 `docs/camera-lut-library.md`의 실기 확인 기록에 있습니다.
@@ -142,6 +145,27 @@ cargo test -p lumix-lut -p lumix-ptp
   - Windows 0.1.1 설치 파일(`sosang_0.1.1_x64-setup.exe`)을 첨부했습니다.
   - 그래서 지금 한 릴리스에 Mac 0.1.0 DMG와 Windows 0.1.1이 섞여 있습니다. macOS 0.1.1이 나오면 v0.1.1 릴리스를 새로 만들어 맞춥니다.
 - PR #1(https://github.com/lee-juncheol/sosang/pull/1, `feat/camera-lut-core` → `main`)을 만들고 2026-11-16에 머지 커밋으로 합쳤습니다. `feat/camera-lut-core` 브랜치는 지우지 않았고, 합친 뒤의 `main`과 같게 맞춰 두었습니다.
+
+### 2026-11-16, Windows 11 (두 번째 Windows 세션)
+
+- GitHub 기록을 다시 쓴 뒤의 재동기화를 안내대로 했습니다. 이 PC에만 있던 변경은 없었고, 옛 기록과의 차이는 Mac에서 지운 문서 5줄뿐이었습니다. 이 문서에 적힌 커밋 번호도 새 번호로 바꿨습니다.
+- 사진 보내기: `photo-courier`(libwebp 포함)가 MSVC로 빌드되고 `cargo test -p photo-courier` 10개, 웹 테스트 105개가 통과했습니다. 앱의 사진 보내기 화면도 뜹니다(단축키 안내가 Ctrl+Enter).
+- 사용자 제보: S1M2를 쓰는 사용자의 LUT 관리에서 체크박스와 삭제가 모두 꺼져 있었습니다("선택된 LUT를 읽지 못해 지우기를 막아 두었습니다").
+  - 원인: 사진 모드에서 LUT를 쓰지 않으면 선택 항목 값이 42("LUT 없음")인데, 앱이 이것을 "못 읽음"으로 처리했습니다. 영상 모드 선택은 별도 항목(`0x530`)에 있습니다.
+  - 카메라 모드를 바꿔 가며 읽기만으로 확인했고, 자세한 구조는 `docs/camera-lut-library.md`의 "삭제와 선택 상태"에 적었습니다.
+  - `SettingsBlob::selected_entries`가 두 항목을 읽어 고른 칸 목록을 돌려줍니다. 앱(`Library.selected`)도 숫자 하나에서 목록으로 바뀌었습니다.
+  - 확인에 쓴 캡처는 `crates/lumix-lut/tests/fixtures/local/`(git 제외)에 `s1m2_fw15_photo37_video_none.bin`, `s1m2_fw15_photo37_video1.bin`, `s1m2_fw15_photo_none_video1.bin`로 두었습니다. macOS에는 없으니 그쪽에서는 이 테스트가 건너뜁니다.
+- 확인 뒤 카메라는 사진 모드 스탠더드, 영상 모드 ARRI 709인 상태입니다(사용자가 직접 바꿈).
+
+### 2026-11-17, Windows 11 (세 번째 Windows 세션)
+
+- 여러 개 지우기 확인 창을 표 아래로 옮기고 화면 하단에 붙도록 했습니다(`position: sticky`).
+- LUT 위치 바꾸기를 넣었습니다: `SettingsBlob::rearranged`, `lumix_ptp::rearrange_luts`, 앱 명령 `camera_rearrange_luts`, LUT 관리의 "위치 바꾸기"(끌어다 놓기와 ↑↓로 두 칸 맞바꾸기, 다 옮긴 뒤 한 번에 적용).
+  - 실기: 29↔30번을 맞바꿔 바이트 단위로 확인했고, 카메라에서도 맞게 적용됐습니다. 사용자 뜻으로 되돌리지 않았습니다.
+- 검증 시간 피드백은 재현되지 않아 보류했습니다(위 "남은 일").
+- Windows 0.1.2를 배포했고, GitHub 릴리스를 대표 페이지(태그 `app`)로 바꿨습니다.
+  - 기존 v0.1.0 릴리스를 태그 `app`으로 옮겼습니다. 주소가 `/releases/tag/v0.1.0`에서 `/releases/tag/app`으로 바뀌었고, 저장소 안에는 옛 주소를 쓰는 곳이 없었습니다. git 태그 `v0.1.0`은 그대로 둡니다.
+  - Mac DMG는 이름만 `sosang-mac-apple-silicon.dmg`로 바꿨고, 내용은 여전히 0.1.0입니다.
 
 ## 보류한 것
 
