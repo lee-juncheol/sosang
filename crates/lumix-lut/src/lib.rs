@@ -27,12 +27,19 @@ const TITLE_HEADER: usize = 8;
 const TITLE_NAME_BYTES: usize = 512;
 /// Link value of an empty title entry.
 const EMPTY_LINK: u16 = 0xFFFF;
-/// Item holding the Library entry chosen in the camera menu, stored three times (item
-/// indices 0, 1, 2; payload 28 bytes; entry + 1 at payload byte 4). Observed on DC-S1M2
-/// firmware 1.5, where it follows the LUT chosen in the camera menu.
-const ITEM_SELECTED: u16 = 0x052F;
+/// Items holding the Library entry chosen in the camera menu: one for photo modes (0x052F)
+/// and one for video modes (0x0530). Each is stored three times (item indices 0, 1, 2;
+/// payload 28 bytes). Payload byte 4 is entry + 1, or `title_count + 1` (42 on DC-S1M2) when
+/// that mode uses no LUT; the next 13 bytes held the same "no LUT" value in every capture.
+/// Observed on DC-S1M2 firmware 1.5 (2026-11-16: photo mode set to Standard made 0x052F read
+/// 42 while 0x0530 kept the video LUT).
+const ITEMS_SELECTED: [u16; 2] = [0x052F, 0x0530];
 const SELECTED_PAYLOAD: usize = 28;
 const SELECTED_AT: usize = 4;
+/// Bytes from `SELECTED_AT` that may name an entry (byte 4 and the 13 that follow it).
+const SELECTED_BYTES: usize = 14;
+/// Entries 0 (Vlog_709) and 1 (ARRI 709) came with the camera and are never changed.
+const BUILT_IN_ENTRIES: usize = 2;
 const LUT_RECORD_LEN: u32 = 0x34A4C; // grid u16 + flag u16 + 33^3*3 u16 + 2 pad bytes
 const LUT_DATA_BYTES: usize = LUT_ENTRIES * 6;
 const MODEL_OFFSET: usize = 0x1E;
@@ -128,7 +135,8 @@ pub struct SettingsBlob {
     bytes: Vec<u8>,
     layout: Layout,
     model: String,
-    selected_at: Option<[usize; 3]>,
+    /// Payload offsets of the three copies of each selection item ([`ITEMS_SELECTED`]).
+    selected_at: Option<[[usize; 3]; 2]>,
 }
 
 impl std::fmt::Debug for SettingsBlob {
@@ -224,12 +232,15 @@ impl SettingsBlob {
         Ok(Self { bytes, layout, model, selected_at })
     }
 
-    /// Offsets of the three copies of the selected-entry byte, when the item is present.
-    fn find_selected(bytes: &[u8]) -> Option<[usize; 3]> {
-        let mut at = [0usize; 3];
-        for (seq, slot) in at.iter_mut().enumerate() {
-            let p = find_item_at(bytes, ITEM_SELECTED, seq as u16, |_, len| len == SELECTED_PAYLOAD).ok()?;
-            *slot = p + SELECTED_AT;
+    /// Offsets of the first selection byte in the three copies of each selection item, when
+    /// both items are present.
+    fn find_selected(bytes: &[u8]) -> Option<[[usize; 3]; 2]> {
+        let mut at = [[0usize; 3]; 2];
+        for (item, copies) in ITEMS_SELECTED.iter().zip(at.iter_mut()) {
+            for (seq, slot) in copies.iter_mut().enumerate() {
+                let p = find_item_at(bytes, *item, seq as u16, |_, len| len == SELECTED_PAYLOAD).ok()?;
+                *slot = p + SELECTED_AT;
+            }
         }
         Some(at)
     }
@@ -383,14 +394,32 @@ impl SettingsBlob {
         Ok(())
     }
 
-    /// Library entry selected in the camera menu, when it can be read for this layout.
-    pub fn selected_entry(&self) -> Option<usize> {
+    /// Library entries selected in the camera menu (photo and video modes), sorted. Empty when
+    /// no mode uses a LUT; `None` when the selection can't be read for this layout (an item is
+    /// missing, its three copies disagree, or a value is neither an entry nor "no LUT").
+    pub fn selected_entries(&self) -> Option<Vec<usize>> {
         let at = self.selected_at?;
-        let v = self.bytes[at[0]];
-        if at.iter().any(|&o| self.bytes[o] != v) || v == 0 || v as usize > self.layout.title_count {
-            return None;
+        let none = self.layout.title_count + 1;
+        let mut selected = Vec::new();
+        for copies in at {
+            let first = &self.bytes[copies[0]..copies[0] + SELECTED_BYTES];
+            if copies.iter().any(|&o| &self.bytes[o..o + SELECTED_BYTES] != first) {
+                return None;
+            }
+            for (i, &v) in first.iter().enumerate() {
+                match v as usize {
+                    v if v == none => {}
+                    v if (1..=self.layout.title_count).contains(&v) => selected.push(v - 1),
+                    // Byte 4 is known; the bytes after it only ever held "no LUT", so an
+                    // unknown value there is ignored rather than blocking deletes.
+                    _ if i == 0 => return None,
+                    _ => {}
+                }
+            }
         }
-        Some(v as usize - 1)
+        selected.sort_unstable();
+        selected.dedup();
+        Some(selected)
     }
 
     /// Return a new blob with Library entry `index` emptied, the way the camera's own delete
@@ -414,8 +443,9 @@ impl SettingsBlob {
         }
         let entries = self.entries();
         // The camera changes its selection when the selected LUT is deleted, by a rule not yet
-        // known, so the selected entry is never deleted, and nothing is when it can't be read.
-        let Some(selected) = self.selected_entry() else {
+        // known, so a LUT selected in any mode is never deleted, and nothing is when the
+        // selection can't be read.
+        let Some(selected) = self.selected_entries() else {
             return Err(Error::Slot("the LUT selected in the camera can't be read on this body, so deleting is not supported yet".into()));
         };
         for &index in &unique {
@@ -425,7 +455,7 @@ impl SettingsBlob {
             if !entries[index].in_use {
                 return Err(Error::Slot(format!("entry {index} is already empty")));
             }
-            if selected == index {
+            if selected.contains(&index) {
                 return Err(Error::Slot(format!("entry {index} is selected in the camera; choose another LUT there first")));
             }
         }
@@ -448,6 +478,85 @@ impl SettingsBlob {
             .find(|(i, (x, y))| x != y && *i != last && !titles.iter().any(|a| a.contains(i)))
         {
             return Err(Error::Guard(format!("byte {i:#x} would change outside the target slots")));
+        }
+        SettingsBlob::parse(b)
+    }
+
+    /// Move LUTs between Library entries in one go (one write to the camera).
+    ///
+    /// `order` has one item per entry: `order[k]` is the entry whose LUT ends up in entry `k`
+    /// (`None` = entry `k` ends up empty). Every LUT in use must appear exactly once. A moved
+    /// LUT takes its name, base style and LUT record with it; the title's link is set to its
+    /// new index, as the camera requires. Entries 0 and 1 and every entry selected in the
+    /// camera stay where they are (the camera refers to selections by entry number), and
+    /// nothing moves when the selection can't be read.
+    pub fn rearranged(&self, order: &[Option<usize>]) -> Result<SettingsBlob, Error> {
+        let count = self.layout.title_count;
+        if order.len() != count {
+            return Err(Error::Slot(format!("the new order lists {} entries, the camera has {count}", order.len())));
+        }
+        let entries = self.entries();
+        let Some(selected) = self.selected_entries() else {
+            return Err(Error::Slot("the LUT selected in the camera can't be read on this body, so moving is not supported yet".into()));
+        };
+        let mut used = vec![false; count];
+        for (k, source) in order.iter().enumerate() {
+            match *source {
+                Some(s) if s >= count => return Err(Error::Slot(format!("entry {k}: entry {s} does not exist"))),
+                Some(s) if !entries[s].in_use => return Err(Error::Slot(format!("entry {k}: entry {s} is empty"))),
+                Some(s) if used[s] => return Err(Error::Slot(format!("entry {s} is placed twice"))),
+                Some(s) => used[s] = true,
+                None => {}
+            }
+            let fixed = k < BUILT_IN_ENTRIES || selected.contains(&k);
+            if fixed && *source != entries[k].in_use.then_some(k) {
+                return Err(Error::Slot(format!("entry {k} is built in or selected in the camera, so it stays as it is")));
+            }
+        }
+        if let Some(lost) = entries.iter().find(|e| e.in_use && !used[e.index]) {
+            return Err(Error::Slot(format!("entry {} ({:?}) is missing from the new order", lost.index, lost.name)));
+        }
+        let moved: Vec<usize> = (0..count).filter(|&k| order[k] != entries[k].in_use.then_some(k)).collect();
+        if moved.is_empty() {
+            return Err(Error::Slot("nothing to move".into()));
+        }
+
+        let record_len = 4 + LUT_RECORD_LEN as usize;
+        let mut b = self.bytes.clone();
+        let mut allowed = Vec::with_capacity(moved.len() * 2 + 1);
+        for &k in &moved {
+            let t = self.title_offset(k);
+            b[t..t + 4].copy_from_slice(&(k as u32).to_le_bytes());
+            match order[k] {
+                Some(s) => {
+                    let from = self.title_offset(s);
+                    b[t + 4..t + 6].copy_from_slice(&(k as u16).to_le_bytes());
+                    b[t + 6..t + TITLE_HEADER + TITLE_NAME_BYTES].copy_from_slice(&self.bytes[from + 6..from + TITLE_HEADER + TITLE_NAME_BYTES]);
+                    let (r, src) = (self.record_offset(k), self.record_offset(s));
+                    b[r..r + record_len].copy_from_slice(&self.bytes[src..src + record_len]);
+                    allowed.push(r..r + record_len);
+                }
+                // Emptied the way the camera's own delete does it; the record is left as it is.
+                None => {
+                    b[t + 4..t + 6].copy_from_slice(&EMPTY_LINK.to_le_bytes());
+                    b[t + 6..t + 8].copy_from_slice(&BaseStyle::VLog.code().to_le_bytes());
+                    b[t + TITLE_HEADER..t + TITLE_HEADER + TITLE_NAME_BYTES].fill(0);
+                }
+            }
+            allowed.push(t..t + TITLE_STRIDE);
+        }
+        let last = b.len() - 1;
+        b[last] = checksum_for(&b);
+        allowed.push(last..last + 1);
+
+        // Guard: nothing outside the moved entries' titles, their records and the checksum.
+        if let Some((i, _)) = b
+            .iter()
+            .zip(&self.bytes)
+            .enumerate()
+            .find(|(i, (x, y))| x != y && !allowed.iter().any(|a| a.contains(i)))
+        {
+            return Err(Error::Guard(format!("byte {i:#x} would change outside the moved slots")));
         }
         SettingsBlob::parse(b)
     }

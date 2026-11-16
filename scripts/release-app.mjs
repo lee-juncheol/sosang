@@ -1,6 +1,6 @@
 // Build a signed desktop app update and put it where the Cloudflare build publishes it.
 //
-//   npm run release:app -- [--version X.Y.Z] [--notes "text"] [--deploy]
+//   npm run release:app -- [--version X.Y.Z] [--notes "text"] [--deploy] [--github]
 //
 // 1. Optionally set the version in package.json, src-tauri/Cargo.toml and tauri.conf.json
 //    (they must match: the updater compares against the version built into the app).
@@ -12,6 +12,8 @@
 //    kept (their downloads are fetched), so macOS and Windows can be released one after the
 //    other from different machines with the same key.
 // 4. With --deploy, build and deploy the site, which publishes both under /app/.
+// 5. With --github, put this machine's installer (macOS DMG, Windows setup .exe) on the one
+//    GitHub release page (tag `app`) and update its version line (scripts/github-release.mjs).
 //
 // Signing key: TAURI_SIGNING_PRIVATE_KEY_PATH, default ~/.tauri/sosang-updater.key. Its
 // password comes from TAURI_SIGNING_PRIVATE_KEY_PASSWORD, or the Tauri CLI asks for it.
@@ -74,12 +76,18 @@ function target(version) {
   const arch = { arm64: 'aarch64', x64: 'x86_64' }[process.arch];
   assert(arch, `Unsupported architecture: ${process.arch}`);
   if (process.platform === 'darwin') {
-    // The updater needs sosang.app.tar.gz, not the DMG installer.
-    return { key: `darwin-${arch}`, bundle: 'app', file: path.join(root, 'target/release/bundle/macos/sosang.app.tar.gz'), name: `sosang_${version}_darwin-${arch}.app.tar.gz` };
+    // The updater needs sosang.app.tar.gz; the DMG is only built for the GitHub release page.
+    const dmgArch = { aarch64: 'aarch64', x86_64: 'x64' }[arch];
+    return {
+      key: `darwin-${arch}`, bundle: github ? 'app,dmg' : 'app',
+      file: path.join(root, 'target/release/bundle/macos/sosang.app.tar.gz'), name: `sosang_${version}_darwin-${arch}.app.tar.gz`,
+      installer: path.join(root, `target/release/bundle/dmg/sosang_${version}_${dmgArch}.dmg`),
+    };
   }
   if (process.platform === 'win32' && arch === 'x86_64') {
     // The NSIS installer is both the first download and the update the updater runs.
-    return { key: 'windows-x86_64', bundle: 'nsis', file: path.join(root, `target/release/bundle/nsis/sosang_${version}_x64-setup.exe`), name: `sosang_${version}_windows-x86_64-setup.exe` };
+    const file = path.join(root, `target/release/bundle/nsis/sosang_${version}_x64-setup.exe`);
+    return { key: 'windows-x86_64', bundle: 'nsis', file, name: `sosang_${version}_windows-x86_64-setup.exe`, installer: file };
   }
   assert.fail(`Releases are built on macOS or 64-bit Windows, not ${process.platform}-${process.arch}`);
 }
@@ -114,6 +122,7 @@ async function otherPlatforms(version, ownKey, releaseDir) {
   return kept;
 }
 
+const github = process.argv.includes('--github');
 const requested = option('--version');
 if (requested) await setVersion(requested);
 const versions = await readVersions();
@@ -149,3 +158,7 @@ console.log(`Platforms in this release: ${Object.keys(manifest.platforms).sort()
 
 if (process.argv.includes('--deploy')) run(['scripts/run-web.mjs', 'deploy:cloudflare']);
 else console.log('Publish it with: npm run deploy:cloudflare');
+if (github) {
+  const { updateGithubRelease } = await import('./github-release.mjs');
+  await updateGithubRelease(own.key, version, own.installer);
+}

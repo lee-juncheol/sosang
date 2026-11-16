@@ -416,6 +416,56 @@ pub fn delete_luts(camera: &Camera, indices: &[usize], expected: &[Expected], ba
     Ok(DeleteReport { deleted, backup })
 }
 
+/// What [`rearrange_luts`] did.
+#[derive(Debug, Clone)]
+pub struct RearrangeReport {
+    /// Entries whose content changed, with the name each now holds (`None` = now empty).
+    pub moved: Vec<(usize, Option<String>)>,
+    pub backup: PathBuf,
+}
+
+/// Move LUTs between Library entries in a single write (see [`SettingsBlob::rearranged`] for
+/// `order`), with a backup and a read-back check of every moved entry's name, style and LUT.
+/// `expected` should list every entry as the caller last saw it, so the write stops if the
+/// camera's Library changed since.
+pub fn rearrange_luts(camera: &Camera, order: &[Option<usize>], expected: &[Expected], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RearrangeReport, PtpError> {
+    if !camera.may_write() {
+        return Err(camera.not_verified());
+    }
+    progress("reading");
+    let current = camera.read_settings()?;
+    check_expected(&current, expected)?;
+    let patched = current.rearranged(order)?;
+    let before = current.entries();
+    let want = patched.entries();
+    let moved: Vec<(usize, Option<String>)> =
+        (0..want.len()).filter(|&k| want[k] != before[k]).map(|k| (k, want[k].in_use.then(|| want[k].name.clone()))).collect();
+    let names: Vec<String> = moved.iter().map(|(k, n)| format!("{k} {}", n.as_deref().unwrap_or("(empty)"))).collect();
+    let backup = save_backup(camera, &current, backup_dir, &format!("before moving to {}", names.join(", ")))?;
+
+    progress("writing");
+    camera.write_settings(&patched)?;
+
+    progress("verifying");
+    let after = camera.read_settings()?;
+    let got = after.entries();
+    let mismatch = moved.iter().find_map(|&(k, _)| {
+        if got.get(k) != want.get(k) {
+            Some(format!("entry {k} reads back as {:?}", got.get(k).map(|e| e.name.as_str())))
+        } else if want[k].in_use && after.lut(k) != patched.lut(k) {
+            Some(format!("LUT data in entry {k} differs from what was sent"))
+        } else {
+            None
+        }
+    });
+    let mismatch = mismatch.or_else(|| (got.len() != before.len()).then(|| "the Library size changed".to_string()));
+    if let Some(m) = mismatch {
+        return Err(roll_back(camera, &current, m, &mut progress));
+    }
+    progress("done");
+    Ok(RearrangeReport { moved, backup })
+}
+
 /// Parse a PTP DeviceInfo dataset (data phase only).
 pub fn parse_device_info(d: &[u8]) -> Option<DeviceInfo> {
     let mut p = 0usize;

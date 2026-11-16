@@ -34,6 +34,20 @@
 .lut-check input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
 .lut-bulk{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:48px;margin-bottom:8px;padding:8px 12px;border:1px solid var(--line-faint);border-radius:7px}
 .lut-bulk.active{border-color:#ff7a7a55;background:#ff5a5a0d}
+.lut-bulk.sticky{position:sticky;bottom:16px;z-index:5;margin:10px 0 0;background:#2a1d1f;box-shadow:0 8px 28px #0008}
+.lut-bulk.arrange{background:#1f2416;border-color:#9aff0055}
+.lut-bulk button.primary{border-color:var(--accent);background:var(--accent);color:#16200c;font-weight:600}
+.lut-bulk button:disabled{opacity:.45;cursor:not-allowed}
+.lut-arrange-start{flex:0 0 auto}
+.lut-manager tr.fixed td{opacity:.55}
+.lut-manager tr.moved td{background:#9aff0010}
+.lut-manager tr.drag-source td{opacity:.4}
+.lut-manager tr[draggable=true]{cursor:grab}
+.lut-grip{color:var(--faint);font-size:14px;user-select:none}
+.lut-move{display:inline-flex;gap:4px}
+.lut-move button{min-width:30px;min-height:28px;padding:0 6px;border:1px solid #414249;border-radius:6px;color:var(--text)}
+.lut-move button:disabled{opacity:.35;cursor:not-allowed}
+.lut-badge.moved{background:#9aff0018;color:var(--accent)}
 .lut-bulk-hint{color:var(--faint)}
 .lut-bulk p{margin:0;font-size:13px;line-height:1.45;overflow-wrap:anywhere;flex:1 1 300px}
 .lut-bulk button{min-height:30px;padding:0 10px;border:1px solid #414249;border-radius:6px;font-size:12px;color:var(--text)}

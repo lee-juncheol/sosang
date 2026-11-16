@@ -3,7 +3,7 @@
 //! talk to the camera at the same time.
 
 use lumix_lut::parse_cube;
-use lumix_ptp::{delete_luts, register_luts, restore_settings, Camera, DeviceInfo, PtpError};
+use lumix_ptp::{delete_luts, rearrange_luts, register_luts, restore_settings, Camera, DeviceInfo, PtpError};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -110,8 +110,9 @@ pub struct Library {
     camera: CameraStatus,
     entries: Vec<LibraryEntry>,
     free_slots: Vec<usize>,
-    /// Entry chosen in the camera menu, when it can be read (deleting needs it).
-    selected: Option<usize>,
+    /// Entries chosen in the camera menu (photo and video modes), when they can be read;
+    /// deleting needs them. Empty when no mode uses a LUT.
+    selected: Option<Vec<usize>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -163,7 +164,7 @@ pub async fn camera_list_luts(app: AppHandle) -> Result<Library, CommandError> {
             .into_iter()
             .map(|e| LibraryEntry { index: e.index, name: e.name, style_code: e.style_code, in_use: e.in_use })
             .collect();
-        Ok(Library { camera: camera.info().into(), entries, free_slots: blob.free_slots(), selected: blob.selected_entry() })
+        Ok(Library { camera: camera.info().into(), entries, free_slots: blob.free_slots(), selected: blob.selected_entries() })
     })
     .await
 }
@@ -286,6 +287,45 @@ pub async fn camera_delete_luts(app: AppHandle, slots: Vec<usize>, names: Vec<St
         })?;
         Ok(DeleteResult {
             deleted: report.deleted.into_iter().map(|(index, name)| EntryName { index, name }).collect(),
+            backup: report.backup.display().to_string(),
+        })
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovedEntry {
+    index: usize,
+    /// Name the entry now holds; `None` when it is now empty.
+    name: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RearrangeResult {
+    moved: Vec<MovedEntry>,
+    backup: String,
+}
+
+/// Move LUTs between Library slots in one write: read, back up, write, read back. About 25 s.
+/// `order[k]` is the slot whose LUT ends up in slot k (`null` = slot k ends up empty), one item
+/// per slot. `names` is every slot as the caller saw it (`null` = empty); the write stops if
+/// the camera no longer matches. Emits `camera-progress` like `camera_register_lut`.
+#[tauri::command]
+pub async fn camera_rearrange_luts(app: AppHandle, order: Vec<Option<usize>>, names: Vec<Option<String>>, experimental: bool) -> Result<RearrangeResult, CommandError> {
+    if names.len() != order.len() {
+        return Err(CommandError::new("internal", "one name per slot is needed"));
+    }
+    let expected: Vec<lumix_ptp::Expected> = names.into_iter().enumerate().collect();
+    with_camera(app, move |app, camera| {
+        consent(camera, experimental);
+        let backups = backup_dir(app)?;
+        let report = rearrange_luts(camera, &order, &expected, &backups, |step| {
+            let _ = app.emit("camera-progress", step);
+        })?;
+        Ok(RearrangeResult {
+            moved: report.moved.into_iter().map(|(index, name)| MovedEntry { index, name }).collect(),
             backup: report.backup.display().to_string(),
         })
     })

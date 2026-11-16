@@ -58,7 +58,9 @@ fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
             let t = Instant::now();
             cam.write_settings(&blob)?;
             println!("rewrote unchanged settings in {:.1}s", t.elapsed().as_secs_f32());
+            let t = Instant::now();
             let again = cam.read_settings()?;
+            println!("read back in {:.1}s", t.elapsed().as_secs_f32());
             let diff = again.as_bytes().iter().zip(blob.as_bytes()).filter(|(a, b)| a != b).count();
             println!("read back: {diff} bytes differ (camera-side state bytes are expected)");
         }

@@ -89,7 +89,7 @@ fn reads_the_entry_selected_in_the_camera() {
     let cases = [("s1m2_fw15_first_read.bin", 32), ("s1m2_fw15_test01_slot40.bin", 2), ("s1m2_fw15_before_camera_delete.bin", 39), ("s1m2_fw15_after_camera_delete.bin", 2)];
     for (name, selected) in cases {
         let Some(b) = fixture(name) else { continue };
-        assert_eq!(SettingsBlob::parse(b).unwrap().selected_entry(), Some(selected), "{name}");
+        assert!(SettingsBlob::parse(b).unwrap().selected_entries().unwrap().contains(&selected), "{name}");
     }
 }
 
@@ -116,7 +116,7 @@ fn delete_writes_the_same_empty_entry_as_the_camera() {
 fn delete_refuses_the_selected_entry_empty_entries_and_the_built_in() {
     let Some(b) = fixture("s1m2_fw15_test01_slot40.bin") else { return };
     let s = SettingsBlob::parse(b).unwrap();
-    assert_eq!(s.selected_entry(), Some(2));
+    assert!(s.selected_entries().unwrap().contains(&2));
     assert!(matches!(s.without_lut(2), Err(Error::Slot(_))), "entry 2 is selected in the camera");
     assert!(matches!(s.without_lut(38), Err(Error::Slot(_))), "entry 38 is empty");
     assert!(matches!(s.without_lut(0), Err(Error::Slot(_))));
@@ -217,13 +217,125 @@ fn other_lumix_bodies_are_read_when_the_structure_matches() {
     let s = SettingsBlob::parse(b.clone()).unwrap();
     assert_eq!(s.model(), "DC-S5M2");
     assert_eq!(s.entries().len(), 41);
-    assert_eq!(s.selected_entry(), Some(2));
+    assert!(s.selected_entries().unwrap().contains(&2));
 
     // Not a LUMIX model string.
     let mut other = b.clone();
     other[0x1E..0x1E + 8].copy_from_slice(b"XX-1234\0");
     reseal(&mut other);
     assert!(matches!(SettingsBlob::parse(other), Err(Error::UnsupportedModel(_))));
+}
+
+#[test]
+fn reads_the_photo_and_video_selections() {
+    // 2026-11-16, Windows: photo mode on entry 37, video mode with no LUT.
+    if let Some(b) = fixture("s1m2_fw15_photo37_video_none.bin") {
+        assert_eq!(SettingsBlob::parse(b).unwrap().selected_entries(), Some(vec![37]));
+    }
+    // Then video mode on ARRI 709 (entry 1).
+    if let Some(b) = fixture("s1m2_fw15_photo37_video1.bin") {
+        assert_eq!(SettingsBlob::parse(b).unwrap().selected_entries(), Some(vec![1, 37]));
+    }
+}
+
+#[test]
+fn delete_works_when_photo_mode_uses_no_lut() {
+    // 2026-11-16: photo mode set to Standard (no LUT) while video mode kept ARRI 709. The
+    // photo item then reads "no LUT" (42), which blocked every delete before.
+    let Some(b) = fixture("s1m2_fw15_photo_none_video1.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    assert_eq!(s.selected_entries(), Some(vec![1]));
+    let out = s.without_lut(37).unwrap();
+    assert!(!out.entries()[37].in_use);
+}
+
+#[test]
+fn delete_refuses_an_entry_selected_in_video_mode() {
+    let Some(mut b) = fixture("s1m2_fw15_photo_none_video1.bin") else { return };
+    // Point the video selection (0x0530, all three copies) at entry 37.
+    for seq in 0..3u8 {
+        let pat = [0x30, 0x05, seq, 0x00, 0x1C, 0x00, 0x00, 0x00];
+        let at = b.windows(8).position(|w| w == pat).expect("video selection item");
+        b[at + 8 + 4] = 38;
+    }
+    reseal(&mut b);
+    let s = SettingsBlob::parse(b).unwrap();
+    assert_eq!(s.selected_entries(), Some(vec![37]));
+    assert!(matches!(s.without_lut(37), Err(Error::Slot(_))), "entry 37 is selected in video mode");
+    assert!(s.without_lut(36).is_ok());
+}
+
+fn identity(s: &SettingsBlob) -> Vec<Option<usize>> {
+    s.entries().iter().map(|e| e.in_use.then_some(e.index)).collect()
+}
+
+#[test]
+fn swapping_two_entries_moves_name_style_and_lut_together() {
+    let Some(b) = fixture("s1m2_fw15_photo_none_video1.bin") else { return };
+    let s = SettingsBlob::parse(b.clone()).unwrap();
+    let before = s.entries();
+    let (a, c) = (30, 33);
+    assert!(before[a].in_use && before[c].in_use);
+    let mut order = identity(&s);
+    order.swap(a, c);
+    let out = s.rearranged(&order).unwrap();
+    let after = out.entries();
+    for (k, from) in [(a, c), (c, a)] {
+        assert_eq!(after[k].name, before[from].name);
+        assert_eq!(after[k].style_code, before[from].style_code);
+        assert_eq!(out.lut(k), s.lut(from), "LUT data moved with entry {from}");
+        // The link must equal the entry's own index.
+        let t = TITLES + k * STRIDE;
+        assert_eq!(&out.as_bytes()[t + 4..t + 6], &(k as u16).to_le_bytes());
+    }
+    // Nothing else changed in the Library.
+    for k in (0..before.len()).filter(|&k| k != a && k != c) {
+        assert_eq!(after[k], before[k]);
+    }
+    // Swapping back restores the original bytes exactly.
+    let back = out.rearranged(&order).unwrap();
+    assert!(back.as_bytes() == b.as_slice());
+}
+
+#[test]
+fn moving_into_an_empty_entry_empties_the_old_one_like_a_delete() {
+    let Some(b) = fixture("s1m2_fw15_photo_none_video1.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    let free = *s.free_slots().first().expect("an empty entry");
+    let from = 30;
+    let mut order = identity(&s);
+    order[free] = Some(from);
+    order[from] = None;
+    let out = s.rearranged(&order).unwrap();
+    assert_eq!(out.entries()[free].name, s.entries()[from].name);
+    assert_eq!(out.lut(free), s.lut(from));
+    assert!(!out.entries()[from].in_use);
+    let deleted = s.without_lut(from).unwrap();
+    let t = TITLES + from * STRIDE;
+    assert_eq!(&out.as_bytes()[t..t + STRIDE], &deleted.as_bytes()[t..t + STRIDE], "emptied like the camera's delete");
+}
+
+#[test]
+fn moving_refuses_fixed_entries_and_incomplete_orders() {
+    let Some(b) = fixture("s1m2_fw15_photo_none_video1.bin") else { return };
+    let s = SettingsBlob::parse(b).unwrap();
+    assert_eq!(s.selected_entries(), Some(vec![1]));
+    let base = identity(&s);
+    let refuse = |order: &[Option<usize>], why: &str| assert!(matches!(s.rearranged(order), Err(Error::Slot(_))), "{why}");
+    refuse(&base, "nothing moves");
+    let mut o = base.clone();
+    o.swap(1, 30);
+    refuse(&o, "entry 1 is built in and selected in video mode");
+    let mut o = base.clone();
+    o.swap(0, 30);
+    refuse(&o, "entry 0 is built in");
+    let mut o = base.clone();
+    o[31] = Some(30);
+    refuse(&o, "entry 30 placed twice, 31 lost");
+    let mut o = base.clone();
+    o[30] = None;
+    refuse(&o, "entry 30 would be lost");
+    refuse(&base[..base.len() - 1], "wrong length");
 }
 
 #[test]
@@ -235,7 +347,7 @@ fn delete_is_refused_when_the_selected_entry_cannot_be_read() {
     b[at] = 0x30;
     reseal(&mut b);
     let s = SettingsBlob::parse(b).unwrap();
-    assert_eq!(s.selected_entry(), None);
+    assert_eq!(s.selected_entries(), None);
     assert!(matches!(s.without_lut(37), Err(Error::Slot(_))));
     // Registering does not depend on it.
     assert!(s.with_lut(38, "TEST", BaseStyle::VLog, &test01(), false).is_ok());

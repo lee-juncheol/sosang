@@ -2,11 +2,11 @@ import { useRef, useState, type DragEvent } from 'react'
 import type { Translate } from './i18n'
 import { errorText, ExperimentalConsent } from './CameraRegister'
 import { CameraBusyOverlay } from './CameraBusyOverlay'
-import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
+import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRearrange, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
 import './lutManager.css'
 
-type Busy = null | { kind: 'reading' } | { kind: 'deleting'; indices: number[] } | { kind: 'adding'; indices: number[] } | { kind: 'restoring'; indices: number[] }
-type Done = { kind: 'deleted' | 'added' | 'restored'; entries: { index: number; name: string }[]; backup: string }
+type Busy = null | { kind: 'reading' } | { kind: 'deleting'; indices: number[] } | { kind: 'adding'; indices: number[] } | { kind: 'restoring'; indices: number[] } | { kind: 'moving'; indices: number[] }
+type Done = { kind: 'deleted' | 'added' | 'restored' | 'moved'; entries: { index: number; name: string }[]; backup: string }
 /** A file waiting to go to the camera. `error` set = the file cannot be used. */
 type QueueItem = { id: number; fileName: string; text: string; style: string | null; error: string; name: string; slot: number | null }
 
@@ -38,13 +38,16 @@ export function LutManager({ t }: { t: Translate }) {
   const [backups, setBackups] = useState<CameraBackup[] | null>(null)
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
   const [done, setDone] = useState<Done | null>(null)
+  /** Pending new order while moving LUTs: `arrange[k]` = slot whose LUT goes to slot k (null = empty). */
+  const [arrange, setArrange] = useState<(number | null)[] | null>(null)
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [error, setError] = useState<{ text: string; detail: string } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const fail = (e: unknown) => setError({ text: errorText(t, e), detail: e instanceof Error ? e.message : String(e) })
 
   async function read() {
-    setBusy({ kind: 'reading' }); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false); setChecked(new Set())
+    setBusy({ kind: 'reading' }); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false); setChecked(new Set()); setArrange(null)
     try {
       const next = await cameraListLuts()
       if (!library || library.camera.model !== next.camera.model || library.camera.firmware !== next.camera.firmware) setExperimentalOk(false)
@@ -120,7 +123,7 @@ export function LutManager({ t }: { t: Translate }) {
 
   function onDrop(event: DragEvent) {
     event.preventDefault(); setDragging(false)
-    if (!busy && canWrite) void addFiles(Array.from(event.dataTransfer.files))
+    if (!busy && canWrite && !arranging) void addFiles(Array.from(event.dataTransfer.files))
   }
   function onDragOver(event: DragEvent) {
     if (!Array.from(event.dataTransfer.types).includes('Files')) return
@@ -167,7 +170,55 @@ export function LutManager({ t }: { t: Translate }) {
     finally { setBusy(null); setStep(null) }
   }
 
+  /** Slots whose content may change while moving: user slots not selected on the camera. */
+  const movable = (k: number) => k >= FIRST_USER_ENTRY && !isSelected(k)
+
+  function startArrange() {
+    if (!library) return
+    setArrange(library.entries.map(e => e.inUse ? e.index : null))
+    setChecked(new Set()); setConfirmBulk(false); setConfirmDelete(null); setDone(null); setError(null)
+  }
+
+  /** Swap the contents of two slots in the pending order. */
+  function swap(a: number, b: number) {
+    if (a === b || !movable(a) || !movable(b)) return
+    setArrange(current => {
+      if (!current) return current
+      const next = [...current]
+      ;[next[a], next[b]] = [next[b], next[a]]
+      return next
+    })
+  }
+
+  /** Nearest movable slot above (-1) or below (+1) `k`. */
+  function neighbour(k: number, direction: -1 | 1): number | null {
+    for (let i = k + direction; library && i >= 0 && i < library.entries.length; i += direction) if (movable(i)) return i
+    return null
+  }
+
+  async function applyArrange() {
+    if (!library || !arrange || !arrangeChanges.length) return
+    const order = arrange
+    setBusy({ kind: 'moving', indices: arrangeChanges }); setStep(null); setError(null); setDone(null)
+    try {
+      const result = await cameraRearrange(order, library.entries.map(e => e.inUse ? e.name : null), experimental, setStep)
+      setDone({ kind: 'moved', entries: result.moved.map(m => ({ index: m.index, name: m.name ?? '' })), backup: result.backup })
+      const old = library.entries
+      setLibrary({
+        ...library,
+        entries: old.map((e, k) => {
+          const from = order[k]
+          return from === null ? { ...e, name: '', inUse: false, styleCode: 49 } : { ...old[from], index: k }
+        }),
+        freeSlots: order.flatMap((from, k) => from === null && k >= 1 ? [k] : []),
+      })
+      setArrange(null)
+    } catch (e) { fail(e) }
+    finally { setBusy(null); setStep(null) }
+  }
+
   function actionLabel(action: string): string {
+    if (action.startsWith('before moving to ')) return t("{0} 위치 바꾸기 전", [action.slice('before moving to '.length)])
     if (action.startsWith('before adding ')) return t("{0} 넣기 전", [action.slice('before adding '.length)])
     if (action.startsWith('before deleting ')) return t("{0} 지우기 전", [action.slice('before deleting '.length)])
     if (action === 'before restoring a backup') return t("백업 되돌리기 전")
@@ -176,8 +227,14 @@ export function LutManager({ t }: { t: Translate }) {
 
   const experimental = !!library && !library.camera.writeSupported && library.camera.writeExperimental
   const canWrite = !!library && (library.camera.writeSupported || (experimental && experimentalOk))
-  /** Deleting needs to know which LUT the camera has selected (it is never deleted). */
+  /** Deleting needs to know which LUTs the camera has selected in photo and video modes
+   *  (those are never deleted). */
   const canDeleteAny = canWrite && library?.selected != null
+  const isSelected = (index: number) => !!library?.selected?.includes(index)
+  const arranging = arrange !== null
+  /** Slots whose content differs from the camera in the pending order. */
+  const arrangeChanges = library && arrange ? arrange.flatMap((from, k) => from !== (library.entries[k].inUse ? k : null) ? [k] : []) : []
+  const canArrange = canDeleteAny && !!library && library.entries.filter((_, k) => k >= FIRST_USER_ENTRY && !isSelected(k)).length > 1
   const ready = queue.filter(q => !q.error)
   const slotCounts = new Map<number, number>()
   for (const q of ready) if (q.slot !== null) slotCounts.set(q.slot, (slotCounts.get(q.slot) ?? 0) + 1)
@@ -191,13 +248,14 @@ export function LutManager({ t }: { t: Translate }) {
     : busy ? t("카메라 설정을 읽고 백업하는 중…")
     : ''
   const used = library ? library.entries.filter(e => e.inUse).length : 0
-  const deletable = library && canDeleteAny ? library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && e.index !== library.selected) : []
+  const deletable = library && canDeleteAny ? library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && !isSelected(e.index)) : []
   const checkedEntries = deletable.filter(e => checked.has(e.index))
   const allChecked = deletable.length > 0 && checkedEntries.length === deletable.length
   const doneText = !done ? ''
     : done.kind === 'restored' ? t("백업 시점의 카메라 설정으로 되돌렸습니다. 카메라에서 설정을 확인해 주세요.")
     : done.kind === 'added' && done.entries.length === 1 ? t("{0}번 칸에 ‘{1}’을 등록했습니다. 카메라 메뉴의 LUT 라이브러리에서 확인하세요.", [done.entries[0].index, done.entries[0].name])
     : done.kind === 'added' ? t("LUT {0}개를 등록했습니다: {1}", [done.entries.length, done.entries.map(e => `${e.index} ${e.name}`).join(', ')])
+    : done.kind === 'moved' ? t("LUT 위치를 바꿨습니다: {0}", [done.entries.map(e => `${e.index} ${e.name || t("빈 칸")}`).join(', ')])
     : done.entries.length === 1 ? t("{0}번 칸의 ‘{1}’을 지웠습니다.", [done.entries[0].index, done.entries[0].name])
     : t("LUT {0}개를 지웠습니다: {1}", [done.entries.length, done.entries.map(e => `${e.index} ${e.name}`).join(', ')])
 
@@ -227,27 +285,45 @@ export function LutManager({ t }: { t: Translate }) {
         {experimental ? <ExperimentalConsent t={t} camera={library.camera} checked={experimentalOk} disabled={!!busy} onChange={setExperimentalOk} className="lut-manager-confirm lut-manager-experimental"/>
           : !canWrite && <p className="lut-manager-warning">{t("{0} 펌웨어 {1}에는 아직 등록하거나 지울 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])}</p>}
         {canWrite && library.selected == null && <p className="lut-manager-note">{t("이 카메라에서는 선택된 LUT를 읽지 못해 지우기를 막아 두었습니다. 넣기는 할 수 있습니다.")}</p>}
-        {canDeleteAny && deletable.length > 0 && <div className={`lut-bulk${checkedEntries.length ? ' active' : ''}`} role="region" aria-label={t("여러 개 지우기")}>
-          {confirmBulk ? <>
-            <p>{t("선택한 LUT {0}개를 지웁니다: {1}", [checkedEntries.length, checkedEntries.map(e => `${e.index} ${e.name}`).join(', ')])}</p>
-            <span className="lut-confirm">
-              <button type="button" className="danger" disabled={!!busy} onClick={() => void remove(checkedEntries.map(e => e.index))}>{t("{0}개 지우기", [checkedEntries.length])}</button>
-              <button type="button" disabled={!!busy} onClick={() => setConfirmBulk(false)}>{t("취소")}</button>
-            </span>
-          </> : !checkedEntries.length ? <p className="lut-bulk-hint">{t("왼쪽 칸을 체크하면 여러 LUT를 한 번에 지울 수 있습니다.")}</p> : <>
-            <p>{t("{0}개 선택됨", [checkedEntries.length])}</p>
-            <span className="lut-confirm">
-              <button type="button" className="danger" disabled={!!busy} onClick={() => { setConfirmBulk(true); setConfirmDelete(null) }}>{t("선택한 LUT 지우기")}</button>
-              <button type="button" disabled={!!busy} onClick={() => setChecked(new Set())}>{t("선택 해제")}</button>
-            </span>
-          </>}
+        {!arranging && canDeleteAny && deletable.length > 0 && !checkedEntries.length && <div className="lut-bulk" role="region" aria-label={t("여러 개 지우기")}>
+          <p className="lut-bulk-hint">{t("왼쪽 칸을 체크하면 여러 LUT를 한 번에 지울 수 있습니다.")}</p>
+          {canArrange && <button type="button" className="lut-arrange-start" disabled={!!busy} onClick={startArrange}>{t("위치 바꾸기")}</button>}
         </div>}
+        {arranging && <p className="lut-manager-note">{t("줄을 끌어다 놓거나 ↑↓ 버튼으로 두 칸을 맞바꿉니다. 빈 칸과 바꾸면 그 칸으로 옮겨집니다. 다 옮긴 뒤 한 번에 카메라에 씁니다. 0·1번과 카메라에서 선택된 LUT는 옮길 수 없습니다.")}</p>}
         <table>
-          <thead><tr><th scope="col" className="lut-check">{canDeleteAny && deletable.length > 0 && <input type="checkbox" aria-label={t("지울 수 있는 LUT 모두 선택")} checked={allChecked} disabled={!!busy}
+          <thead><tr><th scope="col" className="lut-check">{!arranging && canDeleteAny && deletable.length > 0 && <input type="checkbox" aria-label={t("지울 수 있는 LUT 모두 선택")} checked={allChecked} disabled={!!busy}
             onChange={e => { setChecked(e.target.checked ? new Set(deletable.map(d => d.index)) : new Set()); setConfirmBulk(false); setDone(null) }}/>}</th><th scope="col">{t("번호")}</th><th scope="col">{t("이름")}</th><th scope="col">{t("기준")}</th><th scope="col"><span className="visually-hidden">{t("작업")}</span></th></tr></thead>
           <tbody>{library.entries.map(entry => {
+            if (arrange) {
+              const k = entry.index
+              const from = arrange[k]
+              const shown = from === null ? null : library.entries[from]
+              const fixed = !movable(k)
+              const changed = from !== (entry.inUse ? k : null)
+              const up = fixed ? null : neighbour(k, -1)
+              const down = fixed ? null : neighbour(k, 1)
+              return <tr key={k} className={`${shown ? '' : 'empty'}${fixed ? ' fixed' : ''}${changed ? ' moved' : ''}${dragFrom === k ? ' drag-source' : ''}`}
+                draggable={!fixed && !busy}
+                onDragStart={e => { setDragFrom(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(k)) }}
+                onDragEnd={() => setDragFrom(null)}
+                onDragOver={e => { if (dragFrom !== null && !fixed) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move' } }}
+                onDrop={e => { if (dragFrom !== null) { e.preventDefault(); e.stopPropagation(); swap(dragFrom, k); setDragFrom(null) } }}>
+                <td className="lut-check">{!fixed && <span className="lut-grip" aria-hidden="true">⠿</span>}</td>
+                <td className="lut-index">{k}</td>
+                <td className="lut-name">{shown ? <span title={shown.name}>{shown.name}</span> : <span className="lut-empty">{t("빈 칸")}</span>}
+                  {k < FIRST_USER_ENTRY && <span className="lut-badge">{t("카메라 기본")}</span>}
+                  {isSelected(k) && <span className="lut-badge selected">{t("카메라에서 선택됨")}</span>}
+                  {shown && from !== k && <span className="lut-badge moved">{t("원래 {0}번", [from])}</span>}
+                  {!shown && changed && <span className="lut-badge moved">{t("옮겨서 빈 칸")}</span>}</td>
+                <td className="lut-style">{shown ? styleLabel(t, shown.styleCode) : '—'}</td>
+                <td className="lut-actions">{!fixed && <span className="lut-move">
+                  <button type="button" disabled={!!busy || up === null} aria-label={t("{0}번 칸을 위 칸과 바꾸기", [k])} onClick={() => { if (up !== null) swap(k, up) }}>↑</button>
+                  <button type="button" disabled={!!busy || down === null} aria-label={t("{0}번 칸을 아래 칸과 바꾸기", [k])} onClick={() => { if (down !== null) swap(k, down) }}>↓</button>
+                </span>}</td>
+              </tr>
+            }
             const builtIn = entry.index < FIRST_USER_ENTRY
-            const selected = library.selected === entry.index
+            const selected = isSelected(entry.index)
             const rowBusy = busy && busy.kind !== 'reading' && busy.indices.includes(entry.index)
             const canDelete = canDeleteAny && entry.inUse && !builtIn && !selected
             return <tr key={entry.index} className={`${entry.inUse ? '' : 'empty'}${selected ? ' selected' : ''}${queuedSlots.has(entry.index) ? ' target' : ''}`}>
@@ -271,7 +347,30 @@ export function LutManager({ t }: { t: Translate }) {
             </tr>
           })}</tbody>
         </table>
-        {library.selected !== null && <p className="lut-manager-note">{t("카메라에서 선택된 LUT는 지울 수 없습니다. 카메라 메뉴에서 다른 LUT를 고른 뒤 목록을 다시 읽어 주세요.")}</p>}
+        {/* Below the table and sticky, so the delete bar stays in view while ticking rows further down. */}
+        {arranging && <div className="lut-bulk sticky arrange" role="region" aria-label={t("위치 바꾸기")}>
+          <p>{arrangeChanges.length ? t("{0}칸이 바뀝니다. 다 옮긴 뒤 한 번에 카메라에 씁니다.", [arrangeChanges.length]) : t("줄을 끌어다 놓거나 ↑↓로 두 칸을 맞바꾸세요.")}</p>
+          <span className="lut-confirm">
+            <button type="button" className="primary" disabled={!!busy || !arrangeChanges.length} onClick={() => void applyArrange()}>{t("카메라에 적용 (약 25초)")}</button>
+            <button type="button" disabled={!!busy} onClick={() => { setArrange(null); setDragFrom(null) }}>{t("취소")}</button>
+          </span>
+        </div>}
+        {!arranging && canDeleteAny && checkedEntries.length > 0 && <div className="lut-bulk active sticky" role="region" aria-label={t("여러 개 지우기")}>
+          {confirmBulk ? <>
+            <p>{t("선택한 LUT {0}개를 지웁니다: {1}", [checkedEntries.length, checkedEntries.map(e => `${e.index} ${e.name}`).join(', ')])}</p>
+            <span className="lut-confirm">
+              <button type="button" className="danger" disabled={!!busy} onClick={() => void remove(checkedEntries.map(e => e.index))}>{t("{0}개 지우기", [checkedEntries.length])}</button>
+              <button type="button" disabled={!!busy} onClick={() => setConfirmBulk(false)}>{t("취소")}</button>
+            </span>
+          </> : <>
+            <p>{t("{0}개 선택됨", [checkedEntries.length])}</p>
+            <span className="lut-confirm">
+              <button type="button" className="danger" disabled={!!busy} onClick={() => { setConfirmBulk(true); setConfirmDelete(null) }}>{t("선택한 LUT 지우기")}</button>
+              <button type="button" disabled={!!busy} onClick={() => setChecked(new Set())}>{t("선택 해제")}</button>
+            </span>
+          </>}
+        </div>}
+        {!!library.selected?.length && <p className="lut-manager-note">{t("카메라에서 선택된 LUT는 지울 수 없습니다. 카메라 메뉴에서 다른 LUT를 고른 뒤 목록을 다시 읽어 주세요.")}</p>}
       </section>
 
       <div className="lut-manager-side">
@@ -281,7 +380,7 @@ export function LutManager({ t }: { t: Translate }) {
         <div className={`lut-drop${dragging ? ' over' : ''}`}>
           <p>{t(".cube 파일을 여기에 끌어다 놓으세요")}</p>
           <span>{t("여러 개를 한 번에 넣을 수 있습니다.")}</span>
-          <button type="button" disabled={!!busy || !canWrite} onClick={() => fileInput.current?.click()}>{t("파일 고르기")}</button>
+          <button type="button" disabled={!!busy || arranging || !canWrite} onClick={() => fileInput.current?.click()}>{t("파일 고르기")}</button>
           <input ref={fileInput} type="file" accept=".cube" multiple hidden onChange={e => void addFiles(Array.from(e.target.files ?? []))}/>
         </div>
         {queue.length > 0 && <ul className="lut-queue" aria-label={t("넣을 LUT")}>
@@ -311,7 +410,7 @@ export function LutManager({ t }: { t: Translate }) {
         </ul>}
         {overwrites.length > 0 && <label className="lut-manager-confirm"><input type="checkbox" checked={confirmOverwrite} disabled={!!busy} onChange={e => setConfirmOverwrite(e.target.checked)}/>
           <span>{t("이미 있는 LUT {0}개를 지우고 덮어씁니다: {1}", [overwrites.length, overwrites.map(q => `${q.slot} ${library.entries[q.slot!].name}`).join(', ')])}</span></label>}
-        <button type="button" className="lut-manager-primary" disabled={!!busy || !canWrite || !ready.length || problems.length > 0 || (overwrites.length > 0 && !confirmOverwrite)} onClick={() => void add()}>
+        <button type="button" className="lut-manager-primary" disabled={!!busy || arranging || !canWrite || !ready.length || problems.length > 0 || (overwrites.length > 0 && !confirmOverwrite)} onClick={() => void add()}>
           {busy?.kind === 'adding' ? t("등록 중…") : ready.length > 1 ? t("카메라에 {0}개 넣기 (약 25초)", [ready.length]) : t("카메라에 넣기 (약 25초)")}
         </button>
       </section>
@@ -325,9 +424,9 @@ export function LutManager({ t }: { t: Translate }) {
           : <ul className="lut-backup-list">{backups.slice(0, 30).map(b => <li key={b.id}>
             <div><b>{new Date(b.created).toLocaleString()}</b><span>{actionLabel(b.action)}</span><small>{b.model} · {t("펌웨어 {0}", [b.firmware])}</small></div>
             {confirmRestore === b.id ? <span className="lut-confirm">
-              <button type="button" className="danger" disabled={!!busy || !canWrite} onClick={() => void restore(b)}>{t("되돌리기")}</button>
+              <button type="button" className="danger" disabled={!!busy || arranging || !canWrite} onClick={() => void restore(b)}>{t("되돌리기")}</button>
               <button type="button" disabled={!!busy} onClick={() => setConfirmRestore(null)}>{t("취소")}</button>
-            </span> : <button type="button" disabled={!!busy || !canWrite} onClick={() => { setConfirmRestore(b.id); setDone(null) }}>{t("이 시점으로")}</button>}
+            </span> : <button type="button" disabled={!!busy || arranging || !canWrite} onClick={() => { setConfirmRestore(b.id); setDone(null) }}>{t("이 시점으로")}</button>}
           </li>)}</ul>}
       </section>
       </div>

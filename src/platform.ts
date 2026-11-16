@@ -59,7 +59,7 @@ export async function saveFile(filename: string, data: BlobPart, type: string): 
 // Camera commands (app only). Shapes match src-tauri/src/camera.rs.
 export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean; writeExperimental: boolean }
 export type CameraEntry = { index: number; name: string; styleCode: number; inUse: boolean }
-export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number | null }
+export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number[] | null }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
 export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
@@ -118,6 +118,15 @@ export function cameraRegisterMany(items: { cube: string; slot: number; name: st
  *  and if any slot is refused nothing changes. */
 export function cameraDelete(slots: number[], names: string[], experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraDeleteResult> {
   return withProgress(() => cameraCall<CameraDeleteResult>('camera_delete_luts', { slots, names, experimental }), onProgress)
+}
+
+export type CameraRearrangeResult = { moved: { index: number; name: string | null }[]; backup: string }
+
+/** Move LUTs between slots in one write. `order[k]` is the slot whose LUT ends up in slot k
+ *  (`null` = empty); `names` is every slot as last read (`null` = empty), so nothing is written
+ *  if the camera changed meanwhile. Built-in slots and LUTs selected on the camera stay put. */
+export function cameraRearrange(order: (number | null)[], names: (string | null)[], experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRearrangeResult> {
+  return withProgress(() => cameraCall<CameraRearrangeResult>('camera_rearrange_luts', { order, names, experimental }), onProgress)
 }
 
 /** A settings backup taken before a change; `action` says which change (English, from Rust). */
