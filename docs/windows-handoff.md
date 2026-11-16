@@ -1,6 +1,6 @@
 # Claude 세션 인계
 
-처음 작성: 2026-11-15(macOS → Windows 인계). 고침: 2026-11-16, Windows 작업이 끝난 뒤의 상태로 맞춤.
+처음 작성: 2026-11-15(macOS → Windows 인계). 고침: 2026-11-17, macOS 0.1.2 배포 뒤의 상태로 맞춤.
 이 프로젝트를 이어 받는 Claude 세션(macOS, Windows 모두)은 이 문서를 먼저 읽고 시작합니다. 작업이 끝나면 이 문서를 지금 상태에 맞게 고칩니다.
 
 **답변은 항상 한국어로 합니다.** 코드, 명령어, 식별자는 그대로 둡니다.
@@ -44,9 +44,9 @@ USB로 연결한 LUMIX와 PTP로 통신해서, SD 카드 없이 LUT 라이브러
   - 같은 버전의 다른 플랫폼 항목은 그대로 둡니다.
 - 사진 보내기(`#send`, `docs/photo-sending.md`). Windows에서도 빌드와 테스트가 통과했고, 실제 사진으로는 아직 시험하지 않았습니다.
 - 카메라에서 고른 LUT는 사진 모드와 영상 모드를 모두 읽고, 어느 쪽에서든 고른 칸은 지우지 않습니다. 사진 모드에 LUT가 없을 때 지우기가 모두 막히던 문제를 고쳤습니다.
-- LUT 위치 바꾸기: 화면에서 순서를 다 바꾼 뒤 한 번에 씁니다(`docs/camera-lut-library.md`의 "위치 바꾸기"). Windows 실기로 확인했습니다.
+- LUT 위치 바꾸기: 화면에서 순서를 다 바꾼 뒤 한 번에 씁니다(`docs/camera-lut-library.md`의 "위치 바꾸기"). Windows와 macOS 실기로 확인했습니다.
 - 여러 개 지우기 확인 창은 체크하면 표 아래에 붙어 화면 하단을 따라옵니다.
-- 배포 현황(2026-11-17): **Windows 0.1.2**까지 배포했습니다(위 세 가지와 사진 보내기 포함). **macOS는 0.1.0**에 머물러 있고, 서버 `/app/latest.json`에는 `windows-x86_64`만 있습니다.
+- 배포 현황(2026-11-17): **macOS와 Windows 모두 0.1.2**입니다(위 세 가지와 사진 보내기 포함). 서버 `/app/latest.json`에 `darwin-aarch64`와 `windows-x86_64`가 모두 있고, 릴리스 페이지의 DMG도 0.1.2입니다. Mac 0.1.1은 건너뛰었습니다.
 - GitHub 릴리스는 버전 없는 대표 페이지 하나(태그 `app`)로 바꿨습니다. 배포할 때 `--github`를 붙이면 그 페이지의 설치 파일과 버전 줄이 갱신됩니다(`docs/cloudflare.md`의 "앱 릴리스").
 
 ## 지켜야 할 규칙
@@ -82,26 +82,8 @@ cargo test -p lumix-lut -p lumix-ptp
 
 `lumix-lut`의 실기 캡처 테스트는 `tests/fixtures/local/`이 없으면 건너뜁니다. 정상입니다.
 
-## macOS에서 할 일 (Windows 0.1.2까지 반영)
-
-Mac 세션은 이 절부터 처리하고, 끝난 항목은 지웁니다.
-
-1. `git pull`(브랜치 `feat/camera-lut-core`). `gh`가 없으면 설치하고 `gh auth login`으로 저장소 주인 계정에 로그인합니다.
-2. 테스트: `node scripts/run-web.mjs test`, `cargo test -p lumix-lut -p lumix-ptp -p photo-courier`.
-   - 새 실기 테스트(사진·영상 선택, 위치 바꾸기)는 Windows에서 만든 캡처(`s1m2_fw15_photo37_video_none.bin` 등)를 쓰므로 Mac에서는 건너뜁니다. Mac의 기존 캡처로 도는 테스트는 `selected_entries()`(목록)로 바뀐 검사를 통과해야 합니다.
-3. 실기 확인(쓰기는 사용자 허락 후). Windows에서 확인한 것을 macOS 전송(`mac.rs`)으로 다시 봅니다.
-   - 사진 모드를 스탠더드(LUT 없음)로 두고 목록을 읽으면 지우기가 열리는지, 영상 모드에서 고른 칸에 "카메라에서 선택됨"이 붙는지(읽기만).
-   - 위치 바꾸기로 두 칸을 맞바꾸고 카메라에서 적용되는지.
-   - 사진 보내기는 macOS 디버그 앱에서 이미 확인했습니다.
-4. 배포: `npm run release:app -- --version 0.1.2 --notes "<바뀐 점>" --deploy --github`
-   - 버전이 이미 0.1.2라 `--version`은 빼도 됩니다. 서버의 Windows 0.1.2 항목을 받아 함께 싣기 때문에 두 플랫폼이 모두 들어갑니다.
-   - `--github`가 DMG를 만들어 릴리스 페이지의 `sosang-mac-apple-silicon.dmg`를 바꾸고, Mac 버전 줄을 0.1.2로 고칩니다. 지금 그 파일은 0.1.0 DMG입니다.
-   - 배포 뒤 `/app/latest.json`에 `darwin-aarch64`와 `windows-x86_64`가 모두 있는지 확인합니다.
-5. Mac 0.1.1은 배포하지 않고 건너뜁니다. 설치된 Mac 0.1.0은 0.1.2로 바로 업데이트됩니다.
-
 ## 남은 일
 
-- 위 "macOS에서 할 일".
 - Windows 코드 서명이 없어서 처음 설치할 때 SmartScreen 경고가 뜹니다. 서명할지는 사용자와 정합니다.
 - macOS 공증은 아직 하지 않았습니다.
 - 저장소에 CI가 없어서 테스트는 손으로 돌립니다.
@@ -166,6 +148,15 @@ Mac 세션은 이 절부터 처리하고, 끝난 항목은 지웁니다.
 - Windows 0.1.2를 배포했고, GitHub 릴리스를 대표 페이지(태그 `app`)로 바꿨습니다.
   - 기존 v0.1.0 릴리스를 태그 `app`으로 옮겼습니다. 주소가 `/releases/tag/v0.1.0`에서 `/releases/tag/app`으로 바뀌었고, 저장소 안에는 옛 주소를 쓰는 곳이 없었습니다. git 태그 `v0.1.0`은 그대로 둡니다.
   - Mac DMG는 이름만 `sosang-mac-apple-silicon.dmg`로 바꿨고, 내용은 여전히 0.1.0입니다.
+
+### 2026-11-17, macOS (0.1.2 배포)
+
+- 작업 폴더(`film-lab`)에 커밋하지 않은 다른 작업(파이프라인, 새 LUT, `src/` 화면 파일)이 있어서, `git worktree`로 `origin/feat/camera-lut-core`(`4df2e602`) 그대로인 폴더를 따로 만들어 테스트, 빌드, 배포를 했습니다. 다음에도 작업 폴더가 깨끗하지 않으면 같은 방법을 씁니다.
+- 테스트: 웹 107개, `cargo test -p lumix-lut -p lumix-ptp -p photo-courier` 모두 통과(Windows 캡처를 쓰는 테스트는 건너뜀).
+- 실기(macOS 전송, DC-S1M2 fw 1.5): 목록 읽기에서 사진 모드 스탠더드여도 지우기가 열리고, 영상 모드의 1번 ARRI 709에 "카메라에서 선택됨"이 붙었습니다. 위치 바꾸기로 2↔3번을 맞바꿔 쓰고 다시 읽기 확인, 카메라 메뉴에서도 확인했습니다. 사용자 뜻으로 되돌리지 않았습니다(지금 2번 Ektar100PEFC, 3번 C200CAFC).
+- 카메라가 USB(PTP)에 잡혀 있는데 앱과 ImageCaptureCore 모두 "카메라를 찾지 못함"이던 때가 있었습니다. 카메라를 쓰던 디버그 앱을 강제로 끈 뒤였고, 케이블을 다시 꽂으니 풀렸습니다.
+- 이 Mac의 기본 `node`는 14라서 wrangler가 뜨지 않습니다. `scripts/run-web.mjs`가 쓰는 Node 22+로 `npm ci`와 배포를 합니다.
+- `release:app -- --deploy --github`로 macOS 0.1.2를 배포했습니다. 서버의 Windows 0.1.2 항목을 함께 실었고, 릴리스 페이지의 DMG와 Mac 버전 줄, SHA-256이 바뀌었습니다.
 
 ## 보류한 것
 
