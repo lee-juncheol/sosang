@@ -1,0 +1,72 @@
+{
+  "fileChecks": "passed",
+  "rowsPerCube": 35937,
+  "serializationMaxError": 4.999919412940201e-07,
+  "processMode": "negative_print",
+  "scanFilm": false,
+  "referenceModel": "spektrafilm-runtime",
+  "vlogVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0016680809072465064,
+      "p95": 0.0051170048422622206,
+      "p99": 0.012732025160232856,
+      "max": 0.03147101524745552,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.002216421822149823,
+      "p95": 0.007393949175866527,
+      "p99": 0.015815158395040895,
+      "max": 0.04793697440177269,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "cameraVerified": false,
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdGeneration": "camera-vlog-alchemy-v1",
+  "camera": "S1II",
+  "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "stdVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0005858704981008366,
+      "p95": 0.0017106919614625084,
+      "p99": 0.002776061248664758,
+      "max": 0.007486626552861725,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0006151001556288692,
+      "p95": 0.0017354005772292876,
+      "p99": 0.0026984302067640867,
+      "max": 0.007824475420386112,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdSerializationMaxError": 4.999967107011116e-10,
+  "sourceVlogSha256": "c139828921476924b2a0c85de86b9dc05ded429f7cb0bd44b7a36c08be444606",
+  "sourceAdapterSha256": "a46b3369f1d9f4d8948e6fc9f20ed5594602b7361a0e1a0958b9d06a4d0611f1",
+  "vlogUnchanged": true,
+  "warnings": [
+    "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+    "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+    "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+    "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+    "Matched controlled capture validation is pending for this camera model."
+  ],
+  "cameraInterpolation": "Undocumented. Both tetrahedral and trilinear output evaluation are measured.",
+  "sampling": {
+    "randomRgb": 4096,
+    "neutralRamp": 257,
+    "grid": 125,
+    "seed": 20261102
+  }
+}

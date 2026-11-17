@@ -48,10 +48,11 @@ export function usePrintTiming(catalog: Catalog | null, base: Combination | unde
   m: number, y: number, previewCameraId: string, enabled: boolean, published: boolean,
   rawControls: PrintControls = { exposure: 0, fade: 0 }): PrintTiming {
   const info = catalog?.printTiming
-  const entry = base && base.processMode === 'negative_print' && !base.castBaseId ? info?.packs[base.id] : undefined
+  const entry = base && base.processMode === 'negative_print' && !base.castBaseId && !base.labAimBaseId ? info?.packs[base.id] : undefined
   const span = info?.rangeCC?.[1] ?? 30
   const total = { m: clampShift(m, span), y: clampShift(y, span) }
-  const controls = { exposure: Math.max(-EXPOSURE_SPAN, Math.min(EXPOSURE_SPAN, Math.round(rawControls.exposure * 10) / 10)),
+  // Hundredths keep the lab-aim preset exposure (e.g. +0.31 stops) when only M/Y are moved.
+  const controls = { exposure: Math.max(-EXPOSURE_SPAN, Math.min(EXPOSURE_SPAN, Math.round(rawControls.exposure * 100) / 100)),
     fade: Math.max(0, Math.min(100, Math.round(rawControls.fade))) }
   const available = !!entry && !!catalog?.cameraAdapters
   const active = available && enabled && !published
@@ -59,7 +60,7 @@ export function usePrintTiming(catalog: Catalog | null, base: Combination | unde
   // The preview object must keep its identity between renders, or the photo
   // worker restarts on every render and never finishes.
   const [state, setState] = useState<{ key: string; preview?: { key: string; cube: Cube }; error?: string }>({ key: '' })
-  const key = active && entry && adapterAsset ? `${base!.id}:${previewCameraId}:${total.m.toFixed(2)}:${total.y.toFixed(2)}:${controls.exposure.toFixed(1)}:${controls.fade}` : ''
+  const key = active && entry && adapterAsset ? `${base!.id}:${previewCameraId}:${total.m.toFixed(2)}:${total.y.toFixed(2)}:${controls.exposure.toFixed(2)}:${controls.fade}` : ''
 
   useEffect(() => {
     if (!key || !entry || !adapterAsset) return

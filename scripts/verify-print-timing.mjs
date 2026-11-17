@@ -22,7 +22,7 @@ export async function verifyPrintTiming(rootDir, catalog) {
   assert.deepEqual(info.gridCC, [-30, 0, 30]);
   assert.deepEqual(info.rangeCC, [-30, 30]);
   assert.equal(info.resolution, 33);
-  const bases = catalog.combinations.filter(combo => combo.processMode === 'negative_print' && !combo.castBaseId);
+  const bases = catalog.combinations.filter(combo => combo.processMode === 'negative_print' && !combo.castBaseId && !combo.labAimBaseId);
   assert.deepEqual(Object.keys(info.packs).sort(), bases.map(combo => combo.id).sort(), 'Print timing packs differ from the negative print looks');
   const root = path.resolve(rootDir);
   const expected = new Set();

@@ -49,7 +49,7 @@ def make_spec(base):
 
 def candidates(catalog):
     return [c for c in catalog['combinations'] if c.get('processMode') == 'negative_print'
-            and c.get('status') == 'ready' and SUFFIX not in c['id']]
+            and c.get('status') == 'ready' and SUFFIX not in c['id'] and not c.get('labAimBaseId')]
 
 
 def plan(base):
@@ -169,6 +169,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--jobs', type=int, default=3)
     parser.add_argument('--only', help='Base combination ID; prepare one variant without catalog publication')
+    parser.add_argument('--paper', help='Append variants for one paper only; published variants on other papers are kept')
+    parser.add_argument('--missing', action='store_true', help='Append variants only for base looks without one; published variants are kept')
     args = parser.parse_args()
     commit = subprocess.check_output(['git', '-C', str(UPSTREAM), 'rev-parse', 'HEAD'], text=True).strip()
     if commit != CONFIG['engine_commit']: raise SystemExit('Pinned engine commit differs')
@@ -176,7 +178,17 @@ def main():
         raise SystemExit('Vendor checkout must be unchanged')
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
     bases = candidates(catalog)
-    if len(bases) != 128: raise SystemExit(f'Expected 128 negative print base looks, found {len(bases)}')
+    if len(bases) < 128: raise SystemExit(f'Expected at least 128 negative print base looks, found {len(bases)}')
+    kept = []
+    if args.paper:
+        bases = [b for b in bases if b['paper'] == args.paper]
+        if not bases: raise SystemExit('No negative print base looks on that paper')
+        kept = [c for c in catalog['combinations'] if c.get('castBaseId') and c['paper'] != args.paper]
+    if args.missing:
+        kept = [c for c in catalog['combinations'] if c.get('castBaseId')]
+        done = {c['castBaseId'] for c in kept}
+        bases = [b for b in bases if b['id'] not in done]
+        if not bases: raise SystemExit('Nothing missing')
     for base in bases:
         path = PUBLIC / base['files']['vlog']['path'].lstrip('/')
         if sha256(path) != base['files']['vlog']['sha256']: raise SystemExit(f'Changed base VLOG: {base["id"]}')
@@ -202,7 +214,7 @@ def main():
                         for r in sorted(records, key=lambda r: r['number'])}}
     save_json(AUDIT / ('single-build-report.json' if args.only else 'build-report.json'), report)
     if report['failed']: raise SystemExit(f"Failed: {report['failed']}")
-    if not args.only: publish(catalog, records)
+    if not args.only: publish(catalog, kept + records)
     print(json.dumps({k: report[k] for k in ['variants', 'skipped', 'wallSeconds']}), flush=True)
 
 

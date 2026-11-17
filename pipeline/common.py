@@ -13,10 +13,13 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import numpy as np
 
+from pipeline import extensions
+
 CONFIG = json.loads((ROOT / "pipeline/config/default.json").read_text())
 UPSTREAM = ROOT / "vendor/spektrafilm"
 PROFILES = UPSTREAM / "src/spektrafilm/data/profiles"
 PUBLIC = ROOT / "public"
+extensions.install()
 
 
 def sha256(path: Path) -> str:
@@ -40,14 +43,27 @@ RECOMMENDED_PRINT = {
 }
 
 
+def profile_path(stock: str) -> Path:
+    extra = extensions.DIRECTORY / f"{stock}.json"
+    return extra if stock in extensions.extra_stocks() else PROFILES / f"{stock}.json"
+
+
 def profiles():
+    """Upstream stocks in file order, then Film Lab extension stocks.
+
+    Extensions come last so combination numbers of existing looks never move.
+    """
     result = []
-    for path in sorted(PROFILES.glob("*.json")):
+    paths = sorted(PROFILES.glob("*.json")) + [extensions.DIRECTORY / f"{s}.json" for s in extensions.extra_stocks()]
+    for path in paths:
         info = json.loads(path.read_text())["info"]
-        result.append({"id": path.stem, "name": info["name"], "type": info["type"],
-                       "stage": info["stage"], "brand": info["name"].split()[0],
-                       "use": info.get("use"), "recommendedPrint": RECOMMENDED_PRINT.get(path.stem, info.get("target_print")),
-                       "sha256": sha256(path)})
+        entry = {"id": path.stem, "name": info["name"], "type": info["type"],
+                 "stage": info["stage"], "brand": info["name"].split()[0],
+                 "use": info.get("use"), "recommendedPrint": RECOMMENDED_PRINT.get(path.stem, info.get("target_print")),
+                 "sha256": sha256(path)}
+        if path.stem in extensions.EXPERIMENTAL:
+            entry.update(experimental=True, source="film-lab-extension", note=extensions.EXPERIMENTAL[path.stem])
+        result.append(entry)
     return result
 
 

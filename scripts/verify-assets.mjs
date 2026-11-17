@@ -57,7 +57,7 @@ for (const combo of catalog.combinations) {
 }
 for (const film of catalog.films) {
   // Optional cast variants are paired and counted separately by assertLookInventory.
-  const choices = catalog.combinations.filter(c => c.film === film.id && !c.castBaseId);
+  const choices = catalog.combinations.filter(c => c.film === film.id && !c.castBaseId && !c.labAimBaseId);
   assert.equal(choices.length, film.type === 'positive' ? 1 : catalog.papers.length + 1);
   assert.equal(new Set(choices.map(c => `${c.processMode}:${c.paper}`)).size, choices.length);
 }

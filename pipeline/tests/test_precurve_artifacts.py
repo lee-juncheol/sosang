@@ -12,8 +12,10 @@ from pipeline.camera_std import METHOD, BASELINE, models
 
 def test_all_current_downloads_use_camera_specific_source_and_preserve_native_colour():
     catalog=json.loads((PUBLIC/'catalog.json').read_text())
-    # 148 engine looks + 128 recommended-development variants (FUJI official looks retired).
-    assert len(catalog['combinations'])==276
+    # 148 upstream engine looks + 16 on the experimental 3523XD paper + 90 for nine experimental Fuji
+    # negatives (9 papers + digital scan each), 225 recommended-development variants (one per negative
+    # print) and 50 manufacturer lab-aim variants (2383, 3523XD).
+    assert len(catalog['combinations'])==529
     expected={model['id'] for model in models()}
     for c in catalog['combinations']:
         assert c['stdMethod']==METHOD

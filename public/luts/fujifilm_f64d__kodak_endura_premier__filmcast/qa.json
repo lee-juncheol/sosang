@@ -1,0 +1,140 @@
+{
+  "fileChecks": "passed",
+  "rowsPerCube": 35937,
+  "serializationMaxError": 4.999989097198565e-07,
+  "processMode": "negative_print",
+  "scanFilm": false,
+  "referenceModel": "spektrafilm-print-reference-blend-v1",
+  "vlogVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0027546595981344907,
+      "p95": 0.008472309065587458,
+      "p99": 0.016872617877730072,
+      "max": 0.07206934851202856,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.003420523706040779,
+      "p95": 0.011642181283083787,
+      "p99": 0.02374280512308904,
+      "max": 0.05854196516349275,
+      "samples": 4350,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "cameraVerified": false,
+  "filmCast": {
+    "method": "spektrafilm-print-reference-blend-v1",
+    "amount": 0.66,
+    "percent": 66,
+    "experimental": true,
+    "film": "fujifilm_f64d",
+    "paper": "kodak_endura_premier",
+    "illuminant": "TH-KG3",
+    "channelOrder": [
+      "C",
+      "M",
+      "Y"
+    ],
+    "units": "Kodak CC; 100 CC = 1.0 filter optical density",
+    "referenceFilm": "kodak_portra_400",
+    "baseline": "Reference film neutral filters on the same paper (fixed lab pack)",
+    "filmCC": [
+      0.0,
+      60.82217883898517,
+      51.339294287525746
+    ],
+    "referenceCC": [
+      0.0,
+      55.159115960782316,
+      55.88320270882486
+    ],
+    "appliedCC": [
+      0.0,
+      58.896737460396196,
+      52.88422315076744
+    ],
+    "formula": "appliedCC = amount * filmCC + (1 - amount) * referenceCC",
+    "databaseSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
+    "databaseReload": false,
+    "normalizePrintExposure": true,
+    "filterShifts": {
+      "M": 0,
+      "Y": 0
+    },
+    "imageStatistics": false,
+    "outputRgbMixing": false,
+    "notes": [
+      "Experimental Film Lab variant, not an upstream spektrafilm preset.",
+      "The cast direction comes from the calibrated filter database; it is not tuned to a remembered film colour.",
+      "The amount is solved per film and paper so 18% gray reaches a CIELAB chroma target; the targets are an editorial choice, not a measured lab recipe.",
+      "Films listed in TARGET_HUE (C200, X-Tra 400, Gold 200, Ultramax 400, Vision3 200T/500T) use an editorial cast hue instead of the database direction; the hue is a chosen look, not a measurement.",
+      "Cast strength is matched only at mid-gray; the cast direction still differs by film and paper, including pink/magenta casts.",
+      "Mid-gray print exposure normalization stays on, so brightness is aligned but colour is not neutralized."
+    ],
+    "amountPolicy": "chroma-target",
+    "targetChroma": 6.0,
+    "grayChroma": 5.882868089098113,
+    "grayHue": 305.43796873079316,
+    "calibrationGray": {
+      "input": "linear V-Gamut RGB = [0.184, 0.184, 0.184], V-Log encoded",
+      "outputSpace": "sRGB, 8-bit scale (unrounded)",
+      "base": [
+        117.02140195686574,
+        117.02140194580997,
+        117.02140195438332
+      ],
+      "filmCast": [
+        116.4899304278809,
+        112.76950377291162,
+        122.39652862824464
+      ]
+    }
+  },
+  "stdMethod": "camera-vlog-alchemy-v1",
+  "stdGeneration": "camera-vlog-alchemy-v1",
+  "camera": "S1II",
+  "stdReferenceDescription": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "metricReference": "Serialized camera-specific Standard-to-V-Log adapter (trilinear) followed by the unchanged serialized creative VLOG cube (tetrahedral). stdVsDirectEngine is a compatibility key for this sequential transform; it measures 33-grid rebaking error, not a continuous engine or camera accuracy.",
+  "stdVsDirectEngine": {
+    "tetrahedral": {
+      "mean": 0.0009227867273081442,
+      "p95": 0.0028225965667420575,
+      "p99": 0.005024834790705173,
+      "max": 0.015105486353949482,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    },
+    "trilinear": {
+      "mean": 0.0011000325731183548,
+      "p95": 0.0034681871329665485,
+      "p99": 0.005696995831951843,
+      "max": 0.012467165436163774,
+      "samples": 4478,
+      "metric": "max absolute RGB channel error",
+      "space": "encoded sRGB 0–1"
+    }
+  },
+  "stdSerializationMaxError": 4.99990548963325e-10,
+  "sourceVlogSha256": "aaf8d55f2a41e57684e267042c58aa7ce7a361c45a674aa4234c83aa930193d8",
+  "sourceAdapterSha256": "a46b3369f1d9f4d8948e6fc9f20ed5594602b7361a0e1a0958b9d06a4d0611f1",
+  "vlogUnchanged": true,
+  "warnings": [
+    "Standard clipping and gamut compression cannot be inverted exactly; clipped highlights and colours cannot be restored.",
+    "Use the exact camera model and unadjusted Standard Photo Style. No automatic exposure or image statistics are applied.",
+    "Camera cube interpolation is undocumented; tetrahedral and trilinear rebake error are both reported.",
+    "Native V-Log acquisition gain, noise and highlight headroom cannot be recreated by an output LUT.",
+    "Matched controlled capture validation is pending for this camera model."
+  ],
+  "cameraInterpolation": "Undocumented. Both tetrahedral and trilinear output evaluation are measured.",
+  "sampling": {
+    "randomRgb": 4096,
+    "neutralRamp": 257,
+    "grid": 125,
+    "seed": 20261102
+  }
+}

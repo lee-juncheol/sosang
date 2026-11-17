@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { downloadFilename, PAPER_CODES, paperLabel } from '../src/lutNames.ts'
 import type { Catalog } from '../src/types.ts'
+import { printVariant } from '../src/lookSelection.ts'
 
 const catalog: Catalog = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf8'))
 
@@ -22,13 +23,13 @@ test('all downloadable looks retain film words, have safe unique names, and sepa
     const paper = catalog.papers.find(paper => paper.id === combo.paper)
     const fullFilm = film.name.replace(/^(Kodak|Fujifilm) (Professional )?/i, '').replace(/[^A-Za-z0-9]/g, '')
     for (const format of ['std', 'vlog'] as const) {
-      const name = downloadFilename(film, paper, combo.processMode, format, 'S1II', !!combo.castBaseId)
+      const name = downloadFilename(film, paper, combo.processMode, format, 'S1II', printVariant(combo))
       assert.match(name, /^[A-Za-z0-9]+\.cube$/)
       assert.ok(name.startsWith(fullFilm))
       assert.ok(!names.has(name.toLowerCase()), name)
       names.add(name.toLowerCase())
       for (const camera of catalog.cameraAdapters!.models) {
-        assert.equal(downloadFilename(film, paper, combo.processMode, format, camera.id, !!combo.castBaseId), name)
+        assert.equal(downloadFilename(film, paper, combo.processMode, format, camera.id, printVariant(combo)), name)
       }
     }
   }
@@ -60,4 +61,20 @@ test('film-cast variants keep the print code and add FC; paperless modes reject 
   assert.equal(downloadFilename(film, paper, 'negative_print', 'vlog', 'S1II', true), 'Gold200CAFCVLOG.cube')
   assert.equal(downloadFilename(film, paper, 'negative_print', 'zip', 'LUMIX S1II', true), 'Gold200CAFC-S1II.zip')
   assert.throws(() => downloadFilename(film, undefined, 'negative_digital', 'std', 'S1II', true))
+})
+
+test('lab-aim variants keep the print code and add LA; paperless modes reject it', () => {
+  const film = catalog.films.find(film => film.id === 'kodak_vision3_250d')!
+  const paper = catalog.papers.find(paper => paper.id === 'fujifilm_eterna_cp_3523xd')!
+  assert.equal(downloadFilename(film, paper, 'negative_print', 'std', 'S1II', 'lab-aim'), 'Vision3250DXDLA.cube')
+  assert.equal(downloadFilename(film, paper, 'negative_print', 'zip', 'LUMIX S1II', 'lab-aim'), 'Vision3250DXDLA-S1II.zip')
+  assert.throws(() => downloadFilename(film, undefined, 'negative_digital', 'std', 'S1II', 'lab-aim'))
+  const variants = catalog.combinations.filter(combo => combo.labAimBaseId)
+  assert.equal(variants.length, catalog.labAim!.variants)
+  for (const combo of variants) {
+    const base = catalog.combinations.find(c => c.id === combo.labAimBaseId)!
+    assert.equal(combo.number, base.number + 2000)
+    assert.ok(catalog.labAim!.papers[combo.paper!])
+    assert.ok(Math.abs(combo.labAim!.grayVisualDensity - 1) < 0.002)
+  }
 })

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { extractZipEntry } from '../src/assets.ts';
 import { parseStdCube } from '../src/lut.ts';
-import { assertLookInventory, publicLookCount, FILM_CAST_METHOD } from './look-inventory.mjs';
+import { assertLookInventory, publicLookCount, FILM_CAST_METHOD, LAB_AIM_METHOD } from './look-inventory.mjs';
 
 export const CAMERA_STD_METHOD = 'camera-vlog-alchemy-v1';
 export const ALCHEMY_COMMIT = 'e51ba9a23458ff5c316f630b860eb0201139d126';
@@ -66,8 +66,11 @@ export function assertCameraStdContract(combo, adapters) {
   if ('castBaseId' in combo) {
     assert.equal(combo.qa.referenceModel, FILM_CAST_METHOD, `Film-cast QA model differs: ${combo.id}`);
     assert.deepEqual(combo.qa.filmCast, combo.filmCast, `Film-cast recipe differs between catalog and QA: ${combo.id}`);
+  } else if ('labAimBaseId' in combo) {
+    assert.equal(combo.qa.referenceModel, LAB_AIM_METHOD, `Lab-aim QA model differs: ${combo.id}`);
+    assert.deepEqual(combo.qa.labAim, combo.labAim, `Lab-aim recipe differs between catalog and QA: ${combo.id}`);
   } else {
-    assert(!('filmCast' in combo.qa), `Base look acquired film-cast QA metadata: ${combo.id}`);
+    assert(!('filmCast' in combo.qa) && !('labAim' in combo.qa), `Base look acquired variant QA metadata: ${combo.id}`);
   }
   assert(!combo.stdVariant && !combo.stdVariants && !combo.files.stdB && !combo.files.stdLegacy && !combo.files.stdRefined, 'Retired STD variant remains');
   assert.deepEqual(Object.keys(combo.files).sort(), ['provenance', 'qa', 'std', 'vlog', 'zip']);
@@ -204,6 +207,16 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
             assert.equal(provenance.castBase?.id, combo.castBaseId, `Film-cast provenance base: ${combo.id}`);
             assert.equal(provenance.castBase?.preserved, true);
             for (const paper of Object.values(provenance.bundle?.params_snapshot || {})) assert.deepEqual(paper.filmCast?.appliedCC, combo.filmCast.appliedCC, `Baked filters differ from the recipe: ${combo.id}`);
+          }
+          if ('labAimBaseId' in combo) {
+            assert.equal(provenance.sourceRenderingMethod, LAB_AIM_METHOD, `Lab-aim provenance method: ${combo.id}`);
+            assert.deepEqual(provenance.labAim, combo.labAim, `Lab-aim provenance recipe: ${combo.id}`);
+            assert.equal(provenance.labAimBase?.id, combo.labAimBaseId, `Lab-aim provenance base: ${combo.id}`);
+            assert.equal(provenance.labAimBase?.preserved, true);
+            for (const paper of Object.values(provenance.bundle?.params_snapshot || {})) {
+              assert.deepEqual(paper.labAim?.appliedCC, combo.labAim.appliedCC, `Baked filters differ from the recipe: ${combo.id}`);
+              assert.equal(paper.labAim?.printExposure, combo.labAim.printExposure, `Baked print exposure differs from the recipe: ${combo.id}`);
+            }
           }
           assert.equal(source.id, camera); assert.equal(source.commit, adapters.commit);
           assert.equal(source.sha256, sourceHashes.get(camera));

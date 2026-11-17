@@ -269,7 +269,7 @@ export function LutManager({ t }: { t: Translate }) {
     </div>
 
     <p className="lut-manager-status" role="status" aria-live="polite">{progress}</p>
-    {busy && busy.kind !== 'reading' && <CameraBusyOverlay t={t} status={progress}/>}
+    {busy && busy.kind !== 'reading' && <CameraBusyOverlay t={t} status={progress} step={step}/>}
     {done && <div className="lut-manager-done" role="status">
       <p>{doneText}</p>
       <small>{t("바꾸기 전 카메라 설정 백업: {0}", [done.backup])}</small>
@@ -378,7 +378,7 @@ export function LutManager({ t }: { t: Translate }) {
         <h2 id="lut-add-title">{t("내 LUT 넣기")}</h2>
         <p className="lut-manager-help">{t("33 × 33 × 33 격자 .cube 파일을 넣을 수 있습니다. 파일의 #LUMIXPHOTOSTYLE 태그가 STD면 Standard, VLOG나 태그가 없으면 V-Log 기준으로 등록됩니다. 여러 파일은 빈 칸에 차례로 배정되고, 한 번에 카메라에 씁니다.")}</p>
         <div className={`lut-drop${dragging ? ' over' : ''}`}>
-          <p>{t(".cube 파일을 여기에 끌어다 놓으세요")}</p>
+          <p>{dragging ? t("놓으면 넣을 목록에 추가돼요") : t(".cube 파일을 여기에 끌어다 놓으세요")}</p>
           <span>{t("여러 개를 한 번에 넣을 수 있습니다.")}</span>
           <button type="button" disabled={!!busy || arranging || !canWrite} onClick={() => fileInput.current?.click()}>{t("파일 고르기")}</button>
           <input ref={fileInput} type="file" accept=".cube" multiple hidden onChange={e => void addFiles(Array.from(e.target.files ?? []))}/>

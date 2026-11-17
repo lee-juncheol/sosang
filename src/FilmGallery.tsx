@@ -84,7 +84,7 @@ export function FilmGallery({ catalog, t, collection, onSelectCollection, onUseL
   const activeIndex = opened?.collection === collection ? visible.findIndex(photo => photo.id === opened.id) : -1
   const active = visible[activeIndex]
   const activeFilm = active && filmById.get(active.filmId)
-  const methodName = (photo: GalleryPhoto) => recipeById.get(photo.combinationId)?.castBaseId ? t("추천 현상 방법") : t("중립 현상 방법")
+  const methodName = (photo: GalleryPhoto) => recipeById.get(photo.combinationId)?.labAimBaseId ? t("제조사 기준 인화") : recipeById.get(photo.combinationId)?.castBaseId ? t("추천 현상 방법") : t("중립 현상 방법")
   const paperName = (photo: GalleryPhoto) => {
     if (!photo.paperId) return t("인화지 없음 · 슬라이드 직접 스캔")
     const paper = catalog.papers.find(item => item.id === photo.paperId)

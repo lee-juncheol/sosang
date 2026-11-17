@@ -1,5 +1,7 @@
 export interface Asset { path: string; name: string; downloadName?: string; bytes: number; sha256: string; encoding?: 'gzip' | 'zip-entry'; transferBytes?: number; transferSha256?: string }
-export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string }
+export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string
+  /** Film Lab extension stock (not an upstream spektrafilm profile). */
+  experimental?: boolean; source?: 'film-lab-extension'; note?: string }
 export interface Sample {
   id: string; name: string; category: string; credit: string; source: string | null; path: string; width: number; height: number;
   inputKind: 'camera-std' | 'synthetic-srgb' | 'uploaded-srgb' | 'review-jpeg'; sourceFilename?: string; previewLut: 'std';
@@ -31,10 +33,18 @@ export interface FilmCast {
   /** Editorial-hue films: own filters (amount 1) plus a solved M/Y shift towards targetHue. */
   directionPolicy?: 'editorial-hue'; targetHue?: number; hueShiftCC?: number[]
 }
+export interface LabAim {
+  method: 'film-lab-lab-aim-v1'; experimental: true; filmCC: number[]; shiftCC: number[]; appliedCC: number[]
+  printExposure: number; printExposureStops: number; grayVisualDensity: number
+  aim: { visualDensity: number; neutral: true; datasheet: { statusA: number[]; source: string } }
+  calibrationGray?: { baseVisualDensity: number }
+}
 export interface Combination {
   id: string; film: string; paper: string | null; number: number;
   /** Experimental film-cast variant: the base negative print it belongs to. */
   castBaseId?: string; filmCast?: FilmCast;
+  /** Experimental manufacturer lab-aim variant: the base negative print it belongs to. */
+  labAimBaseId?: string; labAim?: LabAim;
   processMode: ProcessMode;
   status: 'ready' | 'failed' | 'unsupported' | 'not-generated'; reason?: string;
   seconds?: number; files?: LutFiles;
@@ -61,6 +71,8 @@ export interface Catalog {
   fujiStudy?: FujiStudy
   suppliedFuji?: SuppliedFuji
   filmCast?: { method: 'spektrafilm-print-reference-blend-v1'; amountPolicy: 'chroma-target'; minAmount: number; targetChroma: Record<string, number>; targetHue?: Record<string, number>; referenceFilm: string; variants: number; skipped: { id: string; reason: string }[]; limitations: string[] }
+  labAim?: { method: 'film-lab-lab-aim-v1'; experimental: true; visualAim: number; variants: number; limitations: string[]
+    papers: Record<string, { statusA: number[]; source: string }> }
   printTiming?: {
     method: 'spektrafilm-print-filter-timing-v1'; experimental: true; unit: 'Kodak CC'; channels: ['M', 'Y']
     gridCC: number[]; rangeCC: [number, number]; resolution: number; limitations: string[]

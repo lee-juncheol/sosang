@@ -118,7 +118,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
   const userEntries = library?.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY) ?? []
 
   return <section className="camera-register" aria-labelledby="camera-register-title" aria-busy={busy}>
-    {phase === 'registering' && <CameraBusyOverlay t={t} status={progress}/>}
+    {phase === 'registering' && <CameraBusyOverlay t={t} status={progress} step={step}/>}
     <div className="camera-register-heading">
       <h3 id="camera-register-title">{t("카메라에 바로 등록")}</h3>
       {library && <span>{library.camera.model} · {t("펌웨어 {0}", [library.camera.firmware])}</span>}

@@ -35,16 +35,38 @@ from pipeline.camera_std import backup_record, rebuild_standard, camera_catalog,
 
 
 def combination_choices(stocks):
-    films = [s for s in stocks if s['stage'] == 'filming']
-    papers = [s for s in stocks if s['stage'] == 'printing']
+    """Every look with its permanent download number. Numbers of existing looks never move.
+
+    1..160   upstream films x upstream papers (slides: one direct scan in their block)
+    161..176 digital scans of upstream negatives
+    177..    each Film Lab extension paper: one block of upstream negatives
+    then     each Film Lab extension film: upstream papers, extension papers, digital scan
+    """
+    ext = lambda s: s.get('source') == 'film-lab-extension'
+    films = [s for s in stocks if s['stage'] == 'filming' and not ext(s)]
+    extra_films = [s for s in stocks if s['stage'] == 'filming' and ext(s)]
+    papers = [s for s in stocks if s['stage'] == 'printing' and not ext(s)]
+    extra_papers = [s for s in stocks if s['stage'] == 'printing' and ext(s)]
     for i, film in enumerate(films):
         # Preserve existing negative filenames; use the first unused number
         # in each formerly unsupported slide block for its single direct scan.
         for j, paper in enumerate([None] if film['type'] == 'positive' else papers):
             yield film, paper, i * len(papers) + j + 1
     # Append negative digital scans without renumbering any existing download.
-    for i, film in enumerate(f for f in films if f['type'] != 'positive'):
+    negatives = [f for f in films if f['type'] != 'positive']
+    for i, film in enumerate(negatives):
         yield film, None, len(films) * len(papers) + i + 1
+    # Film Lab extension papers follow, one block of negatives per paper.
+    start = len(films) * len(papers) + len(negatives)
+    for k, paper in enumerate(extra_papers):
+        for i, film in enumerate(negatives):
+            yield film, paper, start + k * len(negatives) + i + 1
+    # Film Lab extension films (negatives) follow, one block each.
+    start += len(extra_papers) * len(negatives)
+    block = len(papers) + len(extra_papers) + 1
+    for i, film in enumerate(f for f in extra_films if f['type'] != 'positive'):
+        for j, paper in enumerate([*papers, *extra_papers, None]):
+            yield film, paper, start + i * block + j + 1
 
 
 def combination_id(film, paper):
@@ -135,7 +157,7 @@ def generate_one(job):
             "vlogVsDirectEngine":fidelity,"cameraVerified":False}
         save_json(directory/'qa.json',qa)
         provenance={"engine":{"repository":"https://github.com/andreavolpato/spektrafilm","commit":CONFIG['engine_commit'],"version":CONFIG['engine_version']},
-                    "profiles":{"film":film,"paper":paper},"config":CONFIG,"bundle":asdict(bundle.meta),
+                    "profiles":{"film":film,"paper":paper},"extensionPaper":(paper.get('note') if paper and paper.get('experimental') else None),"config":CONFIG,"bundle":asdict(bundle.meta),
                     "processMode":record['processMode'],"scanFilm":paper is None,
                     "processingPath":('film exposure -> film development -> Film Lab virtual RGB scan -> common negative-to-positive conversion' if is_digital else 'film exposure -> film development -> direct film scan' if is_slide else 'film exposure -> film development -> print exposure -> print development -> print scan'),
                     "digitalConversion":({"id":DIGITAL_METHOD_ID,"contract":DIGITAL_CONTRACT,"experimental":True,
@@ -183,7 +205,7 @@ def catalog(records, stocks, previous=None):
                                    and c.get('processMode') not in ('official_direct', 'official_print')]
         # Supplied Fuji cubes are already S1II Standard outputs. They stay in
         # their separate inventory and must never enter the engine or adapter.
-        for key in ['referenceStudy','suppliedFuji']:
+        for key in ['referenceStudy','suppliedFuji','filmCast','printTiming','labAim']:
             if key in previous: result[key]=previous[key]
         result['counts']={s:sum(c['status']==s for c in result['combinations']) for s in ['ready','failed','unsupported','not-generated']}
     save_json(PUBLIC/'catalog.json',result)
@@ -194,6 +216,8 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--only',help='film_id__paper_id, film_id__direct_scan or film_id__digital_scan')
     parser.add_argument('--digital-only',action='store_true',help='Append/rebuild digital scans and preserve verified existing print/slide artifacts byte-for-byte')
+    parser.add_argument('--paper',help='Build only combinations on this paper (e.g. a new extension paper)')
+    parser.add_argument('--missing',action='store_true',help='Build only combinations without a valid published record')
     parser.add_argument('--jobs',type=int,default=3)
     parser.add_argument('--force',action='store_true')
     args=parser.parse_args()
@@ -233,9 +257,11 @@ def main():
             if valid_assets(old):
                 records[cid]=old
         eligible=not args.digital_only or (p is None and f['type']!='positive')
+        if args.paper and (p is None or p['id']!=args.paper): eligible=False
+        if args.missing and cid in records: eligible=False
         if eligible and (not args.only or cid==args.only):
             jobs.append((f,p,number,args.force))
-    if args.only and not jobs:
+    if (args.only or args.paper or args.missing) and not jobs:
         raise SystemExit('Unknown or unsupported combination')
     catalog(records,stocks,previous)
     started=time.perf_counter()

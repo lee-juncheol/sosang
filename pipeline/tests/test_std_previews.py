@@ -64,11 +64,15 @@ def test_every_film_paper_choice_has_current_runtime_preview():
     ready = [combo for combo in catalog['combinations'] if combo['status'] == 'ready']
     # 148 engine looks plus one recommended-development variant per negative print.
     # The retired FUJI official looks are no longer in the catalog.
-    base = [combo for combo in ready if not combo.get('castBaseId')]
+    # Film Lab extension paper (3523XD draft) adds 16 prints, nine extension Fuji negatives add 90 looks;
+    # lab-aim variants exist on 2383 and 3523XD.
+    base = [combo for combo in ready if not combo.get('castBaseId') and not combo.get('labAimBaseId')]
     cast = [combo for combo in ready if combo.get('castBaseId')]
-    assert len(base) == 148
-    assert len(cast) == 128
-    assert len(ready) == 276
+    lab = [combo for combo in ready if combo.get('labAimBaseId')]
+    assert len(base) == 148 + 16 + 90
+    assert len(cast) == 225
+    assert len(lab) == 50 and {combo['paper'] for combo in lab} == {'kodak_2383', 'fujifilm_eterna_cp_3523xd'}
+    assert len(ready) == 529
     assert not any(combo['processMode'].startswith('official_') for combo in ready)
     assert not any(combo['processMode'] == 'reference_interpretation' for combo in ready)
     for combo in ready:

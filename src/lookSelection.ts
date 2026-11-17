@@ -1,5 +1,6 @@
 import type { Combination, ProcessPreference, ProcessMode, Sample, Stock, SuppliedFujiLook } from './types'
 export { downloadFilename } from './lutNames.ts'
+import type { PrintVariant } from './lutNames.ts'
 
 export const CAMERA_STORAGE_KEY = 'film-lab-std-camera'
 export const DEFAULT_CAMERA = 'S1II'
@@ -58,13 +59,24 @@ export function processModeFor(film: Pick<Stock, 'type'>, preference: ProcessPre
 export function findLook(combinations: Combination[], film: Pick<Stock, 'id' | 'type'>, paperId: string, preference: ProcessPreference): Combination | undefined {
   const processMode = processModeFor(film, preference)
   const paper = processMode === 'negative_print' || processMode === 'official_print' ? paperId : null
-  return combinations.find(combo => !combo.castBaseId && combo.film === film.id && combo.processMode === processMode && combo.paper === paper)
+  return combinations.find(combo => !combo.castBaseId && !combo.labAimBaseId && combo.film === film.id && combo.processMode === processMode && combo.paper === paper)
 }
 
 /** The optional film-cast variant that belongs to one base negative print. */
 export function findFilmCast(combinations: Combination[], base: Combination | undefined): Combination | undefined {
-  if (!base || base.castBaseId || base.processMode !== 'negative_print') return undefined
+  if (!base || base.castBaseId || base.labAimBaseId || base.processMode !== 'negative_print') return undefined
   return combinations.find(combo => combo.castBaseId === base.id && combo.status === 'ready')
+}
+
+/** The optional manufacturer lab-aim variant of one base negative print (papers with a datasheet aim only). */
+export function findLabAim(combinations: Combination[], base: Combination | undefined): Combination | undefined {
+  if (!base || base.castBaseId || base.labAimBaseId || base.processMode !== 'negative_print') return undefined
+  return combinations.find(combo => combo.labAimBaseId === base.id && combo.status === 'ready')
+}
+
+/** Which print-method variant a combination is, for file names. */
+export function printVariant(combo: Pick<Combination, 'castBaseId' | 'labAimBaseId'> | undefined): PrintVariant {
+  return combo?.labAimBaseId ? 'lab-aim' : combo?.castBaseId ? 'film-cast' : false
 }
 
 /** Supplied cubes are finished S1II STD looks; no paper, camera bridge, or V-Log is fabricated. */

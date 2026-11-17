@@ -28,7 +28,7 @@ AUDIT = ROOT / 'artifacts/print-timing'
 
 def candidates(catalog):
     return [c for c in catalog['combinations'] if c.get('processMode') == 'negative_print'
-            and c.get('status') == 'ready' and not c.get('castBaseId')]
+            and c.get('status') == 'ready' and not c.get('castBaseId') and not c.get('labAimBaseId')]
 
 
 def generate_one(base):
@@ -87,12 +87,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--jobs', type=int, default=3)
     parser.add_argument('--only')
+    parser.add_argument('--paper', help='Append packs for one paper only; published packs on other papers are kept')
+    parser.add_argument('--missing', action='store_true', help='Append packs only for base looks without one')
     args = parser.parse_args()
     commit = subprocess.check_output(['git', '-C', str(UPSTREAM), 'rev-parse', 'HEAD'], text=True).strip()
     if commit != CONFIG['engine_commit']: raise SystemExit('Pinned engine commit differs')
     catalog = json.loads((PUBLIC / 'catalog.json').read_text())
     bases = candidates(catalog)
-    if len(bases) != 128: raise SystemExit(f'Expected 128 negative print base looks, found {len(bases)}')
+    if len(bases) < 128: raise SystemExit(f'Expected at least 128 negative print base looks, found {len(bases)}')
+    kept = []
+    if args.paper:
+        bases = [b for b in bases if b['paper'] == args.paper]
+        if not bases: raise SystemExit('No negative print base looks on that paper')
+        kept = [{'id': k, 'status': 'ready', **v} for k, v in catalog.get('printTiming', {}).get('packs', {}).items()
+                if not k.endswith('__' + args.paper)]
+    if args.missing:
+        kept = [{'id': k, 'status': 'ready', **v} for k, v in catalog.get('printTiming', {}).get('packs', {}).items()]
+        bases = [b for b in bases if b['id'] not in {k['id'] for k in kept}]
+        if not bases: raise SystemExit('Nothing missing')
     if args.only:
         bases = [b for b in bases if b['id'] == args.only]
         if not bases: raise SystemExit('Unknown negative print combination')
@@ -107,7 +119,7 @@ def main():
                'wallSeconds': round(time.perf_counter() - started, 2), 'catalogPublished': not args.only and not failed,
                'qa': {r['id']: r['qa'] for r in records if r['status'] == 'ready'}})
     if failed: raise SystemExit(f'Failed: {[r["id"] for r in failed]}')
-    if not args.only: publish(catalog, records)
+    if not args.only: publish(catalog, kept + records)
 
 
 if __name__ == '__main__':

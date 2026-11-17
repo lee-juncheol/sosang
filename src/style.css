@@ -108,3 +108,16 @@ html:lang(en) .process-option{font-size:13px}
 .preview-heading>div:first-child{min-width:0}.look-status{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.timing-actions{justify-content:flex-end}
 /* Cross-fade between preview results instead of a loading screen. */
 .result-layer{opacity:0;transition:opacity 220ms ease}.result-layer.loaded{opacity:1}.image-tag.busy>i{animation:busy-dot 0.9s ease-in-out infinite alternate}@keyframes busy-dot{from{opacity:.25}to{opacity:1}}@media(prefers-reduced-motion:reduce){.result-layer{transition:none}.image-tag.busy>i{animation:none}}
+/* Motion, kept quiet: one easing, short durations, nothing bounces. All of it is switched off by
+   the global prefers-reduced-motion rule above. */
+:root{--ease-out:cubic-bezier(.2,.8,.2,1)}
+/* Segmented controls: one highlight slides under the pressed button (see segmentPill.ts). */
+.segmented{position:relative}.segmented::before{content:'';position:absolute;left:0;top:0;width:var(--pill-w,0);height:var(--pill-h,0);transform:translate(var(--pill-x,0),var(--pill-y,0));border-radius:4px;background:var(--pill-bg,var(--raised));box-shadow:var(--pill-shadow,none);opacity:0;pointer-events:none}.segmented.pill-on::before{opacity:1}.segmented.pill-ready::before{transition:transform .24s var(--ease-out),width .24s var(--ease-out),height .24s var(--ease-out)}.segmented.pill-on>*{position:relative;z-index:1;transition:color .16s,background-color .16s}.segmented.pill-on>.active,.segmented.pill-on>.active:hover,.segmented.pill-on>[aria-pressed=true]:hover{background:transparent;box-shadow:none}
+.view-switch{--pill-bg:#35363c;--pill-shadow:0 1px 2px #0002}.locale-switch{--pill-bg:#34363b}
+/* Download: spinner while verifying, then a check for a moment. */
+.download-button>.download-icon{display:grid;place-items:center;width:18px;height:18px;flex:0 0 18px}.download-spinner{width:15px;height:15px;border-radius:50%;border:2px solid #18291b40;border-top-color:#18291b;animation:download-spin .7s linear infinite}@keyframes download-spin{to{transform:rotate(360deg)}}.download-button:disabled{cursor:default}.download-button.is-busy{opacity:.85}.download-button.is-done .download-icon{animation:download-pop .32s var(--ease-out)}.download-button.is-done .download-icon path{stroke-dasharray:24;stroke-dashoffset:24;animation:download-draw .3s .05s var(--ease-out) forwards}@keyframes download-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}@keyframes download-draw{to{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){.download-button.is-done .download-icon path{stroke-dashoffset:0}.download-spinner{border-color:#18291b80}}
+/* Photo drop zone: the icon lifts and the hint changes while a file is held over it. */
+.upload-hint>svg{flex-shrink:0;transition:transform .2s var(--ease-out),color .16s}.photo-upload.dragging .upload-hint{color:var(--text)}.photo-upload.dragging .upload-hint>svg{color:var(--mint);transform:translateY(-3px)}
+.paper-option em.experimental-badge{color:#ffb86b;border:1px solid #ffb86b55;border-radius:3px;padding:0 4px;font-size:10.5px;line-height:1.5}
+.film-copy em.film-experimental{font-style:normal;color:#ffb86b}
