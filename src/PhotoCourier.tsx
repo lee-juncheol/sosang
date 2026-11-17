@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { Translate } from './i18n'
+import type { Locale, Translate } from './i18n'
 import { courierExport, CourierError, courierList, courierListSaved, courierPickFolder, courierPreview, levelZoom, type CourierInfo, type CourierPhoto } from './platform.ts'
 import { folderName, formatExposure, formatLevel, requestThumbnail, roundLevel, sortPhotos, type SortOrder } from './courierUtils.ts'
 import './photoCourier.css'
+import { FeatureGuide } from './FeatureGuide'
 
 const PREVIEW_EDGE = 2560
 const SUBFOLDERS_KEY = 'sosang-send-subfolders'
@@ -59,7 +60,7 @@ function Thumb({ photo }: { photo: CourierPhoto }) {
   return <span ref={box} className={`courier-thumb${failed ? ' failed' : ''}`}>{url ? <img src={url} alt="" draggable={false}/> : <i>JPG</i>}</span>
 }
 
-export function PhotoCourier({ t }: { t: Translate }) {
+export function PhotoCourier({ locale, t }: { locale: Locale; t: Translate }) {
   const [source, setSource] = useState<string | null>(null)
   const [destination, setDestination] = useState<string | null>(null)
   const [subfolders, setSubfolders] = useState(() => readSetting(SUBFOLDERS_KEY, true))
@@ -245,6 +246,7 @@ export function PhotoCourier({ t }: { t: Translate }) {
 
   return <section className="courier" aria-label={t("사진 보내기")}>
     <aside className="courier-side">
+      <div className="courier-guide"><FeatureGuide guide="photo-sending" locale={locale} t={t}/></div>
       <div className="courier-card courier-source">
         <div className="courier-card-head">
           <div><h2>{t("원본 폴더")}</h2><p title={source || undefined}>{source ? folderName(source) : t("SD카드나 사진 폴더를 고르세요")}</p></div>

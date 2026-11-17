@@ -1,7 +1,8 @@
 import { useRef, useState, type DragEvent } from 'react'
-import type { Translate } from './i18n'
+import type { Locale, Translate } from './i18n'
 import { errorText, ExperimentalConsent } from './CameraRegister'
 import { CameraBusyOverlay } from './CameraBusyOverlay'
+import { FeatureGuide } from './FeatureGuide'
 import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRearrange, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
 import './lutManager.css'
 
@@ -22,7 +23,7 @@ function styleLabel(t: Translate, code: number): string {
   }
 }
 
-export function LutManager({ t }: { t: Translate }) {
+export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
   const [library, setLibrary] = useState<CameraLibrary | null>(null)
   const [busy, setBusy] = useState<Busy>(null)
   const [step, setStep] = useState<CameraProgress | null>(null)
@@ -262,7 +263,7 @@ export function LutManager({ t }: { t: Translate }) {
   return <div className={`lut-manager${dragging ? ' dragging' : ''}`} onDragOver={library ? onDragOver : undefined} onDragLeave={e => { if (e.currentTarget === e.target) setDragging(false) }} onDrop={library ? onDrop : undefined}>
     <div className="lut-manager-intro">
       <div>
-        <h1>{t("LUT 관리")}</h1>
+        <div className="lut-manager-title"><h1>{t("LUT 관리")}</h1><FeatureGuide guide="lut-manager" locale={locale} t={t}/></div>
         <p>{t("USB로 연결한 카메라의 LUT 라이브러리를 보고, LUT를 지우거나 내 .cube 파일을 넣습니다. 바꾸기 전에 카메라 설정을 이 컴퓨터에 백업합니다.")}</p>
       </div>
       <button type="button" className="lut-manager-read" disabled={!!busy} onClick={() => void read()}>{library ? t("목록 다시 읽기") : t("카메라 LUT 목록 읽기")}</button>
