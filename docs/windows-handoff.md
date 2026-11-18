@@ -72,6 +72,22 @@ Windows에서 필요한 것:
 
 macOS에서는 Git, Node.js 22.12 이상, Rust, Xcode Command Line Tools가 필요합니다.
 
+macOS에서 Windows 앱까지 빌드하려면(`npm run release:app -- --platform windows` 또는 `all`) 다음도 필요합니다. Homebrew는 Apple Silicon용(`/opt/homebrew`)이어야 합니다.
+
+```bash
+rustup target add x86_64-pc-windows-msvc
+```
+
+```bash
+cargo install --locked cargo-xwin
+```
+
+```bash
+/opt/homebrew/bin/brew install llvm lld nsis
+```
+
+`app-release/`는 git에 없어서 폴더마다 내용이 다릅니다. 사이트 배포는 서버의 앱 릴리스보다 오래됐거나 플랫폼이 빠진 `app-release/`면 멈춥니다. 그때는 최신 `app-release/`를 복사해 옵니다.
+
 ```bash
 git clone -c core.autocrlf=false https://github.com/lee-juncheol/sosang.git
 cd sosang
@@ -84,7 +100,8 @@ cargo test -p lumix-lut -p lumix-ptp
 
 ## 남은 일
 
-- 사용방법 영상(`public/guides/`, LUT 관리·사진 보내기 × 한국어·영어)은 사이트에 배포해야 앱에서 보입니다. 앱은 영상을 서버에서 받습니다.
+- 앱 0.1.3 배포: 사용방법 버튼과 제조사 기준 인화 화면은 앱에 담겨 나가므로 새 버전이 있어야 보입니다(영상과 LUT는 사이트에 이미 있음).
+- macOS에서 크로스 빌드한 Windows 설치 파일은 아직 실제 Windows에서 실행해 보지 않았습니다. 첫 배포 전에 설치, 실행, 카메라 연결, WebP 변환을 확인합니다.
 - macOS: 카메라를 쓰던 앱 프로세스를 강제로 끄면, 새 프로세스(앱, `probe`)가 케이블을 다시 꽂을 때까지 카메라를 찾지 못합니다(ImageCaptureCore 목록에도 없음, 2026-11-17 두 번 재현). 앱을 정상 종료할 때도 그런지, 앱에서 피할 수 있는지는 아직 보지 않았습니다.
 - Windows 코드 서명이 없어서 처음 설치할 때 SmartScreen 경고가 뜹니다. 서명할지는 사용자와 정합니다.
 - macOS 공증은 아직 하지 않았습니다.
@@ -166,6 +183,13 @@ cargo test -p lumix-lut -p lumix-ptp
 - LUT 관리와 사진 보내기에 "사용방법" 버튼과 영상 레이어(`src/FeatureGuide.tsx`)를 붙였습니다. 영상은 `public/guides/{lut-manager,photo-sending}-{ko,en}.mp4`(+ 표지 `.jpg`).
 - 녹화 방법(다시 찍을 때): 디버그 앱 번들을 띄우고 `screencapture -v -V <초> -l <창 ID>`로 앱 창만 녹화(가려져도 됨). 창 그림자와 제목 줄을 잘라 1280×832로 줄이고, 1.4~1.5배 빠르게 한 뒤 H.264 0.65~0.9 Mbps로 다시 인코딩했습니다(AVFoundation 스크립트, 저장소 밖). 이 Mac에는 ffmpeg가 없습니다.
 - LUT 관리 영상은 카메라에 쓰지 않고 적용 직전까지만 보여 줍니다. 파일·폴더 선택 창은 Finder 사이드바(개인 폴더)가 보여서 영상에서 뺐습니다. 사진 보내기 데모 사진은 사이트의 샘플 사진을 JPG로 바꾼 것입니다.
+
+### 2026-11-18 ~ 19, macOS (사이트 배포, Windows 크로스 빌드)
+
+- `6a5f8506`까지 GitHub에 올렸습니다. `c813209c`가 2.9GB라 GitHub의 push 한도(2GB)를 넘어서, LUT를 임시 브랜치로 나눠 올린 뒤 지웠습니다. `/usr/local/bin/git`(2.15)은 이 방식에서 이미 올린 파일을 다시 보내므로 `/usr/bin/git`을 썼습니다.
+- 사고: film-lab에서 사이트를 배포했을 때 그 폴더의 오래된 `app-release/`(0.1.0)가 함께 올라가, 서버의 앱 업데이트 정보가 0.1.0으로 돌아가고 0.1.2 업데이트 파일이 404가 됐습니다. 같은 커밋을 0.1.2 파일과 함께 다시 배포해 복구했고, 재발을 막는 검사(`scripts/check-app-release.mjs`)를 넣었습니다.
+- `release:app`에 `--platform mac|windows|all`을 넣었습니다. macOS에서 Windows 설치 파일 빌드와 임시 키 서명까지 확인했습니다. 실제 Windows 실행은 아직입니다.
+- 크로스 빌드의 libwebp는 SSE4.1 없이 SSE2로 컴파일됩니다(`scripts/windows-cross/`). Windows에서 빌드한 앱보다 WebP 변환이 조금 느릴 수 있습니다.
 
 ## 보류한 것
 

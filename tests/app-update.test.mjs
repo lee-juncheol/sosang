@@ -6,7 +6,7 @@ import path from 'node:path';
 import worker from '../server/worker.mjs';
 
 const APP_ORIGINS = ['tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost'];
-import { validateUpdateManifest, publishUpdateManifest, hostedReleaseFiles } from '../scripts/app-update.mjs';
+import { validateUpdateManifest, publishUpdateManifest, hostedReleaseFiles, assertKeepsPublishedRelease } from '../scripts/app-update.mjs';
 
 const manifest = {
   version: '0.2.0',
@@ -108,4 +108,14 @@ test('the Cloudflare build publishes the release manifest only when there is one
   await fs.writeFile(path.join(project, 'app-release/latest.json'), JSON.stringify({ ...manifest, version: 'x' }));
   await assert.rejects(publishUpdateManifest(project, output));
   await fs.rm(project, { recursive: true, force: true });
+});
+
+test('a deploy cannot take away the published app release', () => {
+  const release = (version, ...names) => ({ version, platforms: Object.fromEntries(names.map(name => [name, {}])) });
+  const live = release('0.1.2', 'darwin-aarch64', 'windows-x86_64');
+  assert.throws(() => assertKeepsPublishedRelease(null, live), /no app release/);
+  assert.throws(() => assertKeepsPublishedRelease(release('0.1.0', 'darwin-aarch64', 'windows-x86_64'), live), /roll the app back/);
+  assert.throws(() => assertKeepsPublishedRelease(release('0.1.2', 'darwin-aarch64'), live), /drop windows-x86_64/);
+  assert.doesNotThrow(() => assertKeepsPublishedRelease(release('0.1.2', 'darwin-aarch64', 'windows-x86_64'), live));
+  assert.doesNotThrow(() => assertKeepsPublishedRelease(release('0.1.10', 'darwin-aarch64'), live));
 });

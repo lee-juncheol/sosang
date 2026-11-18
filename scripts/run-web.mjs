@@ -22,7 +22,7 @@ function build() { run(['node_modules/typescript/bin/tsc','-b']); run(['node_mod
 function buildCloudflare() { build(); run(['scripts/prepare-cloudflare.mjs']); run(['scripts/package-source.mjs']); run(['scripts/verify-cloudflare.mjs']); }
 if (action==='build') { build(); }
 else if (action==='build:cloudflare') { buildCloudflare(); }
-else if (action==='deploy:cloudflare') { buildCloudflare(); run(['node_modules/wrangler/bin/wrangler.js','deploy','--config','wrangler.jsonc',...process.argv.slice(3)]); }
+else if (action==='deploy:cloudflare') { run(['scripts/check-app-release.mjs']); buildCloudflare(); run(['node_modules/wrangler/bin/wrangler.js','deploy','--config','wrangler.jsonc',...process.argv.slice(3)]); }
 else if (action==='preview:cloudflare') { run(['node_modules/wrangler/bin/wrangler.js','dev','--config','wrangler.jsonc','--ip','127.0.0.1',...process.argv.slice(3)]); }
 else if (action==='cloudflare:login') { run(['node_modules/wrangler/bin/wrangler.js','login',...process.argv.slice(3)]); }
 else if (action==='verify:assets') { run(['--experimental-strip-types','scripts/verify-assets.mjs',...process.argv.slice(3)]); }

@@ -53,6 +53,20 @@ export function hostedReleaseFiles(doc) {
   return Object.values(doc.platforms).map(p => new URL(p.url)).filter(u => u.origin === APP_SERVER).map(releaseFile);
 }
 
+/** Throw when deploying `local` (app-release/latest.json, or null) would take away what `live`
+ *  (the published manifest) offers: an older version, or a platform of the same version. */
+export function assertKeepsPublishedRelease(local, live) {
+  const hint = `Copy the current ${APP_RELEASE_DIR}/ here or run release:app first`;
+  assert(local, `This deploy has no app release but ${live.version} is published. ${hint}.`);
+  const parts = version => version.replace(/^v/, '').split(/[-+]/)[0].split('.').map(Number);
+  const [a, b] = [parts(local.version), parts(live.version)];
+  const order = a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  assert(order >= 0, `This deploy would roll the app back from ${live.version} to ${local.version}. ${hint}.`);
+  if (order > 0) return;
+  const missing = Object.keys(live.platforms).filter(name => !local.platforms[name]);
+  assert.equal(missing.length, 0, `This deploy would drop ${missing.join(', ')} from app ${live.version}. ${hint}.`);
+}
+
 /** Copy the release's update manifest and its downloads into the public build when there is
  *  a release. Returns the version, or null without a release. */
 export async function publishUpdateManifest(projectDir, outputDir) {
