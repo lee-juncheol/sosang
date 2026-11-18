@@ -13,7 +13,7 @@ const destination = path.resolve(root, process.argv[2] || 'dist-cloudflare');
 const directories = ['src', 'server', 'tests', 'scripts', 'pipeline', 'licenses', 'docs', 'public/camera-adapters'];
 const requiredFiles = ['index.html', 'tsconfig.json', 'package.json', 'package-lock.json', 'LICENSE', 'README.md'];
 const optionalFiles = ['wrangler.jsonc', 'wrangler.legacy.jsonc'];
-const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.py', '.json', '.jsonc', '.md', '.txt', '.lock', '.html']);
+const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.py', '.json', '.jsonc', '.md', '.txt', '.lock', '.html', '.h']);
 const excludedDirectories = new Set(['vendor', 'vendors', 'cache', 'caches', '__pycache__', 'node_modules', 'public', 'dist', 'dist-cloudflare', 'assets', 'samples', 'originals', 'artifacts', 'coverage', 'credentials', 'secrets']);
 const excludedFiles = /(?:^|[._-])(?:credentials?|secrets?|id_rsa|id_ed25519)(?:[._-]|$)|\.(?:pyc|pyo|pem|key|p12|pfx)$/i;
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
