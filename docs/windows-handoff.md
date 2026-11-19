@@ -151,7 +151,7 @@ cargo test -p lumix-lut -p lumix-ptp
 - GitHub 기록을 다시 쓴 뒤의 재동기화를 안내대로 했습니다. 이 PC에만 있던 변경은 없었고, 옛 기록과의 차이는 Mac에서 지운 문서 5줄뿐이었습니다. 이 문서에 적힌 커밋 번호도 새 번호로 바꿨습니다.
 - 사진 보내기: `photo-courier`(libwebp 포함)가 MSVC로 빌드되고 `cargo test -p photo-courier` 10개, 웹 테스트 105개가 통과했습니다. 앱의 사진 보내기 화면도 뜹니다(단축키 안내가 Ctrl+Enter).
 - 사용자 제보: S1M2를 쓰는 사용자의 LUT 관리에서 체크박스와 삭제가 모두 꺼져 있었습니다("선택된 LUT를 읽지 못해 지우기를 막아 두었습니다").
-  - 원인: 사진 모드에서 LUT를 쓰지 않으면 선택 항목 값이 42("LUT 없음")인데, 앱이 이것을 "못 읽음"으로 처리했습니다. 영상 모드 선택은 별도 항목(`0x530`)에 있습니다.
+  - 원인: 사진 모드에서 LUT를 쓰지 않을 때의 "LUT 없음" 값을 앱이 "못 읽음"으로 처리했습니다. 영상 모드 선택은 사진 모드와 따로 저장됩니다.
   - 카메라 모드를 바꿔 가며 읽기만으로 확인했고, 자세한 구조는 `docs/camera-lut-library.md`의 "삭제와 선택 상태"에 적었습니다.
   - `SettingsBlob::selected_entries`가 두 항목을 읽어 고른 칸 목록을 돌려줍니다. 앱(`Library.selected`)도 숫자 하나에서 목록으로 바뀌었습니다.
   - 확인에 쓴 캡처는 `crates/lumix-lut/tests/fixtures/local/`(git 제외)에 `s1m2_fw15_photo37_video_none.bin`, `s1m2_fw15_photo37_video1.bin`, `s1m2_fw15_photo_none_video1.bin`로 두었습니다. macOS에는 없으니 그쪽에서는 이 테스트가 건너뜁니다.
