@@ -1,0 +1,25 @@
+.contact-dialog{width:min(560px,calc(100% - 32px))}
+.contact-dialog .icon-button{font-size:22px;line-height:1;color:var(--muted)}
+.contact-form{display:flex;flex-direction:column;gap:16px;margin-top:18px}
+.dialog-inner p.contact-intro{margin:0}
+.contact-field{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--text)}
+.contact-field textarea,.contact-field input{width:100%;border:1px solid var(--line);border-radius:7px;background:var(--well);color:var(--text);font:inherit;font-size:15px;line-height:1.6;padding:10px 12px}
+.contact-field textarea{resize:vertical;min-height:150px}
+.contact-field input{min-height:44px}
+.contact-field textarea:focus,.contact-field input:focus{outline:0;border-color:var(--accent)}
+.contact-field textarea::placeholder,.contact-field input::placeholder{color:var(--faint)}
+.contact-field small{align-self:flex-end;font:11px var(--mono);color:var(--faint)}
+.contact-trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.dialog-inner p.contact-context{margin:0;font-size:13px;line-height:1.6;color:var(--muted);padding:10px 12px;border-radius:7px;background:var(--raised);overflow-wrap:anywhere}
+.contact-context span{display:block;font-size:12px;color:var(--faint);margin-bottom:2px}
+.dialog-inner p.contact-privacy{margin:0;font-size:12px;line-height:1.7;color:var(--faint)}
+.dialog-inner p.contact-error{margin:0;font-size:14px;color:#edb49c}
+.contact-submit{align-self:flex-end;min-height:44px;padding:0 22px;border-radius:7px;background:var(--accent);color:#18291b;font-size:15px;font-weight:600}
+.contact-submit:hover:not(:disabled){background:var(--accent-hover)}
+.contact-submit:disabled{opacity:.6;cursor:progress}
+.contact-sent{display:flex;flex-direction:column;gap:4px;margin-top:18px}
+.dialog-inner .contact-sent p:first-child{font-size:17px;color:var(--text)}
+.contact-sent .contact-submit{margin-top:14px}
+.about-actions{display:flex;align-items:center;gap:4px}
+@media(max-width:650px){.contact-submit{align-self:stretch}.about-actions{gap:0}}
+.detail-links button{padding:0;font-size:inherit;color:inherit;text-align:left}

@@ -21,6 +21,7 @@ import { PhotoCourier } from './PhotoCourier'
 import { CameraRegister } from './CameraRegister'
 import { UpdateBanner } from './UpdateBanner'
 import { AppClosingNotice } from './AppClosingNotice'
+import { ContactDialog } from './ContactDialog'
 import { useSegmentPill } from './segmentPill'
 
 const paths: Record<string, React.ReactNode> = {
@@ -37,6 +38,7 @@ const paths: Record<string, React.ReactNode> = {
   arrow: <path d="M4 12h16m-6-6 6 6-6 6"/>,
   camera: <><path d="M3 7h4l2-3h6l2 3h4v14H3z"/><circle cx="12" cy="13" r="4"/></>,
   film: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18M16 3v18M4 8h4m8 0h4M4 16h4m8 0h4"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></>,
   external: <><path d="M14 3h7v7m0-7L10 14"/><path d="M10 4H4v16h16v-6"/></>,
 }
 function Icon({ name, size = 18 }: { name: string; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg> }
@@ -125,6 +127,8 @@ function App() {
   const [downloading, setDownloading] = useState(false)
   const [notice, setNotice] = useState('')
   const dialog = useRef<HTMLDialogElement>(null)
+  const [contactOpen, setContactOpen] = useState(false)
+  const openContact = () => { dialog.current?.close(); setContactOpen(true) }
   const fileInput = useRef<HTMLInputElement>(null)
   const filmLibrary = useRef<HTMLElement>(null)
   const previewPanel = useRef<HTMLElement>(null)
@@ -336,7 +340,7 @@ function App() {
   }
 
   return <>
-    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}{isApp() && <a href="#send" aria-current={view === 'send' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('send') }}>{t("사진 보내기")}</a>}</nav></div><div className="topbar-right"><div ref={localeSwitch} className="locale-switch segmented" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
+    <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}{isApp() && <a href="#send" aria-current={view === 'send' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('send') }}>{t("사진 보내기")}</a>}</nav></div><div className="topbar-right"><div ref={localeSwitch} className="locale-switch segmented" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><div className="about-actions"><button className="about-button" aria-label={t("문의")} onClick={openContact}><Icon name="mail" size={17}/><span>{t("문의")}</span></button><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></div></header>
     {isApp() && <UpdateBanner t={t}/>}
     {isApp() && <AppClosingNotice t={t}/>}
     <main className={view.startsWith('gallery') ? 'gallery-main' : view === 'send' ? 'courier-main' : undefined}>
@@ -414,6 +418,7 @@ function App() {
     </main>
 
     <WhatsNew locale={locale} ready={localeReady} t={t}/>
+    <ContactDialog open={contactOpen} onClose={() => setContactOpen(false)} locale={locale} t={t}/>
     <dialog ref={dialog} className="details-dialog" onClick={e => { if (e.target === dialog.current) dialog.current?.close() }}>
       <div className="dialog-inner"><div className="dialog-heading"><div><span className="eyebrow">sosang</span><h2>{t("출처/라이선스")}</h2></div><button className="icon-button" onClick={() => dialog.current?.close()} aria-label={t("상세 정보 닫기")}><Icon name="close"/></button></div>
       <p className="detail-intro">{film.name} · {processLabel}</p>
@@ -431,6 +436,7 @@ function App() {
       </>}
       <h3>{t("사진과 미리보기")}</h3><p>{t("샘플과 갤러리 사진의 권리는 촬영자에게 있습니다. 샘플 미리보기는 S1II STD 기준이며, 갤러리는 촬영 당시 LUT가 적용된 JPG입니다.")}</p><p>{t("업로드 사진에는 내보내기에서 선택한 카메라의 STD LUT를 적용합니다. 사진은 브라우저 안에서 처리하며 서버에 저장하지 않습니다.")}</p>
       {catalog.sourceCode && <div className="detail-links"><a href={serverUrl(catalog.sourceCode.path)} download>{t("sosang 소스 코드 · GPLv3 ↓")}</a></div>}
+      <h3>{t("문의 · 버그 제보")}</h3><p>{t("궁금한 점이나 버그, 바라는 기능이 있으면 알려 주세요.")}</p><div className="detail-links"><button type="button" onClick={openContact}>{t("문의하기 →")}</button></div>
       </div>
     </dialog>
   </>

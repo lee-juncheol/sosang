@@ -84,8 +84,13 @@ async function cameraCall<T>(cmd: string, args?: Record<string, unknown>): Promi
   }
 }
 
-export const cameraStatus = () => cameraCall<CameraStatus>('camera_status')
-export const cameraListLuts = () => cameraCall<CameraLibrary>('camera_list_luts')
+// Model and firmware of the camera last read in this session, for the contact form. The serial
+// number is never kept here.
+let lastCamera: { model: string; firmware: string } | null = null
+function remember(camera: CameraStatus) { lastCamera = { model: camera.model, firmware: camera.firmware } }
+
+export const cameraStatus = () => cameraCall<CameraStatus>('camera_status').then(status => { remember(status); return status })
+export const cameraListLuts = () => cameraCall<CameraLibrary>('camera_list_luts').then(library => { remember(library.camera); return library })
 
 async function withProgress<T>(run: () => Promise<T>, onProgress?: (step: CameraProgress) => void): Promise<T> {
   let unlisten: (() => void) | undefined
@@ -221,4 +226,53 @@ export const courierExport = (source: string, destination: string, level: number
 export function levelZoom(width: number, height: number, degrees: number): number {
   const angle = Math.max(-15, Math.min(15, degrees)) * Math.PI / 180
   return Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)) * Math.max(width / height, height / width)
+}
+
+// Contact form. Shapes match server/worker.mjs (`/api/contact`).
+export type ContactContext = { source: 'app' | 'web'; version?: string; os?: string; camera?: string; firmware?: string; locale?: string }
+export type ContactErrorCode = 'bad_request' | 'rate_limited' | 'unavailable' | 'network'
+
+export function osName(userAgent: string): string | undefined {
+  if (/Windows/i.test(userAgent)) return 'Windows'
+  if (/iPhone|iPad/i.test(userAgent)) return 'iOS'
+  if (/Android/i.test(userAgent)) return 'Android'
+  if (/Mac OS X|Macintosh/i.test(userAgent)) return 'macOS'
+  if (/Linux/i.test(userAgent)) return 'Linux'
+  return undefined
+}
+
+/** What the contact form sends along with a message: app or website, app version, OS, and the
+ *  model and firmware of the camera read in this session. */
+export async function contactContext(locale: string): Promise<ContactContext> {
+  const context: ContactContext = { source: isApp() ? 'app' : 'web', locale }
+  const os = typeof navigator === 'object' ? osName(navigator.userAgent) : undefined
+  if (os) context.os = os
+  if (isApp()) {
+    try { context.version = await (await import('@tauri-apps/api/app')).getVersion() } catch { /* sent without it */ }
+  }
+  if (lastCamera) { context.camera = lastCamera.model; context.firmware = lastCamera.firmware }
+  return context
+}
+
+export class ContactError extends Error {
+  readonly code: ContactErrorCode
+  constructor(code: ContactErrorCode) { super(code); this.code = code }
+}
+
+/** Send a message to the sosang author. `website` is the hidden field that only bots fill in. */
+export async function sendContact(message: string, email: string, context: ContactContext, website = ''): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(serverUrl('/api/contact'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, email, context, ...(website ? { website } : {}) }),
+    })
+  } catch {
+    throw new ContactError('network')
+  }
+  if (response.ok) return
+  if (response.status === 429) throw new ContactError('rate_limited')
+  if (response.status === 400 || response.status === 413) throw new ContactError('bad_request')
+  throw new ContactError('unavailable')
 }

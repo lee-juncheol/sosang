@@ -92,3 +92,12 @@ npm run release:app -- --version 0.2.0 --notes "바뀐 점" --deploy --github
 - Windows 코드 서명도 아직 하지 않는다. 처음 설치할 때 SmartScreen이 "알 수 없는 게시자" 경고를 띄운다("추가 정보 → 실행"으로 설치). 업데이트 서명(위 키)과는 별개다.
 - 2026-11-15 확인: 0.0.9 시험 앱이 로컬 서버의 0.1.0을 알리고, 내려받아 서명을 확인한 뒤 설치하고 다시 시작했다.
 
+
+## 문의 폼
+
+앱과 사이트의 "문의" 창은 Worker의 `/api/contact`로 보냅니다.
+
+- 메시지는 KV 바인딩 `CONTACT`에 180일 동안 저장합니다. `wrangler.jsonc`에 id가 없으므로 첫 배포 때 wrangler가 namespace를 만듭니다.
+- 같은 주소에서는 1분에 3건까지만 받습니다(`CONTACT_LIMIT`). IP 주소는 이 제한에만 쓰고 저장하지 않습니다.
+- 받은 메시지 보기: `npm run contact:inbox` (`--all`, `--delete msg:<key>`).
+- 새 메시지 알림을 받으려면 Discord 웹훅 URL을 비밀값으로 넣습니다: `npx wrangler secret put CONTACT_WEBHOOK --config wrangler.jsonc`. 없으면 저장만 합니다.
