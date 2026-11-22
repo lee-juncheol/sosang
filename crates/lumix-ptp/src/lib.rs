@@ -47,6 +47,9 @@ pub enum PtpError {
     Verify(String),
     /// The read-back check failed and the settings read before the write were written back.
     RolledBack(String),
+    /// A write failed partway (timeout, lost connection, error response) and the settings could
+    /// not be read back afterwards, so whether the camera changed is unknown.
+    Unconfirmed(String),
     Io(std::io::Error),
     Unsupported,
 }
@@ -62,6 +65,7 @@ impl std::fmt::Display for PtpError {
             PtpError::Settings(e) => write!(f, "{e}"),
             PtpError::NotVerified { model, version } => write!(f, "writing to {model} firmware {version} has not been verified"),
             PtpError::Verify(m) => write!(f, "read-back check failed: {m}"),
+            PtpError::Unconfirmed(m) => write!(f, "the write could not be confirmed: {m}"),
             PtpError::RolledBack(m) => write!(f, "read-back check failed ({m}); the settings from before the write were written back"),
             PtpError::Io(e) => write!(f, "{e}"),
             PtpError::Unsupported => write!(f, "camera access is only implemented on macOS and Windows so far"),
@@ -197,6 +201,39 @@ fn check(op: u16, code: u16) -> Result<(), PtpError> {
     }
 }
 
+/// Write `next` and read the settings back. `current` is what the camera held just before.
+///
+/// A failed write (timeout, lost connection, error response) may still have reached the camera
+/// in part or in full, so it is never taken at its word: the settings are read back first.
+/// Unchanged → the write's own error (nothing happened, the caller can retry). Changed → the
+/// read-back goes to the caller's usual check, which accepts it or rolls back. Unreadable →
+/// [`PtpError::Unconfirmed`].
+fn write_and_read_back(camera: &Camera, current: &SettingsBlob, next: &SettingsBlob, unchecked: bool, progress: &mut impl FnMut(&str)) -> Result<SettingsBlob, PtpError> {
+    progress("writing");
+    let written = if unchecked { camera.write_camera_settings(next) } else { camera.write_settings(next) };
+    match written {
+        Ok(()) => {
+            progress("verifying");
+            camera.read_settings()
+        }
+        // Refused before anything was sent.
+        Err(e @ (PtpError::NotVerified { .. } | PtpError::Verify(_) | PtpError::Unsupported)) => Err(e),
+        Err(e) => {
+            progress("verifying");
+            after_failed_write(e, camera.read_settings(), |now| now.as_bytes() == current.as_bytes())
+        }
+    }
+}
+
+/// What a read-back after a failed write means; see [`write_and_read_back`].
+fn after_failed_write<B>(write: PtpError, read: Result<B, PtpError>, unchanged: impl Fn(&B) -> bool) -> Result<B, PtpError> {
+    match read {
+        Ok(now) if unchanged(&now) => Err(write),
+        Ok(now) => Ok(now),
+        Err(read) => Err(PtpError::Unconfirmed(format!("{write}; reading the settings back also failed ({read})"))),
+    }
+}
+
 /// What [`register_lut`] did.
 #[derive(Debug, Clone)]
 pub struct RegisterReport {
@@ -266,11 +303,7 @@ pub fn register_luts(
     let names: Vec<String> = luts.iter().map(|l| format!("{} {}", l.index, l.name)).collect();
     let backup = save_backup(camera, &current, backup_dir, &format!("before adding {}", names.join(", ")))?;
 
-    progress("writing");
-    camera.write_settings(&patched)?;
-
-    progress("verifying");
-    let after = camera.read_settings()?;
+    let after = write_and_read_back(camera, &current, &patched, false, &mut progress)?;
     let entries = after.entries();
     let mismatch = luts.iter().find_map(|l| {
         let entry = entries.get(l.index)?;
@@ -365,11 +398,7 @@ pub fn restore_settings(camera: &Camera, saved: &SettingsBlob, backup_dir: &Path
     }
     let backup = save_backup(camera, &current, backup_dir, "before restoring a backup")?;
 
-    progress("writing");
-    camera.write_camera_settings(saved)?;
-
-    progress("verifying");
-    let after = camera.read_settings()?;
+    let after = write_and_read_back(camera, &current, saved, true, &mut progress)?;
     if after.as_bytes() != saved.as_bytes() {
         let n = after.as_bytes().iter().zip(saved.as_bytes()).filter(|(a, b)| a != b).count();
         return Err(PtpError::Verify(format!("{n} bytes differ from the restored file")));
@@ -403,11 +432,7 @@ pub fn delete_luts(camera: &Camera, indices: &[usize], expected: &[Expected], ba
     let names: Vec<String> = deleted.iter().map(|(i, n)| format!("{i} {n}")).collect();
     let backup = save_backup(camera, &current, backup_dir, &format!("before deleting {}", names.join(", ")))?;
 
-    progress("writing");
-    camera.write_settings(&patched)?;
-
-    progress("verifying");
-    let after = camera.read_settings()?.entries();
+    let after = write_and_read_back(camera, &current, &patched, false, &mut progress)?.entries();
     if let Some((i, _)) = deleted.iter().find(|(i, _)| after.get(*i).map_or(true, |e| e.in_use)) {
         let m = format!("entry {i} still holds {:?}", after.get(*i).map(|e| e.name.as_str()).unwrap_or("?"));
         return Err(roll_back(camera, &current, m, &mut progress));
@@ -443,11 +468,7 @@ pub fn rearrange_luts(camera: &Camera, order: &[Option<usize>], expected: &[Expe
     let names: Vec<String> = moved.iter().map(|(k, n)| format!("{k} {}", n.as_deref().unwrap_or("(empty)"))).collect();
     let backup = save_backup(camera, &current, backup_dir, &format!("before moving to {}", names.join(", ")))?;
 
-    progress("writing");
-    camera.write_settings(&patched)?;
-
-    progress("verifying");
-    let after = camera.read_settings()?;
+    let after = write_and_read_back(camera, &current, &patched, false, &mut progress)?;
     let got = after.entries();
     let mismatch = moved.iter().find_map(|&(k, _)| {
         if got.get(k) != want.get(k) {
@@ -504,6 +525,25 @@ pub fn parse_device_info(d: &[u8]) -> Option<DeviceInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_failed_write_is_judged_by_the_read_back() {
+        use super::{after_failed_write, PtpError, OP_WRITE_SETTINGS};
+        let before = vec![1u8, 2, 3];
+        let same = |now: &Vec<u8>| *now == before;
+        // Nothing changed: the write's own error, so the caller can simply retry.
+        let r = after_failed_write(PtpError::Timeout("the camera to answer"), Ok(before.clone()), same);
+        assert!(matches!(r, Err(PtpError::Timeout(_))));
+        // Something changed: hand the read-back to the usual check (accept or roll back).
+        let r = after_failed_write(PtpError::Response { op: OP_WRITE_SETTINGS, code: 0x2002 }, Ok(vec![1, 9, 3]), same);
+        assert_eq!(r.unwrap(), vec![1, 9, 3]);
+        // Unreadable: the state is unknown.
+        let r = after_failed_write(PtpError::Timeout("the camera to answer"), Err(PtpError::Transport("camera is gone".into())), same);
+        match r {
+            Err(PtpError::Unconfirmed(m)) => assert!(m.contains("timed out") && m.contains("camera is gone"), "{m}"),
+            other => panic!("expected Unconfirmed, got {other:?}"),
+        }
+    }
+
     #[test]
     fn backup_info_strings_are_valid_json() {
         assert_eq!(super::json_string("plain"), "\"plain\"");

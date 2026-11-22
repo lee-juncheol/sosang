@@ -34,6 +34,7 @@ export function errorText(t: Translate, error: unknown): string {
     case 'bad_backup': return t("백업 파일을 읽지 못했습니다.")
     case 'unknown_layout': return t("이 카메라의 설정 형식은 아직 읽을 수 없습니다. 지원하는 기종인지 확인해 주세요.")
     case 'rolled_back': return t("쓰기 후 확인에 실패해, 쓰기 전 카메라 설정으로 되돌렸습니다. 이 기종에서는 아직 등록이 잘 되지 않습니다.")
+    case 'unconfirmed': return t("쓰는 도중 카메라와 연결이 끊겨, 설정이 바뀌었는지 확인하지 못했습니다. 카메라를 다시 연결해 LUT 목록을 읽어 보고, 이상하면 LUT 관리의 백업으로 되돌려 주세요.")
     case 'verify_failed': return t("쓰기 후 다시 읽은 내용이 보낸 내용과 다릅니다. 카메라의 LUT 라이브러리를 확인해 주세요.")
     default: return t("카메라와 통신하지 못했습니다. 케이블과 카메라 전원을 확인한 뒤 다시 시도해 주세요.")
   }

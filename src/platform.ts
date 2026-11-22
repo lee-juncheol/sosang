@@ -62,7 +62,7 @@ export type CameraEntry = { index: number; name: string; styleCode: number; inUs
 export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number[] | null }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
-export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
+export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unconfirmed' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
 export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'restoring' | 'done'
 
 export class CameraError extends Error {

@@ -86,6 +86,7 @@ impl From<PtpError> for CommandError {
             PtpError::Settings(lumix_lut::Error::Changed(_)) => "slot_changed",
             PtpError::Verify(_) => "verify_failed",
             PtpError::RolledBack(_) => "rolled_back",
+            PtpError::Unconfirmed(_) => "unconfirmed",
             PtpError::Unsupported => "unsupported_platform",
             _ => "camera_error",
         };
