@@ -487,7 +487,8 @@ pub fn rearrange_luts(camera: &Camera, order: &[Option<usize>], expected: &[Expe
     Ok(RearrangeReport { moved, backup })
 }
 
-/// Parse a PTP DeviceInfo dataset (data phase only).
+/// Parse a PTP DeviceInfo dataset (data phase only). A truncated or malformed dataset gives
+/// `None`, never a panic.
 pub fn parse_device_info(d: &[u8]) -> Option<DeviceInfo> {
     let mut p = 0usize;
     let u16v = |p: &mut usize| -> Option<u16> {
@@ -503,13 +504,13 @@ pub fn parse_device_info(d: &[u8]) -> Option<DeviceInfo> {
     let s = |p: &mut usize| -> Option<String> {
         let n = *d.get(*p)? as usize;
         *p += 1;
-        let units: Vec<u16> = (0..n).map(|i| u16::from_le_bytes([d[*p + 2 * i], d[*p + 2 * i + 1]])).collect();
+        let units: Vec<u16> = d.get(*p..*p + 2 * n)?.chunks_exact(2).map(|b| u16::from_le_bytes([b[0], b[1]])).collect();
         *p += 2 * n;
         Some(String::from_utf16_lossy(&units).trim_end_matches('\0').to_string())
     };
     let arr = |p: &mut usize| -> Option<()> {
         let n = u32::from_le_bytes(d.get(*p..*p + 4)?.try_into().ok()?) as usize;
-        *p += 4 + 2 * n;
+        *p = n.checked_mul(2)?.checked_add(*p + 4)?;
         Some(())
     };
     u16v(&mut p)?; // standard version
@@ -570,5 +571,13 @@ mod tests {
         let info = super::parse_device_info(&d).unwrap();
         assert_eq!((info.model.as_str(), info.version.as_str()), ("DC-S1M2", "1.5"));
         assert!(info.write_verified());
+        // A camera that sends the dataset cut short anywhere is refused, not a crash.
+        for len in 0..d.len() {
+            assert!(super::parse_device_info(&d[..len]).is_none(), "accepted {len} of {} bytes", d.len());
+        }
+        // An array length far beyond the data.
+        let mut huge = d.clone();
+        huge[11..15].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(super::parse_device_info(&huge).is_none());
     }
 }
