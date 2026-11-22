@@ -68,7 +68,8 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
       setLibrary({
         ...library,
         entries: library.entries.map(e => gone.has(e.index) ? { ...e, name: '', inUse: false, styleCode: 49 } : e),
-        freeSlots: [...library.freeSlots, ...gone].sort((a, b) => a - b),
+        // A locked entry stays unusable until the list is read again.
+        freeSlots: [...library.freeSlots, ...[...gone].filter(x => !library.locked.includes(x))].sort((a, b) => a - b),
       })
       setChecked(new Set())
     } catch (e) { fail(e) }
@@ -235,7 +236,8 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
   const arranging = arrange !== null
   /** Slots whose content differs from the camera in the pending order. */
   const arrangeChanges = library && arrange ? arrange.flatMap((from, k) => from !== (library.entries[k].inUse ? k : null) ? [k] : []) : []
-  const canArrange = canDeleteAny && !!library && library.entries.filter((_, k) => k >= FIRST_USER_ENTRY && !isSelected(k)).length > 1
+  const isLocked = (index: number) => !!library?.locked.includes(index)
+  const canArrange = canDeleteAny && !!library && !library.reordered && library.entries.filter((_, k) => k >= FIRST_USER_ENTRY && !isSelected(k)).length > 1
   const ready = queue.filter(q => !q.error)
   const slotCounts = new Map<number, number>()
   for (const q of ready) if (q.slot !== null) slotCounts.set(q.slot, (slotCounts.get(q.slot) ?? 0) + 1)
@@ -332,7 +334,8 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
               <td className="lut-index">{entry.index}</td>
               <td className="lut-name">{entry.inUse ? <span title={entry.name}>{entry.name}</span> : <span className="lut-empty">{t("빈 칸")}</span>}
                 {builtIn && <span className="lut-badge">{t("카메라 기본")}</span>}
-                {selected && <span className="lut-badge selected">{t("카메라에서 선택됨")}</span>}</td>
+                {selected && <span className="lut-badge selected">{t("카메라에서 선택됨")}</span>}
+                {isLocked(entry.index) && <span className="lut-badge" title={t("카메라 메뉴에서 순서를 바꾼 칸입니다. 앱에서는 덮어쓰거나 넣을 수 없고, 지우기만 됩니다.")}>{t("카메라에서 순서 바뀜")}</span>}</td>
               <td className="lut-style">{entry.inUse ? styleLabel(t, entry.styleCode) : '—'}</td>
               <td className="lut-actions">
                 {rowBusy ? <span className="lut-row-busy">{busy!.kind === 'deleting' ? t("지우는 중…") : t("넣는 중…")}</span>
@@ -342,7 +345,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
                   </span>
                   : entry.inUse && !builtIn ? <button type="button" disabled={!!busy || !canDeleteAny || selected} title={selected ? t("카메라에서 다른 LUT를 고른 뒤 지울 수 있습니다.") : undefined}
                     aria-label={t("{0}번 ‘{1}’ 지우기", [entry.index, entry.name])} onClick={() => { setConfirmDelete(entry.index); setConfirmBulk(false); setDone(null) }}>{t("삭제")}</button>
-                  : !entry.inUse ? <button type="button" disabled={!!busy || !canWrite} aria-label={t("{0}번 칸에 넣기", [entry.index])} onClick={() => { setPreferSlot(entry.index); fileInput.current?.click() }}>{t("여기에 넣기")}</button>
+                  : !entry.inUse ? <button type="button" disabled={!!busy || !canWrite || isLocked(entry.index)} aria-label={t("{0}번 칸에 넣기", [entry.index])} onClick={() => { setPreferSlot(entry.index); fileInput.current?.click() }}>{t("여기에 넣기")}</button>
                   : null}
               </td>
             </tr>
@@ -371,6 +374,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
             </span>
           </>}
         </div>}
+        {library.reordered && <p className="lut-manager-note">{t("카메라 메뉴에서 LUT 순서를 바꾼 흔적이 있어, 앱의 위치 바꾸기를 막아 두었습니다. ‘카메라에서 순서 바뀜’ 칸은 다른 칸의 LUT 데이터를 함께 쓰고 있어 덮어쓸 수 없습니다. 지우기와 빈 칸에 넣기는 됩니다.")}</p>}
         {!!library.selected?.length && <p className="lut-manager-note">{t("카메라에서 선택된 LUT는 지울 수 없습니다. 카메라 메뉴에서 다른 LUT를 고른 뒤 목록을 다시 읽어 주세요.")}</p>}
       </section>
 
@@ -398,7 +402,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
                 <select aria-label={t("{0}을 넣을 칸", [q.fileName])} value={q.slot ?? ''} disabled={!!busy} onChange={e => updateItem(q.id, { slot: e.target.value === '' ? null : Number(e.target.value) })}>
                   {q.slot === null && <option value="">{t("칸을 고르세요")}</option>}
                   {library.freeSlots.length > 0 && <optgroup label={t("빈 칸")}>{library.freeSlots.map(index => <option key={index} value={index}>{t("{0}번 · 빈 칸", [index])}</option>)}</optgroup>}
-                  <optgroup label={t("덮어쓰기")}>{library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY).map(e => <option key={e.index} value={e.index}>{t("{0}번 · {1}", [e.index, e.name])}</option>)}</optgroup>
+                  <optgroup label={t("덮어쓰기")}>{library.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && !isLocked(e.index)).map(e => <option key={e.index} value={e.index}>{t("{0}번 · {1}", [e.index, e.name])}</option>)}</optgroup>
                 </select>
                 <input className="lut-manager-name" aria-label={t("{0}의 카메라 표시 이름", [q.fileName])} value={q.name} maxLength={95} spellCheck={false} disabled={!!busy}
                   onChange={e => updateItem(q.id, { name: e.target.value.replace(/[^\x20-\x7e]/g, '') })}/>

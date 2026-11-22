@@ -84,6 +84,7 @@ impl From<PtpError> for CommandError {
             PtpError::Settings(lumix_lut::Error::InvalidName(_)) => "bad_name",
             PtpError::Settings(lumix_lut::Error::Slot(_)) => "bad_slot",
             PtpError::Settings(lumix_lut::Error::Changed(_)) => "slot_changed",
+            PtpError::Settings(lumix_lut::Error::Reordered(_)) => "reordered",
             PtpError::Verify(_) => "verify_failed",
             PtpError::RolledBack(_) => "rolled_back",
             PtpError::Unconfirmed(_) => "unconfirmed",
@@ -145,6 +146,11 @@ pub struct Library {
     /// Entries chosen in the camera menu (photo and video modes), when they can be read;
     /// deleting needs them. Empty when no mode uses a LUT.
     selected: Option<Vec<usize>>,
+    /// Entries whose LUT record another entry renders since a reorder in the camera's menu;
+    /// the app does not write LUTs there (deleting is fine).
+    locked: Vec<usize>,
+    /// The camera's menu reordered LUTs, so moving them in the app is refused.
+    reordered: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -196,7 +202,9 @@ pub async fn camera_list_luts(app: AppHandle) -> Result<Library, CommandError> {
             .into_iter()
             .map(|e| LibraryEntry { index: e.index, name: e.name, style_code: e.style_code, in_use: e.in_use })
             .collect();
-        Ok(Library { camera: camera.info().into(), entries, free_slots: blob.free_slots(), selected: blob.selected_entries() })
+        let locked = blob.shared_records();
+        let reordered = !locked.is_empty() || !blob.camera_reordered().is_empty();
+        Ok(Library { camera: camera.info().into(), entries, free_slots: blob.free_slots(), selected: blob.selected_entries(), locked, reordered })
     })
     .await
 }

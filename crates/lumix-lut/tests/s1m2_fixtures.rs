@@ -54,6 +54,10 @@ fn reproduces_the_verified_test01_write_byte_for_byte() {
     let out = s.with_lut(40, "TEST01", BaseStyle::Standard, &test01(), true).unwrap();
     assert!(out.as_bytes() == after.as_slice(), "patched blob differs from the blob the camera accepted");
     assert_eq!(out.lut(40).unwrap(), test01());
+    // Entry 40 pointed at record 37 (empty entry 38's) then; no other entry used record 39, so
+    // writing 40 was safe, while writing 38 would have overwritten what 40 showed.
+    assert_eq!((s.camera_reordered(), s.shared_records()), (vec![40], vec![38]));
+    assert!(!s.free_slots().contains(&38));
 }
 
 #[test]
@@ -351,4 +355,33 @@ fn delete_is_refused_when_the_selected_entry_cannot_be_read() {
     assert!(matches!(s.without_lut(37), Err(Error::Slot(_))));
     // Registering does not depend on it.
     assert!(s.with_lut(38, "TEST", BaseStyle::VLog, &test01(), false).is_ok());
+}
+
+/// Reordering in the camera's own menu (2026-11-22 capture, against the app's backup taken just
+/// before): names and styles moved between entries 28..=36, the LUT records stayed put, and each
+/// moved entry's link points at its old record.
+#[test]
+fn camera_reordered_entries_are_found_and_left_alone() {
+    let (Some(before), Some(after)) = (fixture("s1m2_fw15_before_camera_reorder.bin"), fixture("s1m2_fw15_after_camera_reorder.bin")) else { return };
+    let (before, after) = (SettingsBlob::parse(before).unwrap(), SettingsBlob::parse(after).unwrap());
+    assert!(before.camera_reordered().is_empty() && before.shared_records().is_empty());
+    assert_eq!(after.camera_reordered(), (28..=36).collect::<Vec<_>>());
+    assert_eq!(after.shared_records(), (28..=36).collect::<Vec<_>>());
+
+    // Each LUT is still read under its own name, wherever the camera moved the name.
+    let (b, a) = (before.entries(), after.entries());
+    for k in 28..=36 {
+        let was = b.iter().find(|e| e.in_use && e.name == a[k].name).expect("same names before and after");
+        assert_eq!(after.lut(k), before.lut(was.index), "entry {k} {:?}", a[k].name);
+    }
+
+    // Writing a reordered entry would overwrite another entry's LUT: refused.
+    let lut = test01();
+    let err = after.with_lut(31, "TEST01", BaseStyle::Standard, &lut, true).unwrap_err();
+    assert!(matches!(err, Error::Reordered(_)), "{err}");
+    let order: Vec<Option<usize>> = a.iter().map(|e| e.in_use.then_some(e.index)).collect();
+    assert!(matches!(after.rearranged(&order), Err(Error::Reordered(_))));
+    // Free entries whose records nobody uses still take new LUTs.
+    assert_eq!(after.free_slots(), vec![20, 21, 37, 38, 39, 40]);
+    assert!(after.with_lut(37, "TEST01", BaseStyle::Standard, &lut, false).is_ok());
 }

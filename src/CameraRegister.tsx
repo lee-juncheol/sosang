@@ -35,6 +35,7 @@ export function errorText(t: Translate, error: unknown): string {
     case 'unknown_layout': return t("이 카메라의 설정 형식은 아직 읽을 수 없습니다. 지원하는 기종인지 확인해 주세요.")
     case 'rolled_back': return t("쓰기 후 확인에 실패해, 쓰기 전 카메라 설정으로 되돌렸습니다. 이 기종에서는 아직 등록이 잘 되지 않습니다.")
     case 'unconfirmed': return t("쓰는 도중 카메라와 연결이 끊겨, 설정이 바뀌었는지 확인하지 못했습니다. 카메라를 다시 연결해 LUT 목록을 읽어 보고, 이상하면 LUT 관리의 백업으로 되돌려 주세요.")
+    case 'reordered': return t("카메라 메뉴에서 순서를 바꾼 칸이라, 앱에서 쓰면 다른 LUT를 덮어쓰게 됩니다. 아무것도 쓰지 않았습니다. 빈 칸을 고르거나 카메라 메뉴에서 바꿔 주세요.")
     case 'verify_failed': return t("쓰기 후 다시 읽은 내용이 보낸 내용과 다릅니다. 카메라의 LUT 라이브러리를 확인해 주세요.")
     default: return t("카메라와 통신하지 못했습니다. 케이블과 카메라 전원을 확인한 뒤 다시 시도해 주세요.")
   }
@@ -124,7 +125,7 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
     : step === 'restoring' ? t("확인에 실패해 이전 설정으로 되돌리는 중… 케이블을 빼지 마세요.")
     : phase === 'registering' ? t("카메라 설정을 읽고 백업하는 중…")
     : ''
-  const userEntries = library?.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY) ?? []
+  const userEntries = library?.entries.filter(e => e.inUse && e.index >= FIRST_USER_ENTRY && !library.locked.includes(e.index)) ?? []
 
   return <section className="camera-register" aria-labelledby="camera-register-title" aria-busy={busy}>
     {phase === 'registering' && <CameraBusyOverlay t={t} status={progress} step={step}/>}

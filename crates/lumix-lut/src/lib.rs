@@ -63,6 +63,9 @@ pub enum Error {
     Guard(String),
     /// A Library entry no longer holds what the caller saw (changed on the camera meanwhile).
     Changed(String),
+    /// The camera's own reordering left entries pointing at other entries' LUT records (see
+    /// [`SettingsBlob::shared_records`]), and this change would overwrite or misplace one.
+    Reordered(String),
 }
 
 impl std::fmt::Display for Error {
@@ -75,6 +78,7 @@ impl std::fmt::Display for Error {
             Error::UnsupportedPhotoStyle(t) => write!(f, "#LUMIXPHOTOSTYLE {t} is not supported yet (only STD, VLOG or no tag)"),
             Error::InvalidName(m) => write!(f, "invalid LUT name: {m}"),
             Error::Slot(m) => write!(f, "{m}"),
+            Error::Reordered(m) => write!(f, "{m}"),
             Error::Guard(m) => write!(f, "refusing to write: {m}"),
             Error::Changed(m) => write!(f, "the camera's LUT Library changed: {m}"),
         }
@@ -261,7 +265,33 @@ impl SettingsBlob {
         self.layout.titles + index * TITLE_STRIDE
     }
 
-    /// Offset of the record linked to title `index` (title n -> record n - 1).
+    /// The title's link field: which LUT record (link - 1) the camera renders for it, or
+    /// 0xFFFF for an empty entry.
+    fn link(&self, index: usize) -> u16 {
+        u16_at(&self.bytes, self.title_offset(index) + 4)
+    }
+
+    /// Reordering LUTs in the camera's own menu moves names and styles between title entries
+    /// but leaves the LUT records where they were, pointing each moved title at its old record
+    /// (link != own index). The app stores entry k's LUT in record k - 1.
+
+    /// Used entries whose link is not their own index (moved by the camera, or written that
+    /// way). Moving LUTs in the app assumes every link is its own index, so it is refused
+    /// while this is not empty.
+    pub fn camera_reordered(&self) -> Vec<usize> {
+        (1..self.layout.title_count).filter(|&k| self.link(k) != 0xFFFF && self.link(k) as usize != k).collect()
+    }
+
+    /// Entries whose record k - 1 another used entry renders: writing a LUT there would
+    /// overwrite that other entry's LUT, so it is refused. Deleting stays allowed (it only
+    /// empties the title, as the camera's own delete does).
+    pub fn shared_records(&self) -> Vec<usize> {
+        let count = self.layout.title_count;
+        let links: Vec<u16> = (0..count).map(|k| self.link(k)).collect();
+        (1..count).filter(|&k| (1..count).any(|j| j != k && links[j] as usize == k)).collect()
+    }
+
+    /// Offset of record `index - 1`, where the app stores title `index`'s LUT.
     fn record_offset(&self, index: usize) -> usize {
         assert!(index >= 1 && index - 1 < self.layout.record_count, "entry {index} has no LUT record");
         self.layout.records + (index - 1) * (4 + LUT_RECORD_LEN as usize)
@@ -287,17 +317,22 @@ impl SettingsBlob {
             .collect()
     }
 
-    /// Entries that can receive a new LUT (unused, and linked to a record).
+    /// Entries that can receive a new LUT: unused, and their record not used by another entry.
     pub fn free_slots(&self) -> Vec<usize> {
-        self.entries().into_iter().filter(|e| e.index >= 1 && !e.in_use).map(|e| e.index).collect()
+        let shared = self.shared_records();
+        self.entries().into_iter().filter(|e| e.index >= 1 && !e.in_use && !shared.contains(&e.index)).map(|e| e.index).collect()
     }
 
-    /// The stored LUT for a used entry.
+    /// The LUT the camera renders for a used entry (the record its link points at).
     pub fn lut(&self, index: usize) -> Option<Lut33> {
         if index == 0 || index >= self.layout.title_count || !self.entries()[index].in_use {
             return None;
         }
-        let p = self.record_offset(index) + 8;
+        let record = self.link(index) as usize;
+        if record == 0 || record - 1 >= self.layout.record_count {
+            return None;
+        }
+        let p = self.record_offset(record) + 8;
         let v = (0..LUT_ENTRIES)
             .map(|i| {
                 let q = p + i * 6;
@@ -333,6 +368,9 @@ impl SettingsBlob {
             seen.push(l.index);
             if entries[l.index].in_use && !allow_overwrite {
                 return Err(Error::Slot(format!("entry {} already holds a LUT", l.index)));
+            }
+            if self.shared_records().contains(&l.index) {
+                return Err(Error::Reordered(format!("entry {}'s LUT record is used by another entry since a reorder in the camera", l.index)));
             }
             validate_name(l.name)?;
         }
@@ -496,6 +534,13 @@ impl SettingsBlob {
             return Err(Error::Slot(format!("the new order lists {} entries, the camera has {count}", order.len())));
         }
         let entries = self.entries();
+        let mut reordered = self.camera_reordered();
+        reordered.extend(self.shared_records());
+        reordered.sort_unstable();
+        reordered.dedup();
+        if !reordered.is_empty() {
+            return Err(Error::Reordered(format!("entries {reordered:?} were reordered in the camera, so moving is left to the camera's menu")));
+        }
         let Some(selected) = self.selected_entries() else {
             return Err(Error::Slot("the LUT selected in the camera can't be read on this body, so moving is not supported yet".into()));
         };

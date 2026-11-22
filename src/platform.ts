@@ -59,10 +59,12 @@ export async function saveFile(filename: string, data: BlobPart, type: string): 
 // Camera commands (app only). Shapes match src-tauri/src/camera.rs.
 export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean; writeExperimental: boolean }
 export type CameraEntry = { index: number; name: string; styleCode: number; inUse: boolean }
-export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number[] | null }
+/** `locked`: entries whose LUT data another entry uses since LUTs were reordered in the camera's
+ *  menu; nothing is written there. `reordered`: such a reorder happened, so moving is refused. */
+export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number[] | null; locked: number[]; reordered: boolean }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
-export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unconfirmed' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
+export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'reordered' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unconfirmed' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
 export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'restoring' | 'done'
 
 export class CameraError extends Error {
