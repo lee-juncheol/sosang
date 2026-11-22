@@ -20,6 +20,7 @@ import { LutManager } from './LutManager'
 import { PhotoCourier } from './PhotoCourier'
 import { CameraRegister } from './CameraRegister'
 import { UpdateBanner } from './UpdateBanner'
+import { AppClosingNotice } from './AppClosingNotice'
 import { useSegmentPill } from './segmentPill'
 
 const paths: Record<string, React.ReactNode> = {
@@ -337,6 +338,7 @@ function App() {
   return <>
     <header className="topbar"><div className="topbar-left"><a className="brand-link" href="#studio" onClick={event => { event.preventDefault(); navigate('studio') }} aria-label={t("sosang 홈")}><span className="brand-word">sosang<span className="brand-period">.</span></span><span className="brand-descriptor">{t("컬러 스튜디오")}</span></a><nav className="site-nav" aria-label={t("주요 메뉴")}><a href="#studio" aria-current={view === 'studio' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('studio') }}>{t("스튜디오")}</a><a href="#gallery" aria-current={view.startsWith('gallery') ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('gallery') }}>{t("갤러리")}</a>{isApp() && <a href="#luts" aria-current={view === 'luts' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('luts') }}>{t("LUT 관리")}</a>}{isApp() && <a href="#send" aria-current={view === 'send' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('send') }}>{t("사진 보내기")}</a>}</nav></div><div className="topbar-right"><div ref={localeSwitch} className="locale-switch segmented" role="group" aria-label={t("언어 선택")}><button type="button" aria-label={t("한국어로 전환")} aria-pressed={locale === 'ko'} className={locale === 'ko' ? 'active' : ''} onClick={() => setLocale('ko')}>KO</button><button type="button" aria-label={t("영어로 전환")} aria-pressed={locale === 'en'} className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button></div><button className="about-button" aria-label={t("제작 정보")} onClick={() => dialog.current?.showModal()}><Icon name="info" size={17}/><span>{t("제작 정보")}</span></button></div></header>
     {isApp() && <UpdateBanner t={t}/>}
+    {isApp() && <AppClosingNotice t={t}/>}
     <main className={view.startsWith('gallery') ? 'gallery-main' : view === 'send' ? 'courier-main' : undefined}>
       {view === 'luts' ? <LutManager locale={locale} t={t}/> : view === 'send' ? <PhotoCourier locale={locale} t={t}/> : view !== 'studio' ? <FilmGallery catalog={catalog} t={t} collection={view === 'gallery/recommended' ? 'recommended' : 'examples'} onSelectCollection={next => navigate(next === 'recommended' ? 'gallery/recommended' : 'gallery', false)} onUseLook={useGalleryLook}/> : <>
       <div className="intro"><div className="studio-title"><h1>{t("스튜디오")}</h1><LutUsageGuide locale={locale} t={t}/></div><div className="catalog-stat"><b>{catalog.counts.ready + suppliedLooks.length}</b><span>{t("가지 컬러 조합")}<small>33³ LUT · sRGB</small></span></div></div>

@@ -3,9 +3,23 @@ mod courier;
 mod files;
 mod update;
 
+use tauri::{Manager, RunEvent, WindowEvent};
+#[cfg(target_os = "macos")]
+use tauri::{
+    menu::{Menu, MenuItem, MenuItemKind},
+    AppHandle,
+};
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_MENU_ID {
+            app.exit(0);
+        }
+    });
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -38,6 +52,41 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running the sosang app");
+        // Closing the window or quitting during a camera operation waits for it to finish.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if camera::exit_when_idle(window.app_handle()) {
+                    api.prevent_close();
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building the sosang app")
+        .run(|app, event| {
+            if let RunEvent::ExitRequested { code, api, .. } = event {
+                // An update restart already holds the camera lock and needs no wait.
+                if code != Some(tauri::RESTART_EXIT_CODE) && camera::exit_when_idle(app) {
+                    api.prevent_exit();
+                }
+            }
+        });
 }
+
+/// The default macOS menu, except Quit: the built-in item terminates the process at once,
+/// which no exit handler can hold. This one asks the app to exit, so a camera operation can
+/// finish first.
+#[cfg(target_os = "macos")]
+fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let menu = Menu::default(app)?;
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        if let Some(quit) = app_menu.items()?.pop() {
+            app_menu.remove(&quit)?;
+        }
+        let name = &app.package_info().name;
+        app_menu.append(&MenuItem::with_id(app, QUIT_MENU_ID, format!("Quit {name}"), true, Some("CmdOrCtrl+Q"))?)?;
+    }
+    Ok(menu)
+}
+
+#[cfg(target_os = "macos")]
+const QUIT_MENU_ID: &str = "sosang-quit";

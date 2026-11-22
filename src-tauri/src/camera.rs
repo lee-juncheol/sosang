@@ -6,6 +6,7 @@ use lumix_lut::parse_cube;
 use lumix_ptp::{delete_luts, rearrange_luts, register_luts, restore_settings, Camera, DeviceInfo, PtpError};
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -19,12 +20,42 @@ const FIRST_USER_ENTRY: usize = 2;
 /// One camera operation at a time. An async-aware mutex so an app update can hold it across
 /// its download and keep camera writes out until the restart.
 #[derive(Default)]
-pub struct CameraLock(tauri::async_runtime::Mutex<()>);
+pub struct CameraLock {
+    lock: tauri::async_runtime::Mutex<()>,
+    /// The app is closing: no new camera operation may start.
+    closing: AtomicBool,
+}
 
 impl CameraLock {
     pub(crate) fn try_lock(&self) -> Result<impl Send + '_, CommandError> {
-        self.0.try_lock().map_err(|_| CommandError::new("busy", "another camera operation is running"))
+        if self.closing.load(Ordering::SeqCst) {
+            return Err(CommandError::new("busy", "the app is closing"));
+        }
+        self.lock.try_lock().map_err(|_| CommandError::new("busy", "another camera operation is running"))
     }
+}
+
+/// Called when the window is closed or the app is asked to quit. Returns true when the caller
+/// must hold the close: a camera operation is running, and killing the process mid-transfer
+/// leaves the camera's session open (on macOS the camera then stays unreachable until the
+/// cable is plugged in again). New operations are refused from now on; once the running one
+/// has finished and closed its session, the app exits.
+pub(crate) fn exit_when_idle(app: &AppHandle) -> bool {
+    let state = app.state::<CameraLock>();
+    if let Ok(_idle) = state.lock.try_lock() {
+        state.closing.store(true, Ordering::SeqCst);
+        return false;
+    }
+    if !state.closing.swap(true, Ordering::SeqCst) {
+        let _ = app.emit("app-closing", ());
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            // `with_camera` drops the camera (closing its session) before it releases the lock.
+            drop(app.state::<CameraLock>().lock.lock().await);
+            app.exit(0);
+        });
+    }
+    true
 }
 
 /// Error sent to the UI: a stable `code` to branch on and an English `message` for logs.

@@ -599,6 +599,7 @@ export const english: Readonly<Record<string, string>> = {
   "카메라에 쓰는 중… 케이블을 빼거나 카메라를 끄지 마세요.": "Writing to the camera… Do not unplug the cable or turn the camera off.",
   "다시 읽어 확인하는 중…": "Reading back to check…",
   "카메라 작업이 끝난 뒤 다시 시도해 주세요.": "Try again after the camera operation finishes.",
+  "카메라 작업이 끝나면 앱이 닫힙니다.": "The app will close when the camera operation finishes.",
   "업데이트를 설치하지 못했습니다. 잠시 뒤 다시 시도해 주세요.": "Couldn't install the update. Try again in a moment.",
   "내려받는 중… {0} / {1} MB": "Downloading… {0} / {1} MB",
   "내려받는 중… {0} MB": "Downloading… {0} MB",
