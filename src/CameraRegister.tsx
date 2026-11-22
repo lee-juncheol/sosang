@@ -93,8 +93,16 @@ export function CameraRegister({ t, filename, format, ready, cameraAliases, came
   async function register() {
     if (!library || slot === null || blocked || (overwrite && !confirmOverwrite)) return
     setPhase('registering'); setStep(null); setError(null); setResult(null)
+    let cube: string
     try {
-      const cube = await getCube()
+      cube = await getCube()
+    } catch (e) {
+      // Nothing reached the camera: the file itself could not be fetched, checked or built.
+      setError({ text: t("등록할 LUT 파일을 준비하지 못해 카메라에는 아무것도 쓰지 않았습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요."), detail: e instanceof Error ? t(e.message) : String(e) })
+      setPhase('idle')
+      return
+    }
+    try {
       const done = await cameraRegister(cube, slot, name, overwrite, library.entries[slot]?.inUse ? library.entries[slot].name : null, experimental, setStep)
       setResult(done)
       const freeSlots = library.freeSlots.filter(s => s !== done.index)

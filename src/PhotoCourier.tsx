@@ -199,7 +199,8 @@ export function PhotoCourier({ locale, t }: { locale: Locale; t: Translate }) {
 
   // Preview: wait a moment while stepping quickly, then load the selected photo.
   useEffect(() => {
-    if (!selected) { setPreviewError(''); return }
+    setPreviewError('')
+    if (!selected) return
     let live = true
     const path = selected.path, name = selected.name
     const timer = window.setTimeout(() => {
@@ -224,7 +225,9 @@ export function PhotoCourier({ locale, t }: { locale: Locale; t: Translate }) {
     return () => observer.disconnect()
   }, [])
 
-  const visible = selected ? shown : null
+  // While the next photo loads the previous one stays up, to avoid flicker when stepping
+  // quickly; once its preview has failed, the previous photo must not stand in for it.
+  const visible = selected && shown && (shown.path === selected.path || !previewError) ? shown : null
   const frame = visible && box.width && box.height ? (() => {
     const aspect = visible.width / visible.height
     const width = Math.min(box.width, box.height * aspect)
