@@ -6,7 +6,24 @@ import path from 'node:path';
 import worker from '../server/worker.mjs';
 
 const APP_ORIGINS = ['tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost'];
-import { validateUpdateManifest, publishUpdateManifest, hostedReleaseFiles, assertKeepsPublishedRelease } from '../scripts/app-update.mjs';
+import crypto from 'node:crypto';
+import { validateUpdateManifest, publishUpdateManifest, hostedReleaseFiles, assertKeepsPublishedRelease, verifyUpdateSignature } from '../scripts/app-update.mjs';
+
+/** A throwaway minisign key in the format Tauri uses, and a signer for update files. */
+function testSigner() {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const raw = publicKey.export({ format: 'der', type: 'spki' }).subarray(12);
+  const id = crypto.randomBytes(8);
+  const b64 = text => Buffer.from(text).toString('base64');
+  const pubkey = b64(`untrusted comment: test key\n${Buffer.concat([Buffer.from('Ed'), id, raw]).toString('base64')}\n`);
+  const sign = data => {
+    const sig = crypto.sign(null, crypto.createHash('blake2b512').update(data).digest(), privateKey);
+    const comment = 'timestamp:1\tfile:test';
+    const global = crypto.sign(null, Buffer.concat([sig, Buffer.from(comment)]), privateKey);
+    return b64(`untrusted comment: test\n${Buffer.concat([Buffer.from('ED'), id, sig]).toString('base64')}\ntrusted comment: ${comment}\n${global.toString('base64')}\n`);
+  };
+  return { pubkey, sign };
+}
 
 const manifest = {
   version: '0.2.0',
@@ -76,7 +93,8 @@ test('update manifests need semver, signatures and https downloads', () => {
 });
 
 test('downloads on the sosang server must be release files, and are copied into the build', async () => {
-  const hosted = { ...manifest, platforms: { 'darwin-aarch64': { signature: 'c2ln', url: 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/sosang.app.tar.gz' } } };
+  const { pubkey, sign } = testSigner();
+  const hosted = { ...manifest, platforms: { 'darwin-aarch64': { signature: sign(Buffer.from('bundle')), url: 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/sosang.app.tar.gz' } } };
   assert.deepEqual(hostedReleaseFiles(hosted), ['releases/0.2.0/sosang.app.tar.gz']);
   for (const url of ['https://sosang.film-lab-jc.workers.dev/catalog.json', 'https://sosang.film-lab-jc.workers.dev/app/releases/../latest.json', 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/a/b.tar.gz', 'https://sosang.film-lab-jc.workers.dev/app/releases/0.2.0/a.tar.gz?x=1']) {
     assert.throws(() => validateUpdateManifest({ ...hosted, platforms: { 'darwin-aarch64': { signature: 'c2ln', url } } }), undefined, url);
@@ -85,8 +103,12 @@ test('downloads on the sosang server must be release files, and are copied into 
   const output = path.join(project, 'dist-cloudflare');
   try {
     await fs.mkdir(path.join(project, 'app-release/releases/0.2.0'), { recursive: true });
+    await fs.mkdir(path.join(project, 'src-tauri'));
+    await fs.writeFile(path.join(project, 'src-tauri/tauri.conf.json'), JSON.stringify({ plugins: { updater: { pubkey } } }));
     await fs.writeFile(path.join(project, 'app-release/latest.json'), JSON.stringify(hosted));
     await assert.rejects(publishUpdateManifest(project, output), /ENOENT/, 'a missing download stops the build');
+    await fs.writeFile(path.join(project, 'app-release/releases/0.2.0/sosang.app.tar.gz'), 'older build');
+    await assert.rejects(publishUpdateManifest(project, output), /does not match its signature/, 'a stale file under the signed name stops the build');
     await fs.writeFile(path.join(project, 'app-release/releases/0.2.0/sosang.app.tar.gz'), 'bundle');
     await fs.writeFile(path.join(project, 'app-release/releases/0.2.0/old.tar.gz'), 'not referenced');
     assert.equal(await publishUpdateManifest(project, output), '0.2.0');
@@ -110,12 +132,29 @@ test('the Cloudflare build publishes the release manifest only when there is one
   await fs.rm(project, { recursive: true, force: true });
 });
 
+test('update files are checked against their signature and the app key', () => {
+  const { pubkey, sign } = testSigner();
+  const data = Buffer.from('update bundle');
+  const signature = sign(data);
+  assert.doesNotThrow(() => verifyUpdateSignature(data, signature, pubkey, 'ok'));
+  assert.throws(() => verifyUpdateSignature(Buffer.from('update bundle!'), signature, pubkey, 'x'), /does not match/);
+  assert.throws(() => verifyUpdateSignature(data, signature, testSigner().pubkey, 'x'), /different key/);
+  const lines = Buffer.from(signature, 'base64').toString().split('\n');
+  lines[2] = 'trusted comment: edited';
+  assert.throws(() => verifyUpdateSignature(data, Buffer.from(lines.join('\n')).toString('base64'), pubkey, 'x'), /comment was altered/);
+  assert.throws(() => verifyUpdateSignature(data, 'c2ln', pubkey, 'x'), /malformed/);
+});
+
 test('a deploy cannot take away the published app release', () => {
-  const release = (version, ...names) => ({ version, platforms: Object.fromEntries(names.map(name => [name, {}])) });
+  const release = (version, ...names) => ({ version, pub_date: '2026-11-19T00:00:00Z', platforms: Object.fromEntries(names.map(name => [name, { signature: `${name}-a` }])) });
   const live = release('0.1.2', 'darwin-aarch64', 'windows-x86_64');
   assert.throws(() => assertKeepsPublishedRelease(null, live), /no app release/);
   assert.throws(() => assertKeepsPublishedRelease(release('0.1.0', 'darwin-aarch64', 'windows-x86_64'), live), /roll the app back/);
   assert.throws(() => assertKeepsPublishedRelease(release('0.1.2', 'darwin-aarch64'), live), /drop windows-x86_64/);
   assert.doesNotThrow(() => assertKeepsPublishedRelease(release('0.1.2', 'darwin-aarch64', 'windows-x86_64'), live));
   assert.doesNotThrow(() => assertKeepsPublishedRelease(release('0.1.10', 'darwin-aarch64'), live));
+  // Same version, another build of one platform: only a newer release may replace it.
+  const rebuilt = (pub_date) => ({ ...release('0.1.2', 'darwin-aarch64', 'windows-x86_64'), pub_date, platforms: { ...release('0.1.2', 'darwin-aarch64').platforms, 'windows-x86_64': { signature: 'windows-b' } } });
+  assert.throws(() => assertKeepsPublishedRelease(live, { ...rebuilt('2026-11-20T00:00:00Z') }), /replace the published windows-x86_64 build/);
+  assert.doesNotThrow(() => assertKeepsPublishedRelease(rebuilt('2026-11-20T00:00:00Z'), live));
 });

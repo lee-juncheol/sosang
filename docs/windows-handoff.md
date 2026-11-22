@@ -190,6 +190,7 @@ cargo test -p lumix-lut -p lumix-ptp
 
 - `6a5f8506`까지 GitHub에 올렸습니다. `c813209c`가 2.9GB라 GitHub의 push 한도(2GB)를 넘어서, LUT를 임시 브랜치로 나눠 올린 뒤 지웠습니다. `/usr/local/bin/git`(2.15)은 이 방식에서 이미 올린 파일을 다시 보내므로 `/usr/bin/git`을 썼습니다.
 - 사고: film-lab에서 사이트를 배포했을 때 그 폴더의 오래된 `app-release/`(0.1.0)가 함께 올라가, 서버의 앱 업데이트 정보가 0.1.0으로 돌아가고 0.1.2 업데이트 파일이 404가 됐습니다. 같은 커밋을 0.1.2 파일과 함께 다시 배포해 복구했고, 재발을 막는 검사(`scripts/check-app-release.mjs`)를 넣었습니다.
+  - 2026-11-22 보강: 같은 버전이라도 서버와 서명이 다른 플랫폼은 로컬 릴리스가 더 최근(`pub_date`)일 때만 올라갑니다. 사이트 빌드는 올리는 업데이트 파일마다 앱 공개키로 서명을 확인합니다. `release:app`은 다른 플랫폼 항목을 서버에서 먼저 가져오고 그 파일을 매번 새로 받습니다. 그래서 다른 PC에서 같은 버전을 다시 빌드해 배포했다면, 이 PC의 예전 `app-release/`로는 배포가 멈춥니다. 서버 것을 받아 오거나 `release:app`을 다시 실행합니다.
 - `release:app`에 `--platform mac|windows|all`을 넣었습니다. macOS에서 Windows 설치 파일 빌드와 임시 키 서명까지 확인했습니다. 실제 Windows 실행은 아직입니다.
 - 크로스 빌드의 libwebp는 SSE4.1 없이 SSE2로 컴파일됩니다(`scripts/windows-cross/`). Windows에서 빌드한 앱보다 WebP 변환이 조금 느릴 수 있습니다.
 - 0.1.3을 `release:app -- --platform all`로 빌드하고, DMG를 따로 만든 뒤 사이트와 GitHub 릴리스 페이지에 배포했습니다. 업데이트 파일 서명은 앱의 공개키로 검증했고, 서버와 릴리스 페이지의 파일이 빌드 결과와 같은 것도 확인했습니다.

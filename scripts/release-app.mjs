@@ -118,23 +118,26 @@ function macTarget(version, arch) {
 }
 
 /** Entries for the other platforms of the same version, so a release from one machine does not
- *  drop what another machine already published. Their downloads are copied into releaseDir,
- *  because the site build publishes only what app-release/ holds. */
+ *  drop what another machine already published. The published manifest comes first, and its
+ *  downloads are always fetched again: a local copy of the same name may be an older build of
+ *  that version. They go into releaseDir because the site build publishes only what
+ *  app-release/ holds (and checks every file against its signature). */
 async function otherPlatforms(version, ownKeys, releaseDir) {
   const sources = [];
+  const response = await fetch(`${APP_SERVER}/app/latest.json`, { cache: 'no-store' });
+  assert([200, 204, 404].includes(response.status), `Could not read the published app release (${response.status})`);
+  if (response.status === 200) sources.push({ from: `${APP_SERVER}/app/latest.json`, doc: await response.json(), live: true });
   const local = await fs.readFile(path.join(root, APP_UPDATE_SOURCE), 'utf8').catch(() => null);
-  if (local) sources.push({ from: APP_UPDATE_SOURCE, doc: JSON.parse(local) });
-  const response = await fetch(`${APP_SERVER}/app/latest.json`, { cache: 'no-store' }).catch(() => null);
-  if (response?.status === 200) sources.push({ from: `${APP_SERVER}/app/latest.json`, doc: await response.json() });
+  if (local) sources.push({ from: APP_UPDATE_SOURCE, doc: JSON.parse(local), live: false });
   const kept = {};
-  for (const { from, doc } of sources) {
+  for (const { from, doc, live } of sources) {
     if (doc.version !== version) continue;
     validateUpdateManifest(doc);
     for (const [key, entry] of Object.entries(doc.platforms)) {
       if (ownKeys.includes(key) || kept[key]) continue;
       const url = new URL(entry.url);
       const file = path.join(releaseDir, path.basename(url.pathname));
-      if (!existsSync(file)) {
+      if (live || !existsSync(file)) {
         assert.equal(url.origin, APP_SERVER, `${key} download is not on ${APP_SERVER}: ${url.href}`);
         const got = await fetch(url);
         assert(got.ok, `Could not download the published ${key} update (${got.status}): ${url.href}`);
