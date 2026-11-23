@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { publicCatalog, EXTERNAL_SAMPLE_MANIFEST, EMPTY_EXTERNAL_SAMPLES } from './prepare-cloudflare.mjs';
 import { publicLookCount } from './look-inventory.mjs';
 import { verifyCameraStd } from './verify-camera-std.mjs';
+import { restoreCameraArchives } from './split-camera-archives.mjs';
 import { verifyPrintTiming } from './verify-print-timing.mjs';
 import { verifyGallery } from './verify-gallery.mjs';
 import { verifySuppliedFuji } from './verify-supplied-fuji.mjs';
@@ -29,7 +30,9 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
   const { catalog: expected, removedIds } = publicCatalog(sourceCatalog);
   const catalog = JSON.parse(await fs.readFile(path.join(root, 'catalog.json'), 'utf8'));
   const { sourceCode, ...publicSubset } = catalog;
-  assert.deepEqual(publicSubset, expected, 'Public catalog differs from the permitted subset of the personal build');
+  // Compare JSON text: a failing deepEqual on the 16 MB catalog builds a diff too large to print.
+  const restored = restoreCameraArchives(publicSubset, expected);
+  assert(JSON.stringify(restored) === JSON.stringify(expected), 'Public catalog differs from the permitted subset of the personal build');
   const publicLooks = publicLookCount(catalog);
   assert.equal(catalog.combinations.length, publicLooks);
   assert(!('referenceStudy' in catalog));
@@ -111,9 +114,16 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
       luts++;
     }
     for (const asset of [...Object.values(combo.files), ...Object.values(combo.previews)]) await verifyAsset(asset);
-    for (const entry of Object.values(combo.stdByCamera)) {
-      assert.equal(entry.std.encoding, 'zip-entry');
-      assert.equal(entry.std.path, entry.zip.path);
+    for (const [camera, entry] of Object.entries(combo.stdByCamera)) {
+      if (camera === catalog.cameraAdapters.defaultCamera) {
+        assert.equal(entry.std.encoding, 'zip-entry');
+        assert.equal(entry.std.path, entry.zip.path);
+      } else {
+        // Made in the browser (verify-camera-std rebuilds and checks every one).
+        assert.equal(entry.std.encoding, 'camera-std');
+        assert.equal(entry.zip.encoding, 'camera-package');
+        assert.equal(entry.std.path, combo.files.zip.path);
+      }
       await verifyAsset(entry.std); await verifyAsset(entry.zip);
     }
   }

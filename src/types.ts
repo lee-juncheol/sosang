@@ -1,4 +1,8 @@
-export interface Asset { path: string; name: string; downloadName?: string; bytes: number; sha256: string; encoding?: 'gzip' | 'zip-entry'; transferBytes?: number; transferSha256?: string }
+export interface Asset { path: string; name: string; downloadName?: string; bytes: number; sha256: string; encoding?: 'gzip' | 'zip-entry' | 'camera-std' | 'camera-package'; transferBytes?: number; transferSha256?: string
+  /** camera-std: made in the browser from the look's VLOG cube and the camera adapter; bytes/sha256 are the result. */
+  compose?: { camera: string; vlog: Asset; adapter: Asset }
+  /** camera-package: the camera ZIP rebuilt from the default ZIP, the composed STD and this look's camera notes ZIP (path). */
+  package?: { camera: string; base: Asset; std: Asset } }
 export interface Stock { id: string; name: string; type: string; stage: string; brand: string; use: string; recommendedPrint: string | null; sha256: string
   /** Film Lab extension stock (not an upstream spektrafilm profile). */
   experimental?: boolean; source?: 'film-lab-extension'; note?: string }

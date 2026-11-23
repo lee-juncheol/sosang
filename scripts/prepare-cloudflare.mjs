@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { assertLookInventory, publicLookCount } from './look-inventory.mjs';
 import { publishUpdateManifest } from './app-update.mjs';
+import { cameraArchivePaths, splitCameraArchives } from './split-camera-archives.mjs';
 
 export { PUBLIC_LOOKS } from './look-inventory.mjs';
 export const REMOVED_REFERENCE_LOOKS = 4;
@@ -50,6 +51,8 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
   assert.deepEqual(lutEntries.map(entry => entry.name).sort(), sourceCatalog.combinations.map(combo => combo.id).sort(), 'Unexpected source LUT files or directories');
   assert(lutEntries.every(entry => entry.isDirectory()), 'LUT entries must be directories');
   await fs.rm(output, { recursive: true, force: true });
+  // Camera ZIPs are rebuilt in the browser; see split-camera-archives.mjs.
+  const cameraArchives = cameraArchivePaths(catalog);
   await fs.cp(source, output, {
     recursive: true,
     filter: async entry => {
@@ -60,6 +63,7 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
       if (['research/reference-looks.json', 'research/fujifilm-official.json'].includes(relative)) return false;
       if (['legacy-v3', 'refined-v3', 'audit'].some(name => relative === name || relative.startsWith(name + '/'))) return false;
       if (relative.startsWith('luts/') && removedIds.has(relative.split('/')[1])) return false;
+      if (cameraArchives.has(relative)) return false;
       // /app/ holds only the update manifest added below.
       assert(relative !== 'app' && !relative.startsWith('app/'), `Unexpected app/ files in input: ${relative}`);
       assert(!relative.split('/').some(part => part === 'sample-study' || part === '.cache' || part === '.git'), `Private data in input: ${relative}`);
@@ -71,10 +75,11 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
   const externalManifest = path.join(output, EXTERNAL_SAMPLE_MANIFEST);
   await fs.mkdir(path.dirname(externalManifest), { recursive: true });
   await fs.writeFile(externalManifest, JSON.stringify(EMPTY_EXTERNAL_SAMPLES, null, 2) + '\n');
+  const cameraSplit = await splitCameraArchives(catalog, source, output);
   await fs.writeFile(path.join(output, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
   // Desktop app update information from the release step, when there is a release.
   const appVersion = await publishUpdateManifest(path.dirname(source), output);
-  return { output, combinations: catalog.combinations.length, excluded: removedIds.size, counts: catalog.counts, appVersion };
+  return { output, combinations: catalog.combinations.length, excluded: removedIds.size, counts: catalog.counts, appVersion, cameraSplit };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

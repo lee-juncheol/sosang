@@ -71,6 +71,18 @@ S1II 원본 adapter SHA-256: `7f1f997cb4bcf5c427e8e6ccc81acfedd3f14dae0b1e8e3f86
 
 모든 원래 V-Log 바이트와 그 안의 필름·인화·FUJIFILM 모델을 보존합니다. 이전 B 파일은 서비스 디렉터리 밖 개발 아카이브에 보존하고 현행 미리보기·다운로드에서 제외합니다. 각 카메라 ZIP에 선택한 STD와 원래 V-Log, 생성 정보, 수치 QA, 관련 라이선스를 넣습니다. 기본 S1II 외 기종의 CUBE는 검증된 ZIP 엔트리로 전송하여 raw 파일 사본을 늘리지 않습니다.
 
+## 공개 사이트에서는 브라우저가 카메라별 파일을 만든다 (2026-11-23)
+
+공개 배포본(`dist-cloudflare`)에는 S1II ZIP(`NNNNLUTS.zip`)만 있고, 나머지 9개 기종의 ZIP은 없습니다. 기종별 ZIP은 STD 큐브와 설명 파일 3개(qa.json, provenance.json, README.txt)만 다르고 나머지는 S1II ZIP과 같은 바이트이기 때문입니다.
+
+- STD 큐브: 브라우저가 `src/cameraStd.ts`로 `L_VLOG(A_camera(x))`를 계산합니다. `pipeline/camera_std.py`와 같은 계산 순서(삼선형 → 사면체), 같은 소수 9자리 출력이라 **파이프라인 파일과 바이트까지 같습니다.** 529개 룩 × 10개 기종 5,290개 전부 확인했습니다(`scripts/check-browser-std.mjs`). 카탈로그의 SHA-256으로 그대로 검증한 뒤 미리보기·다운로드·카메라 등록에 씁니다.
+- 기종별 ZIP: S1II ZIP의 공통 파일, 계산한 STD, 룩마다 하나인 `NNNNCAMS.zip`(9개 기종의 설명 파일 `<기종>/qa.json` 등)으로 브라우저가 다시 묶습니다. 안의 파일은 모두 원본과 같고, ZIP 압축 바이트만 브라우저에 따라 다를 수 있습니다.
+- 카탈로그에는 `encoding: "camera-std"` / `"camera-package"`로 표시하고, 원본 이름·크기·해시를 그대로 둡니다. 재료(VLOG, 변환표, S1II ZIP)는 반복해서 적지 않고 앱이 카탈로그를 읽을 때 `hydrateCameraAssets`로 연결합니다.
+- 나누기는 `scripts/split-camera-archives.mjs`(prepare-cloudflare 단계)가 하며, 공통 파일이 S1II ZIP과 같은 바이트인지 확인한 뒤에만 뺍니다. `verify-camera-std`는 공개 배포본의 기종별 ZIP 4,761개를 모두 앱과 같은 코드로 다시 만들어 STD 해시와 설명 파일을 검사합니다.
+- 개인용 `dist/`와 `public/`에는 기존처럼 모든 기종의 ZIP이 남습니다.
+- 효과: 공개 LUT 폴더 4.9GB → 약 0.6GB.
+- 예전 기종별 ZIP 주소(`…/0086G9II.zip`)는 공개 사이트에서 더 이상 열리지 않습니다. 이 방식 이전에 설치한 데스크톱 앱은 S1II 외 기종에서 다운로드가 실패하므로 앱 업데이트가 필요합니다.
+
 기종별 source hash와 고정 commit, 보간 방법, 실기 검증 상태를 provenance에 기록합니다. V-Log Alchemy Apache-2.0 고지, spektrafilm 프로파일 고지, 해당하는 FUJIFILM 고지를 각각 보존합니다.
 
 ## 재생성

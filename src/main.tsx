@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Asset, Catalog, Combination, NegativeProcessMode, Sample } from './types'
 import { fetchVerifiedAsset } from './assets'
+import { hydrateCameraAssets } from './cameraStd'
 import { paperLabel } from './lutNames'
 import { renameZipEntries } from './downloadZip'
 import { PHOTO_ACCEPT, usePhotoLook, usePhotoUpload, useSamplePhoto } from './usePhoto'
@@ -211,7 +212,7 @@ function App() {
     setLoadError('')
     fetch(serverUrl('/catalog.json'), { signal: controller.signal }).then(async r => {
       if (!r.ok) throw new Error(`카탈로그를 불러올 수 없습니다 (${r.status})`)
-      const data = await r.json() as Catalog
+      const data = hydrateCameraAssets(await r.json() as Catalog)
       if (data.schemaVersion !== 2 || !data.films.length || !data.papers.length || !data.combinations.length) throw new Error('지원하지 않는 카탈로그입니다.')
       const combinations = data.combinations.filter(c => c.processMode !== 'reference_interpretation')
       if (!data.cameraAdapters?.models.length || combinations.some(c => c.status === 'ready' && !selectStdAsset(c, data.cameraAdapters!.defaultCamera))) throw new Error('카메라별 STD LUT 파일 정보를 확인하지 못했습니다. 다시 불러와 주세요.')

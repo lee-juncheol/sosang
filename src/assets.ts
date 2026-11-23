@@ -1,5 +1,6 @@
 import type { Asset } from './types'
 import { serverUrl } from './platform.ts'
+import { buildCameraPackage, composeStdText, parseCubeTable } from './cameraStd.ts'
 
 const invalidZip = () => new Error('ZIP LUT 파일 검증에 실패했습니다. 페이지를 새로고침해 주세요.')
 
@@ -112,10 +113,24 @@ export async function extractZipEntry(buffer: ArrayBuffer, name: string, expecte
 }
 
 // Shared by downloads and the upload renderer, including packed production LUTs.
-export async function fetchVerifiedAsset(asset: Asset): Promise<ArrayBuffer> {
-  const response = await fetch(serverUrl(asset.path))
-  if (!response.ok) throw new Error('LUT 파일을 가져오지 못했습니다. 다시 시도해 주세요.')
-  let buffer = await response.arrayBuffer()
+export async function fetchVerifiedAsset(asset: Asset, load: (path: string) => Promise<ArrayBuffer> = fetchPath): Promise<ArrayBuffer> {
+  if (asset.encoding === 'camera-std') {
+    const { camera, vlog, adapter } = asset.compose ?? {}
+    if (!camera || !vlog || !adapter) throw new Error('LUT 파일 정보를 확인하지 못했습니다. 페이지를 새로고침해 주세요.')
+    const [vlogTable, adapterTable] = await Promise.all([cubeTable(vlog, load), cubeTable(adapter, load)])
+    const buffer = new TextEncoder().encode(composeStdText(vlogTable, adapterTable, camera, vlog.name)).buffer as ArrayBuffer
+    await verifyBytes(buffer, asset.bytes, asset.sha256)
+    return buffer
+  }
+  if (asset.encoding === 'camera-package') {
+    const { camera, base, std } = asset.package ?? {}
+    if (!camera || !base || !std) throw new Error('LUT 파일 정보를 확인하지 못했습니다. 페이지를 새로고침해 주세요.')
+    const notes = await load(asset.path)
+    await verifyBytes(notes, asset.transferBytes, asset.transferSha256)
+    const [baseZip, stdCube] = await Promise.all([fetchVerifiedAsset(base, load), fetchVerifiedAsset(std, load)])
+    return buildCameraPackage(baseZip, notes, camera, std.name, new Uint8Array(stdCube))
+  }
+  let buffer = await load(asset.path)
   if (asset.encoding === 'zip-entry') {
     await verifyBytes(buffer, asset.transferBytes, asset.transferSha256)
     buffer = await extractZipEntry(buffer, asset.name, asset.bytes)
@@ -126,4 +141,24 @@ export async function fetchVerifiedAsset(asset: Asset): Promise<ArrayBuffer> {
   }
   await verifyBytes(buffer, asset.bytes, asset.sha256)
   return buffer
+}
+
+async function fetchPath(path: string): Promise<ArrayBuffer> {
+  const response = await fetch(serverUrl(path))
+  if (!response.ok) throw new Error('LUT 파일을 가져오지 못했습니다. 다시 시도해 주세요.')
+  return response.arrayBuffer()
+}
+
+// Parsed source cubes (camera adapters, VLOG renderers) by content hash, for this session.
+const tables = new Map<string, Promise<Float64Array>>()
+function cubeTable(asset: Asset, load: (path: string) => Promise<ArrayBuffer>) {
+  let table = tables.get(asset.sha256)
+  if (!table) {
+    table = fetchVerifiedAsset(asset, load).then(buffer => parseCubeTable(new TextDecoder().decode(buffer)))
+    table.catch(() => tables.delete(asset.sha256))
+    tables.set(asset.sha256, table)
+    // Keep the adapters and a few recent looks.
+    if (tables.size > 24) tables.delete(tables.keys().next().value!)
+  }
+  return table
 }

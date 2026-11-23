@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { extractZipEntry } from '../src/assets.ts';
+import { extractZipEntry, fetchVerifiedAsset } from '../src/assets.ts';
 import { parseStdCube } from '../src/lut.ts';
 import { assertLookInventory, publicLookCount, FILM_CAST_METHOD, LAB_AIM_METHOD } from './look-inventory.mjs';
 
@@ -141,7 +141,7 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
   }
   assert.deepEqual((await fs.readdir(path.join(root, 'luts'))).sort(), catalog.combinations.map(combo => combo.id).sort(), 'LUT inventory differs from camera catalog');
   const parsed = new Set();
-  let archives = 0;
+  let archives = 0, identicalPackages = 0;
   for (const combo of catalog.combinations) {
     assertCameraStdContract(combo, adapters);
     assert(!privatePath.test(JSON.stringify(combo)), `Private path in ${combo.id}`);
@@ -150,10 +150,29 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
     for (const model of adapters.models) {
       const camera = model.id, record = combo.stdByCamera[camera], zip = record.zip;
       assert.equal(path.dirname(zip.path), `/luts/${combo.id}`, 'Camera ZIP belongs to another look');
-      assert.equal(path.basename(zip.path), zip.name);
-      const bytes = await fs.readFile(localAssetPath(root, zip.path));
-      assert.equal(bytes.length, zip.bytes); assert.equal(hash(bytes), zip.sha256);
-      expectedFiles.add(zip.name); archives++;
+      let bytes;
+      if (zip.encoding === 'camera-package') {
+        // Public build: rebuilt exactly as the browser does, from the default ZIP,
+        // the camera adapter and this look's camera notes.
+        assert.notEqual(camera, adapters.defaultCamera, 'The default camera ZIP must be a real file');
+        assert.equal(path.basename(zip.path), `${String(combo.number).padStart(4, '0')}CAMS.zip`);
+        assert.equal(record.std.encoding, 'camera-std');
+        assert(!('compose' in record.std) && !('package' in zip), 'Sources are linked when the catalog is read, not stored');
+        assert.equal(record.std.path, combo.files.zip.path); assert.equal(record.std.transferSha256, combo.files.zip.sha256);
+        // Same links as hydrateCameraAssets in the app.
+        const std = { ...record.std, compose: { camera, vlog: combo.files.vlog, adapter: model.asset } };
+        const pack = { ...zip, package: { camera, base: combo.files.zip, std } };
+        bytes = Buffer.from(await fetchVerifiedAsset(pack, async url => { const file = await fs.readFile(localAssetPath(root, url)); return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength); }));
+        expectedFiles.add(path.basename(zip.path));
+        // The STD cube is verified by hash; compression may differ between browsers.
+        if (bytes.length === zip.bytes && hash(bytes) === zip.sha256) identicalPackages++;
+      } else {
+        assert.equal(path.basename(zip.path), zip.name);
+        bytes = await fs.readFile(localAssetPath(root, zip.path));
+        assert.equal(bytes.length, zip.bytes); assert.equal(hash(bytes), zip.sha256);
+        expectedFiles.add(zip.name);
+      }
+      archives++;
       const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       const entries = zipEntries(bytes);
       const names = [record.std.name, combo.files.vlog.name, 'README.txt', 'CHANGELOG.txt', 'qa.json', 'provenance.json', 'SPEKTRAFILM_LICENSE.txt', 'spektrafilm-LICENSE.txt', 'V-Log-Alchemy-LICENSE.txt', ...(combo.officialSource ? ['FUJIFILM_NOTICE.txt'] : [])].sort();
@@ -170,7 +189,9 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
         // The shared VLOG record refers to the default bundle, even while we
         // independently authenticate the identical VLOG in another camera ZIP.
         if (tag === 'STD' || camera === adapters.defaultCamera) {
-          if (!asset.encoding) {
+          if (asset.encoding === 'camera-std') {
+            assert.notEqual(camera, adapters.defaultCamera);
+          } else if (!asset.encoding) {
             assert.equal(camera, adapters.defaultCamera, 'Non-default camera has duplicate raw LUT');
             assert((await fs.readFile(localAssetPath(root, asset.path))).equals(raw), `Raw/ZIP ${tag} disagreement`);
             expectedFiles.add(asset.name);
@@ -237,5 +258,5 @@ export async function verifyCameraStd(rootDir, catalog, expectedCount, expectedC
     assert.deepEqual((await fs.readdir(directory)).sort(), [...expectedFiles].sort(), `Unexpected/retired raw asset: ${combo.id}`);
     assert.deepEqual(JSON.parse(await fs.readFile(path.join(directory, 'metadata.json'), 'utf8')), combo);
   }
-  return { method: CAMERA_STD_METHOD, cameras: adapters.models.length, combinations: catalog.combinations.length, stdLuts: catalog.combinations.length * adapters.models.length, luts: catalog.combinations.length * (adapters.models.length + 1), archives, sourceAdapters: sourceHashes.size };
+  return { method: CAMERA_STD_METHOD, cameras: adapters.models.length, combinations: catalog.combinations.length, stdLuts: catalog.combinations.length * adapters.models.length, luts: catalog.combinations.length * (adapters.models.length + 1), archives, browserPackages: identicalPackages, sourceAdapters: sourceHashes.size };
 }
