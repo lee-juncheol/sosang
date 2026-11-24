@@ -21,7 +21,10 @@
 //    GitHub release page (tag `app`) and update its version line (scripts/github-release.mjs).
 //
 // Signing key: TAURI_SIGNING_PRIVATE_KEY_PATH, default ~/.tauri/sosang-updater.key. Its
-// password comes from TAURI_SIGNING_PRIVATE_KEY_PASSWORD, or the Tauri CLI asks for it.
+// password comes from TAURI_SIGNING_PRIVATE_KEY_PASSWORD, then (macOS) the login Keychain item
+// `sosang-updater-key`, otherwise the Tauri CLI asks for it. Save it once in the Keychain with
+//   security add-generic-password -U -s sosang-updater-key -a "$USER" -w
+// (it asks for the password, so it never lands in the shell history).
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
@@ -160,6 +163,16 @@ const version = versions.tauri;
 const keyPath = process.env.TAURI_SIGNING_PRIVATE_KEY_PATH || path.join(os.homedir(), '.tauri/sosang-updater.key');
 assert(existsSync(keyPath), `Updater signing key not found: ${keyPath}`);
 assert(!path.resolve(keyPath).startsWith(root + path.sep), 'Keep the signing key outside the repository');
+const KEYCHAIN_ITEM = 'sosang-updater-key';
+if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD && process.platform === 'darwin') {
+  const found = spawnSync('/usr/bin/security', ['find-generic-password', '-s', KEYCHAIN_ITEM, '-a', os.userInfo().username, '-w'], { encoding: 'utf8' });
+  if (found.status === 0 && found.stdout) {
+    process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = found.stdout.replace(/\n$/, '');
+    console.log(`Signing password: from the Keychain (${KEYCHAIN_ITEM})`);
+  } else {
+    console.log(`Signing password: not in the Keychain (${KEYCHAIN_ITEM}), the build will ask for it`);
+  }
+}
 
 const built = targets(version, option('--platform'));
 process.env.PATH = `${path.join(os.homedir(), '.cargo', 'bin')}${path.delimiter}${process.env.PATH}`;
