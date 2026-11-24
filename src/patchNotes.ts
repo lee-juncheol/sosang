@@ -10,6 +10,13 @@ export type PatchNote = {
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
+  { id: '2026-11-24', date: '2026-11-24', app: '0.1.7', items: {
+    ko: ['언어 버튼 옆에서 지금까지의 업데이트 내역을 볼 수 있어요.',
+      '새로 추가된 필름과 인화지에 NEW 표시가 붙어요.',
+      '현상 방법은 처음부터 추천 현상으로 선택돼요.'],
+    en: ['See the update history from the button beside the language switch.',
+      'Newly added films and print films carry a NEW badge.',
+      'The recommended development is now selected by default.'] } },
   { id: '2026-11-23', date: '2026-11-23', app: '0.1.6', items: {
     ko: ['S1II가 아닌 카메라용 LUT를 브라우저와 앱이 직접 만들어요. 받는 파일의 내용은 이전과 똑같아요.',
       '데스크톱 앱은 0.1.6으로 업데이트해야 다른 카메라의 다운로드와 카메라 등록이 다시 돼요.'],
