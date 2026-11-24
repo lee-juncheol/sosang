@@ -113,7 +113,7 @@ function App() {
   const [filmId, setFilmId] = useState('kodak_portra_400')
   const [paperId, setPaperId] = useState('fujifilm_crystal_archive_typeii')
   const [negativeMode, setNegativeMode] = useState<NegativeProcessMode>('negative_print')
-  const [printMethod, setPrintMethod] = useState<'neutral' | 'film-cast' | 'lab-aim'>('neutral')
+  const [printMethod, setPrintMethod] = useState<'neutral' | 'film-cast' | 'lab-aim'>('film-cast')
   // Session-only memory of slider positions per look (film + paper) and per
   // print filter mode; a page reload starts every look from its default again.
   const [timingStore, setTimingStore] = useState<Record<string, { m: number; y: number; e?: number; f?: number }>>({})
