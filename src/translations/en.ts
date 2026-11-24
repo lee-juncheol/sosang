@@ -2,6 +2,10 @@
 export const english: Readonly<Record<string, string>> = {
   "업데이트 · 2026년 11월": "Update · November 2026",
   "새로워진 점": "What's new",
+  "업데이트 내역": "Updates",
+  "업데이트 내역 (새 소식 있음)": "Updates (new)",
+  "업데이트 내역 닫기": "Close updates",
+  "앱 {0}": "App {0}",
   "업데이트 안내 닫기": "Close update notes",
   "새 슬라이더와 STD 변환 개선을 보여 주는 짧은 영상": "Short video showing the new sliders and the improved STD conversion",
   "새 슬라이더 E · F": "New E · F sliders",

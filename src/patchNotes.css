@@ -1,0 +1,13 @@
+.patch-notes-button{position:relative}
+.patch-notes-dot{position:absolute;top:9px;left:20px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg,#151619)}
+.patch-notes-dialog{width:min(640px,calc(100vw - 32px))}
+.patch-notes-list{list-style:none;margin:0;padding:0 0 0 18px;border-left:2px solid var(--line);display:grid;gap:22px}
+.patch-notes-list>li{position:relative}
+.patch-notes-list>li::before{content:"";position:absolute;left:-25px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--line);border:2px solid var(--surface)}
+.patch-notes-list>li.latest::before{background:var(--accent)}
+.patch-notes-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.patch-notes-meta time{font:13px var(--mono);color:var(--muted)}
+.patch-notes-app{font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:2px 9px}
+.patch-notes-list ul{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
+.patch-notes-list ul li{font-size:15px;line-height:1.7;color:var(--text)}
+@media(max-width:650px){.topbar .about-button.patch-notes-button{display:flex;min-width:36px;padding:0;justify-content:center}.topbar .topbar-right{gap:4px}.patch-notes-dot{top:10px;left:16px}.patch-notes-list ul li{font-size:14px}}
