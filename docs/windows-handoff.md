@@ -47,6 +47,7 @@ USB로 연결한 LUMIX와 PTP로 통신해서, SD 카드 없이 LUT 라이브러
 - LUT 위치 바꾸기: 화면에서 순서를 다 바꾼 뒤 한 번에 씁니다(`docs/camera-lut-library.md`의 "위치 바꾸기"). Windows와 macOS 실기로 확인했습니다.
 - 여러 개 지우기 확인 창은 체크하면 표 아래에 붙어 화면 하단을 따라옵니다.
 - 배포 현황(2026-11-24): **macOS와 Windows 모두 0.1.7**입니다. 서버 `/app/latest.json`에 `darwin-aarch64`와 `windows-x86_64`가 함께 있고, GitHub 릴리스 페이지(태그 `app`)의 DMG와 설치 파일도 0.1.7입니다. 두 파일 모두 이 Mac에서 빌드했습니다.
+- 브랜치(2026-11-25): **`main` 하나만 씁니다.** 작업 브랜치 `feat/camera-lut-core`는 `main`에 합친 뒤 지웠습니다. Windows에서 그 브랜치를 받아 두었다면 `git checkout main && git pull`로 옮기고 `git branch -d feat/camera-lut-core`로 지웁니다.
 - GitHub 릴리스는 버전 없는 대표 페이지 하나(태그 `app`)로 바꿨습니다. 배포할 때 `--github`를 붙이면 그 페이지의 설치 파일과 버전 줄이 갱신됩니다(`docs/cloudflare.md`의 "앱 릴리스").
 
 ## 지켜야 할 규칙
@@ -147,7 +148,7 @@ cargo test -p lumix-lut -p lumix-ptp
 - 릴리스 v0.1.0을 "sosang for Mac & Windows"로 고쳤습니다.
   - Windows 0.1.1 설치 파일(`sosang_0.1.1_x64-setup.exe`)을 첨부했습니다.
   - 그래서 지금 한 릴리스에 Mac 0.1.0 DMG와 Windows 0.1.1이 섞여 있습니다. macOS 0.1.1이 나오면 v0.1.1 릴리스를 새로 만들어 맞춥니다.
-- PR #1(https://github.com/lee-juncheol/sosang/pull/1, `feat/camera-lut-core` → `main`)을 만들고 2026-11-16에 머지 커밋으로 합쳤습니다. `feat/camera-lut-core` 브랜치는 지우지 않았고, 합친 뒤의 `main`과 같게 맞춰 두었습니다.
+- PR #1(https://github.com/lee-juncheol/sosang/pull/1, `feat/camera-lut-core` → `main`)을 만들고 2026-11-16에 머지 커밋으로 합쳤습니다. 그 뒤로도 `feat/camera-lut-core`에서 작업하다가, 2026-11-25에 0.1.7까지를 `main`에 빨리감기로 합치고 이 브랜치는 로컬과 GitHub에서 지웠습니다. 지금은 `main`만 씁니다.
 
 ### 2026-11-16, Windows 11 (두 번째 Windows 세션)
 
@@ -172,7 +173,7 @@ cargo test -p lumix-lut -p lumix-ptp
 
 ### 2026-11-17, macOS (0.1.2 배포)
 
-- 작업 폴더(`film-lab`)에 커밋하지 않은 다른 작업(파이프라인, 새 LUT, `src/` 화면 파일)이 있어서, `git worktree`로 `origin/feat/camera-lut-core`(`4df2e602`) 그대로인 폴더를 따로 만들어 테스트, 빌드, 배포를 했습니다. 다음에도 작업 폴더가 깨끗하지 않으면 같은 방법을 씁니다.
+- 작업 폴더(`film-lab`)에 커밋하지 않은 다른 작업(파이프라인, 새 LUT, `src/` 화면 파일)이 있어서, `git worktree`로 `origin/feat/camera-lut-core`(`4df2e602`, 이 브랜치는 지금 지워졌고 같은 커밋이 `main`에 있음) 그대로인 폴더를 따로 만들어 테스트, 빌드, 배포를 했습니다. 다음에도 작업 폴더가 깨끗하지 않으면 같은 방법을 씁니다.
 - 테스트: 웹 107개, `cargo test -p lumix-lut -p lumix-ptp -p photo-courier` 모두 통과(Windows 캡처를 쓰는 테스트는 건너뜀).
 - 실기(macOS 전송, DC-S1M2 fw 1.5): 목록 읽기에서 사진 모드 스탠더드여도 지우기가 열리고, 영상 모드의 1번 ARRI 709에 "카메라에서 선택됨"이 붙었습니다. 위치 바꾸기로 2↔3번을 맞바꿔 쓰고 다시 읽기 확인, 카메라 메뉴에서도 확인했습니다. 사용자 뜻으로 되돌리지 않았습니다(지금 2번 Ektar100PEFC, 3번 C200CAFC).
 - 카메라가 USB(PTP)에 잡혀 있는데 앱과 ImageCaptureCore 모두 "카메라를 찾지 못함"이던 때가 있었습니다. 카메라를 쓰던 디버그 앱을 강제로 끈 뒤였고, 케이블을 다시 꽂으니 풀렸습니다.
