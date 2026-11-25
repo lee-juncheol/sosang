@@ -89,6 +89,23 @@ function Preview({ sample, combo, mode, resultPath, processingError, retry, look
   </div>
 }
 
+// Typed value beside a gauge slider. Commits on Enter or blur, clamped to the slider range and
+// rounded to its step; while focused the draft text is kept so "-" or "1." can be typed.
+function TimingNumber({ value, min, max, step, label, onCommit, signed, suffix }: { value: number; min: number; max: number; step: number; label: string; onCommit: (v: number) => void; signed?: boolean; suffix?: string }) {
+  const shown = (signed ? formatShift(value) : String(Math.round(value))) + (suffix || '')
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    if (draft === null) return
+    const n = Number(draft.trim().replace(',', '.').replace(/[−–]/g, '-').replace(/^[+±]/, '').replace(/%$/, ''))
+    if (draft.trim() !== '' && Number.isFinite(n)) {
+      const digits = step < 1 ? 1 : 0
+      onCommit(Number(Math.min(max, Math.max(min, Math.round(n / step) * step)).toFixed(digits)))
+    }
+    setDraft(null)
+  }
+  return <span className="timing-number"><input type="text" inputMode="decimal" aria-label={label} value={draft ?? shown} onFocus={e => { setDraft(shown.replace(suffix || '\u0000', '')); e.target.select() }} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDraft(null); window.setTimeout(() => (e.target as HTMLInputElement).blur()) } }}/></span>
+}
+
 const FADE_MS = 220
 
 /** Rough name for the hue a recommended development leaves in 18% gray (CIELAB h°). */
@@ -113,7 +130,7 @@ function App() {
   const [filmId, setFilmId] = useState('kodak_portra_400')
   const [paperId, setPaperId] = useState('fujifilm_crystal_archive_typeii')
   const [negativeMode, setNegativeMode] = useState<NegativeProcessMode>('negative_print')
-  const [printMethod, setPrintMethod] = useState<'neutral' | 'film-cast' | 'lab-aim'>('film-cast')
+  const [printMethod, setPrintMethod] = useState<'film-cast' | 'lab-aim'>('film-cast')
   // Session-only memory of slider positions per look (film + paper) and per
   // print filter mode; a page reload starts every look from its default again.
   const [timingStore, setTimingStore] = useState<Record<string, { m: number; y: number; e?: number; f?: number }>>({})
@@ -187,7 +204,7 @@ function App() {
   const onPublished = onLabPreset || ((onCastPreset || onNeutral) && controlsAtZero)
   const onDefault = labSelected ? onLabPreset : (castSelected ? onCastPreset : onNeutral) && controlsAtZero
   const activeCombo = suppliedLook ? suppliedCombination(suppliedLook, catalog!.suppliedFuji!.cameraId) : onLabPreset ? labCombo : onCastPreset ? castCombo : baseCombo
-  function choosePrintMethod(method: 'neutral' | 'film-cast' | 'lab-aim') { setPrintMethod(method); setNotice('') }
+  function choosePrintMethod(method: 'film-cast' | 'lab-aim') { setPrintMethod(method); setNotice('') }
   const builtinSample = catalog?.samples.find(s => s.id === sampleId) || catalog?.samples[0] || null
   const previewCameraId = previewCameraFor(builtinSample, !!activePhoto, exportCameraId)
   const camera = catalog?.cameraAdapters?.models.find(model => model.id === exportCameraId)
@@ -243,14 +260,18 @@ function App() {
     if (photo.paperId) setPaperId(photo.paperId)
     const recorded = catalog?.combinations.find(combo => combo.id === photo.combinationId)
     const useCast = !!recorded?.castBaseId && recorded.film !== catalog?.filmCast?.referenceFilm
-    const method = recorded?.labAimBaseId ? 'lab-aim' : useCast ? 'film-cast' : 'neutral'
+    const method = recorded?.labAimBaseId ? 'lab-aim' : 'film-cast'
     setNegativeMode('negative_print'); setPrintMethod(method)
-    // Reopen the recorded preset even if this look was fine-tuned in the studio.
+    // Reopen the recorded preset even if this look was fine-tuned in the studio. The menu has no
+    // neutral entry: a neutral gallery look opens as the recommended method with the gauge at 0.
     if (recorded?.processMode === 'negative_print') {
-      const key = (recorded.labAimBaseId || recorded.castBaseId || recorded.id) + '|' + method
+      const baseId = recorded.labAimBaseId || recorded.castBaseId || recorded.id
+      const neutralOnCast = !recorded.labAimBaseId && !useCast && recorded.film !== catalog?.filmCast?.referenceFilm && !!findFilmCast(catalog!.combinations, recorded)
       setTimingStore(store => {
-        if (!(key in store)) return store
-        const next = { ...store }; delete next[key]; return next
+        const next = { ...store }
+        delete next[baseId + '|' + method]; delete next[baseId + '|neutral']
+        if (neutralOnCast) next[baseId + '|film-cast'] = { m: 0, y: 0 }
+        return next
       })
     }
     setCameraId(photo.cameraId)
@@ -300,7 +321,7 @@ function App() {
   const isDigital = processMode !== 'negative_print' && processMode !== 'official_print'
   const isNegativeDigital = processMode === 'negative_digital'
   const combo: Combination = activeCombo || { id: `${film.id}__${processMode}`, film: film.id, paper: isDigital ? null : paper.id, processMode, number: 0, status: 'not-generated', reason: t("선택한 처리 방식의 LUT가 아직 준비되지 않았습니다.") }
-  const castActive = castSelected
+  const castActive = !labSelected
   const castLabel = t("추천 현상 방법")
   const labLabel = t("제조사 기준 인화")
   const presetLabel = onLabPreset ? labLabel : onCastPreset && controlsAtZero ? castLabel : ''
@@ -320,7 +341,7 @@ function App() {
   const publishedFilename = downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, format, camera?.name || exportCameraId, printVariant(combo))
   const selectedFilename = timing.active && format !== 'zip' ? publishedFilename.replace(/(VLOG)?\.cube$/, `${shiftCode(timing.total.m, timing.total.y)}$1.cube`) : publishedFilename
   const castIsReference = baseCombo?.film === catalog.filmCast?.referenceFilm
-  const castDescription = !castCombo ? t("이 조합에는 추천 현상 방법 LUT가 없습니다.") : t("Portra 400은 기준 필름이라 중립 현상과 색이 같습니다.")
+  const castDescription = !castCombo ? t("이 조합에는 추천 현상 방법이 없어 중립(M·Y 0)으로 인화합니다.") : t("Portra 400은 기준 필름이라 중립 현상과 색이 같습니다.")
   const stdLabel = `${camera?.name || '—'} · STD`
   const previewStdLabel = `${previewCamera?.name || '—'} · STD`
   const selectedQa = selectStdQa(combo, exportCameraId)
@@ -384,22 +405,21 @@ function App() {
             </fieldset>}
             {isDigital ? <div className={`direct-scan-note ${isNegativeDigital ? 'experimental-scan' : ''}`} role="status"><Icon name={isSupplied ? 'camera' : 'film'} size={22}/><strong>{processLabel}</strong><p>{isSupplied ? t("제공된 STD LUT를 그대로 적용합니다.") : isSlide ? t("슬라이드는 현상한 필름 자체를 스캔합니다. 인화지 프로파일은 적용하지 않습니다.") : t("인화지 없이 네거티브를 양화로 바꾸는 sosang의 실험 모드입니다.")}</p></div> : <p className="section-description">{t("인화지 · 프린트 필름")}</p>}
             {!isSupplied && <fieldset className="paper-fieldset" disabled={isDigital} aria-label={isDigital ? t("인화지·프린트 필름 선택 (직접 출력에서는 사용하지 않음)") : t("인화지·프린트 필름")}><div className="paper-list" role="radiogroup" aria-label={t("인화지·프린트 필름")}>{catalog.papers.map(p => <label className={`paper-option ${!isDigital && p.id === paper.id ? 'selected' : ''}`} key={p.id}><input type="radio" name="paper" value={p.id} checked={!isDigital && p.id === paper.id} onChange={() => { setPaperId(p.id); setNotice('') }}/><span className="paper-radio"/><span><strong>{paperLabel(p, true)}</strong><small>{p.use === 'cine' ? t("영화용 프린트 필름") : p.brand} {p.experimental && <em className="new-badge" title={t("데이터시트로 만든 Film Lab 초안 프로파일입니다. 실제 프린트와 비교하지 않았습니다.")}>NEW</em>} {!isDigital && p.id === film.recommendedPrint && <em>{t("권장 조합")}</em>}</small></span></label>)}</div></fieldset>}
-            {!isDigital && !isSupplied && <fieldset className="film-cast-switch"><legend className="section-description method-legend"><span>{t("현상 방법")}</span><button type="button" className="method-info-button" aria-label={t("현상 방법 설명")} aria-expanded={methodInfo} onClick={() => setMethodInfo(v => !v)}><Icon name="info" size={15}/></button></legend>{methodInfo && <div className="method-info-layer" role="dialog" aria-label={t("현상 방법 설명")}><button type="button" className="method-info-close" aria-label={t("닫기")} onClick={() => setMethodInfo(false)}>×</button><h4>{t("중립 현상 방법")}</h4><p>{t("18% 회색이 R·G·B 값이 같은 회색으로 나오도록 필름·인화지마다 인화 필터를 맞춘 그레이 밸런스 버전입니다. 그래서 같은 인화지에서는 필름 간 색 차이가 작아집니다.")}</p><h4>{t("추천 현상 방법")}</h4><p><>{t("현상소가 모든 필름을 같은 기준 필터(Portra 400)로 인화한 것처럼, 필름이 원래 가진 색 기운을 조금 남긴 버전입니다. 18% 회색에 남는 색의 세기는 필름마다 비슷하게 맞췄고, 색의 방향은 대부분 필름 데이터가 정합니다.")}{castCombo?.filmCast && <> {castIsReference ? t("Portra 400은 기준 필름이라 중립 현상과 색이 같습니다.") : castCombo.filmCast.directionPolicy === 'editorial-hue' ? t("이 필름은 필름 데이터대로면 알려진 색과 다른 쪽으로 남아서, 알려진 느낌에 맞춰 {0} 쪽으로 방향을 정했습니다.", [t(castDirection(castCombo.filmCast.grayHue))]) : t("이 조합은 {0} 쪽으로 남습니다.", [t(castDirection(castCombo.filmCast.grayHue))])}</>}</></p>{labPaper && <><h4>{labLabel}</h4><p>{t("인화지 데이터시트의 현상소 기준(18% 회색 카드가 농도 1.0의 회색으로 나오게)대로 인화 노출과 M·Y 필터를 맞춘 버전입니다. 중립 현상 방법보다 어둡고 진하며, 밝은 부분에 인화지 고유의 색이 더 남습니다.")}{labCombo?.labAim && <> {t("이 조합은 인화 노출 {0}스톱, M {1} · Y {2} CC입니다.", [formatShift(labCombo.labAim.printExposureStops), formatShift(labCombo.labAim.shiftCC[1]), formatShift(labCombo.labAim.shiftCC[2])])}</>}</p></>}<h4>{t("슬라이더 원리")}</h4><p>{t("슬라이더 값은 중립 현상 방법 기준의 인화 필터 이동량(Kodak CC)으로, spektrafilm GUI의 Print M·Y filter shift와 같습니다. 그 필터를 더 넣으면(+) 그 색이 빠집니다. ±{0} CC 안에서 미리 계산한 9개 지점을 보간합니다.", [timing.span])}</p></div>}
-              <label className={`cast-option ${!castActive && !labSelected ? 'selected' : ''}`}><input type="radio" name="film-cast" value="neutral" checked={!castActive && !labSelected} onChange={() => choosePrintMethod('neutral')}/><span className="paper-radio"/><span><strong>{t("중립 현상 방법")}</strong></span></label>
-              <label className={`cast-option ${castActive ? 'selected' : ''} ${castLocked ? 'unavailable' : ''}`}><input type="radio" name="film-cast" value="film-cast" disabled={castLocked} checked={castActive} onChange={() => choosePrintMethod('film-cast')}/><span className="paper-radio"/><span><strong>{castLabel}</strong>{castLocked && <small>{castDescription}</small>}</span></label>
+            {!isDigital && !isSupplied && <fieldset className="film-cast-switch"><legend className="section-description method-legend"><span>{t("현상 방법")}</span><button type="button" className="method-info-button" aria-label={t("현상 방법 설명")} aria-expanded={methodInfo} onClick={() => setMethodInfo(v => !v)}><Icon name="info" size={15}/></button></legend>{methodInfo && <div className="method-info-layer" role="dialog" aria-label={t("현상 방법 설명")}><button type="button" className="method-info-close" aria-label={t("닫기")} onClick={() => setMethodInfo(false)}>×</button><h4>{t("중립 현상 방법")}</h4><p>{t("18% 회색이 R·G·B 값이 같은 회색으로 나오도록 필름·인화지마다 인화 필터를 맞춘 그레이 밸런스 버전입니다. 그래서 같은 인화지에서는 필름 간 색 차이가 작아집니다.")} {t("메뉴에는 없고, 인화 미세 조정에서 M·Y를 0으로 두면 이 버전이 됩니다.")}</p><h4>{t("추천 현상 방법")}</h4><p><>{t("현상소가 모든 필름을 같은 기준 필터(Portra 400)로 인화한 것처럼, 필름이 원래 가진 색 기운을 조금 남긴 버전입니다. 18% 회색에 남는 색의 세기는 필름마다 비슷하게 맞췄고, 색의 방향은 대부분 필름 데이터가 정합니다.")}{castCombo?.filmCast && <> {castIsReference ? t("Portra 400은 기준 필름이라 중립 현상과 색이 같습니다.") : castCombo.filmCast.directionPolicy === 'editorial-hue' ? t("이 필름은 필름 데이터대로면 알려진 색과 다른 쪽으로 남아서, 알려진 느낌에 맞춰 {0} 쪽으로 방향을 정했습니다.", [t(castDirection(castCombo.filmCast.grayHue))]) : t("이 조합은 {0} 쪽으로 남습니다.", [t(castDirection(castCombo.filmCast.grayHue))])}</>}</></p>{labPaper && <><h4>{labLabel}</h4><p>{t("인화지 데이터시트의 현상소 기준(18% 회색 카드가 농도 1.0의 회색으로 나오게)대로 인화 노출과 M·Y 필터를 맞춘 버전입니다. 중립 현상 방법보다 어둡고 진하며, 밝은 부분에 인화지 고유의 색이 더 남습니다.")}{labCombo?.labAim && <> {t("이 조합은 인화 노출 {0}스톱, M {1} · Y {2} CC입니다.", [formatShift(labCombo.labAim.printExposureStops), formatShift(labCombo.labAim.shiftCC[1]), formatShift(labCombo.labAim.shiftCC[2])])}</>}</p></>}<h4>{t("슬라이더 원리")}</h4><p>{t("슬라이더 값은 중립 현상 방법 기준의 인화 필터 이동량(Kodak CC)으로, spektrafilm GUI의 Print M·Y filter shift와 같습니다. 그 필터를 더 넣으면(+) 그 색이 빠집니다. ±{0} CC 안에서 미리 계산한 9개 지점을 보간합니다.", [timing.span])}</p></div>}
+              <label className={`cast-option ${castActive ? 'selected' : ''}`}><input type="radio" name="film-cast" value="film-cast" checked={castActive} onChange={() => choosePrintMethod('film-cast')}/><span className="paper-radio"/><span><strong>{castLabel}</strong>{castLocked && <small>{castDescription}</small>}</span></label>
               {labPaper && <label className={`cast-option ${labSelected ? 'selected' : ''} ${!labCombo ? 'unavailable' : ''}`}><input type="radio" name="film-cast" value="lab-aim" disabled={!labCombo} checked={labSelected} onChange={() => choosePrintMethod('lab-aim')}/><span className="paper-radio"/><span><strong>{labLabel}</strong><small>{labCombo ? t("데이터시트 기준 · 더 어둡고 진함 · 실험") : t("이 조합에는 제조사 기준 인화 LUT가 없습니다.")}</small></span></label>}
             </fieldset>}
             {!isDigital && !isSupplied && timing.available && <fieldset className="timing-panel"><legend className="section-description">{t("인화 미세 조정 · 실험")}</legend>
               {(['M', 'Y'] as const).map(channel => { const value = channel === 'M' ? timingM : timingY, set = (v: number) => setTiming(channel === 'M' ? { m: v } : { y: v })
-                return <label className="timing-row" key={channel}><span className={`timing-channel timing-${channel.toLowerCase()}`}>{channel}</span><input type="range" min={-timing.span} max={timing.span} step={0.1} value={value} aria-label={t("{0} 필터 이동 (Kodak CC)", [channel])} onChange={e => { set(Number(e.target.value)); setNotice('') }}/><output>{formatShift(value)}</output></label> })}
-              <label className="timing-row"><span className="timing-channel timing-e" title={t("인화 노출")}>E</span><input type="range" min={-EXPOSURE_SPAN} max={EXPOSURE_SPAN} step={0.1} value={timingControls.exposure} aria-label={t("인화 노출 (스톱)")} onChange={e => { setTiming({ e: Number(e.target.value) }); setNotice('') }}/><output>{formatShift(timingControls.exposure)}</output></label>
-              <label className="timing-row"><span className="timing-channel timing-f" title={t("페이드 (블랙 올림)")}>F</span><input type="range" min={0} max={100} step={1} value={timingControls.fade} aria-label={t("페이드, 블랙 올림 (%)")} onChange={e => { setTiming({ f: Number(e.target.value) }); setNotice('') }}/><output>{Math.round(timingControls.fade)}%</output></label>
+                return <label className="timing-row" key={channel}><span className={`timing-channel timing-${channel.toLowerCase()}`}>{channel}</span><input type="range" min={-timing.span} max={timing.span} step={0.1} value={value} aria-label={t("{0} 필터 이동 (Kodak CC)", [channel])} onChange={e => { set(Number(e.target.value)); setNotice('') }}/><TimingNumber value={value} min={-timing.span} max={timing.span} step={0.1} signed label={t("{0} 필터 이동 (Kodak CC)", [channel])} onCommit={v => { set(v); setNotice('') }}/></label> })}
+              <label className="timing-row"><span className="timing-channel timing-e" title={t("인화 노출")}>E</span><input type="range" min={-EXPOSURE_SPAN} max={EXPOSURE_SPAN} step={0.1} value={timingControls.exposure} aria-label={t("인화 노출 (스톱)")} onChange={e => { setTiming({ e: Number(e.target.value) }); setNotice('') }}/><TimingNumber value={timingControls.exposure} min={-EXPOSURE_SPAN} max={EXPOSURE_SPAN} step={0.1} signed label={t("인화 노출 (스톱)")} onCommit={v => { setTiming({ e: v }); setNotice('') }}/></label>
+              <label className="timing-row"><span className="timing-channel timing-f" title={t("페이드 (블랙 올림)")}>F</span><input type="range" min={0} max={100} step={1} value={timingControls.fade} aria-label={t("페이드, 블랙 올림 (%)")} onChange={e => { setTiming({ f: Number(e.target.value) }); setNotice('') }}/><TimingNumber value={timingControls.fade} min={0} max={100} step={1} suffix="%" label={t("페이드, 블랙 올림 (%)")} onCommit={v => { setTiming({ f: v }); setNotice('') }}/></label>
               <p className="film-cast-note">{t("E: 인화 노출(스톱). + 쪽이 인화지를 더 오래 노출해 어두워집니다. F: 페이드. 인화지의 가장 어두운 검정을 들어 올려 바랜 그림자를 만듭니다.")}</p>
-              <div className="timing-actions"><button type="button" disabled={onDefault} onClick={() => { resetTiming(); setNotice('') }}>{t("초기화")}</button></div>
+              <div className="timing-actions"><span className="timing-buttons"><button type="button" disabled={onNeutral && controlsAtZero} onClick={() => { setTiming({ m: 0, y: 0, e: 0, f: 0 }); setNotice('') }}>{t("중립 (0)")}</button><button type="button" disabled={onDefault} onClick={() => { resetTiming(); setNotice('') }}>{t("초기화")}</button></span></div>
               <p className="film-cast-note">{t("미리보기와 다운로드 LUT에 바로 반영됩니다. 값은 새로고침 전까지 조합마다 기억합니다.")}</p>
               {format === 'zip' && <p className="film-cast-note">{t("인화 필터를 조정한 LUT는 STD 또는 V-Log 파일로 내려받을 수 있습니다.")}</p>}
             </fieldset>}
-            {!isDigital && !castActive && !labSelected && <p className="paper-balance-note">{t("중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다.")} <button onClick={() => dialog.current?.showModal()}>{t("생성 기준 보기")}</button></p>}
+            {!isDigital && !labSelected && onNeutral && controlsAtZero && <p className="paper-balance-note">{t("중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다.")} <button onClick={() => dialog.current?.showModal()}>{t("생성 기준 보기")}</button></p>}
           </div>
           <div className="export-section">{previewOffscreen && miniSrc && <button type="button" className="mini-preview" onClick={() => previewPanel.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })} aria-label={t("미리보기로 돌아가기")}><img src={miniSrc} alt=""/><span>{t("미리보기")}</span></button>}<div className="section-label"><span>{t("LUT 내보내기")}</span><Icon name="download" size={16}/></div><div className="export-spec"><span>{t("출력")} <b>sRGB</b></span><span>{t("격자")} <b>33 × 33 × 33</b></span></div>
             <div className="export-camera-control"><label className="output-label" htmlFor="export-camera">{t("카메라 선택")}</label><select id="export-camera" value={exportCameraId} disabled={format === 'vlog' || isSupplied} onChange={event => chooseCamera(event.target.value)}>{catalog.cameraAdapters?.models.filter(model => !isSupplied || model.id === exportCameraId).map(model => <option key={model.id} value={model.id}>{model.name}{model.cameraUse === 'post-only' ? ' · ' + t("편집용") : ''}</option>)}</select></div>

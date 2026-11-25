@@ -829,4 +829,7 @@ export const english: Readonly<Record<string, string>> = {
   "답장받을 이메일 (선택)": "Email for a reply (optional)",
   "함께 보내는 정보": "Sent along",
   "보내 주신 내용과 이메일은 답변에만 쓰고 180일 뒤 지웁니다. 카메라 시리얼 번호, 사진, IP 주소는 보내거나 저장하지 않습니다.": "Your message and email are used only to reply and are deleted after 180 days. Camera serial numbers, photos and IP addresses are not sent or stored.",
+  "이 조합에는 추천 현상 방법이 없어 중립(M·Y 0)으로 인화합니다.": "This look has no recommended development, so it prints neutral (M and Y at 0).",
+  "메뉴에는 없고, 인화 미세 조정에서 M·Y를 0으로 두면 이 버전이 됩니다.": "It is not in the menu: set M and Y to 0 in Print fine-tuning to get this version.",
+  "중립 (0)": "Neutral (0)",
 }
