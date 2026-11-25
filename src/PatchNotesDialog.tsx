@@ -32,7 +32,7 @@ export function PatchNotesButton({ locale, t }: { locale: Locale; t: Translate }
         <div className="usage-content">
           <ol className="patch-notes-list">
             {PATCH_NOTES.map((note, index) => <li key={note.id} className={index === 0 ? 'latest' : undefined}>
-              <div className="patch-notes-meta"><time dateTime={note.id}>{note.date}</time>{note.app && <span className="patch-notes-app">{t("앱 {0}", [note.app])}</span>}</div>
+              <div className="patch-notes-meta"><time dateTime={note.date}>{note.date}</time>{note.app && <span className="patch-notes-app">{t("앱 {0}", [note.app])}</span>}</div>
               <ul>{note.items[locale].map(item => <li key={item}>{item}</li>)}</ul>
             </li>)}
           </ol>

@@ -1,5 +1,6 @@
 // User-facing update history shown in the topbar's "업데이트 내역" layer, newest first.
-// Add a new entry at the top for each release; its id marks it as unread until the visitor opens the layer.
+// Add a new entry at the top for each release; its id (unique, the date plus the app version when a
+// day has two releases) marks it as unread until the visitor opens the layer.
 import type { Locale } from './i18n'
 
 export type PatchNote = {
@@ -10,6 +11,11 @@ export type PatchNote = {
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
+  { id: '2026-11-25-0.1.9', date: '2026-11-25', app: '0.1.9', items: {
+    ko: ['중립 현상이 버튼으로 돌아왔어요. 누르면 인화 미세 조정이 모두 0이 돼요.',
+      '사이트에서 데스크톱 앱 소개와 다운로드를 볼 수 있어요.'],
+    en: ['Neutral development is back as a button. It sets every Print fine-tuning value to 0.',
+      'The site now introduces the desktop app and links its downloads.'] } },
   { id: '2026-11-25', date: '2026-11-25', app: '0.1.8', items: {
     ko: ['현상 방법에서 중립을 뺐어요. 인화 미세 조정의 "중립 (0)" 버튼을 누르면 같은 결과가 나와요.',
       '인화 미세 조정 슬라이더 옆 칸에 숫자를 직접 입력할 수 있어요.'],
