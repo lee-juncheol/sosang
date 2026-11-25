@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Asset, Catalog, Combination, NegativeProcessMode, Sample } from './types'
 import { fetchVerifiedAsset } from './assets'
-import { hydrateCameraAssets } from './cameraStd'
+import { loadCatalogIndex, loadFilmDetail, withFilmDetail } from './catalogLoader'
+import { hasLookFiles, type FilmDetail } from './catalogSplit'
+import { buildLutZip, lutLicenseFiles } from './lutZip'
 import { paperLabel } from './lutNames'
 import { renameZipEntries } from './downloadZip'
 import { PHOTO_ACCEPT, usePhotoLook, usePhotoUpload, useSamplePhoto } from './usePhoto'
@@ -125,6 +127,11 @@ function viewFromHash(): View {
 function App() {
   const { locale, ready: localeReady, setLocale, t, message } = useLocale()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
+  // Split catalog: films whose details (files, recipes, print packs) are merged in, and any error loading them.
+  const [loadedFilms, setLoadedFilms] = useState<ReadonlySet<string>>(() => new Set())
+  const [detailError, setDetailError] = useState('')
+  const [detailAttempt, setDetailAttempt] = useState(0)
+  const localDetails = useRef<Record<string, FilmDetail> | undefined>(undefined)
   const [view, setView] = useState<View>(viewFromHash)
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -201,8 +208,10 @@ function App() {
   const onCastPreset = castSelected && sameShift({ m: timingM, y: timingY }, castPreset)
   const onNeutral = sameShift({ m: timingM, y: timingY }, { m: 0, y: 0 })
   const onLabPreset = labSelected && sameShift({ m: timingM, y: timingY }, labPreset) && Math.abs(timingControls.exposure - labPreset.e) < 0.005 && timingControls.fade < 0.5
-  // On a preset the published, verified files are used; anywhere else the sliders bake a cube.
-  const onPublished = onLabPreset || ((onCastPreset || onNeutral) && controlsAtZero)
+  // On a preset whose look is baked the published, verified files are used; anywhere else (and for
+  // the browser-made neutral and lab-aim looks) the sliders bake a cube from the pair's pack.
+  const onPublished = (onLabPreset && hasLookFiles(labCombo)) || (controlsAtZero && ((onCastPreset && hasLookFiles(castCombo)) || (!onCastPreset && onNeutral && hasLookFiles(baseCombo))))
+  const detailsReady = !catalog || !selectedFilm || isSupplied || catalog.layout !== 'split-v1' || loadedFilms.has(selectedFilm.id)
   const onDefault = labSelected ? onLabPreset : (castSelected ? onCastPreset : onNeutral) && controlsAtZero
   const activeCombo = suppliedLook ? suppliedCombination(suppliedLook, catalog!.suppliedFuji!.cameraId) : onLabPreset ? labCombo : onCastPreset ? castCombo : baseCombo
   function choosePrintMethod(method: 'film-cast' | 'lab-aim') { setPrintMethod(method); setNotice('') }
@@ -218,7 +227,7 @@ function App() {
   const stdAsset = selectStdAsset(activeCombo, previewCameraId)
   const timing = usePrintTiming(catalog, baseCombo, timingM, timingY, previewCameraId, !!activeCombo && activeCombo.processMode === 'negative_print', onPublished, timingControls)
   const blockedReason = previewCameraId === UNSUPPORTED_L10 ? t("DMC-L10용 STD 변환은 없습니다. DC-L10과 다른 카메라이므로 미리보기를 적용하지 않습니다.")
-    : activeCombo && !stdAsset ? t("이 카메라용 STD LUT가 준비되지 않았습니다.") : undefined
+    : activeCombo && detailsReady && !stdAsset && !timing.active ? t("이 카메라용 STD LUT가 준비되지 않았습니다.") : undefined
   const samplePhoto = useSamplePhoto(view === 'studio' && !activePhoto ? builtinSample : null)
   const photoLook = usePhotoLook(activePhoto || samplePhoto.photo, view === 'studio' && activeCombo?.status === 'ready' && !blockedReason ? (timing.active ? timing.preview : stdAsset) : undefined)
   useEffect(() => {
@@ -228,21 +237,19 @@ function App() {
     observer.observe(target)
     return () => observer.disconnect()
   }, [view, photoLook.path, catalog])
-  const processingError = timing.error || (!activePhoto ? samplePhoto.error : undefined) || photoLook.error
-  const retryPreview = () => { if (!activePhoto && samplePhoto.error) samplePhoto.retry(); else photoLook.retry() }
+  const processingError = detailError || timing.error || (!activePhoto ? samplePhoto.error : undefined) || photoLook.error
+  const retryPreview = () => { if (detailError) { setDetailError(''); setDetailAttempt(n => n + 1); return } if (!activePhoto && samplePhoto.error) samplePhoto.retry(); else photoLook.retry() }
 
   useEffect(() => {
     const controller = new AbortController()
     setLoadError('')
-    fetch(serverUrl('/catalog.json'), { signal: controller.signal }).then(async r => {
-      if (!r.ok) throw new Error(`카탈로그를 불러올 수 없습니다 (${r.status})`)
-      const data = hydrateCameraAssets(await r.json() as Catalog)
-      if (data.schemaVersion !== 2 || !data.films.length || !data.papers.length || !data.combinations.length) throw new Error('지원하지 않는 카탈로그입니다.')
+    loadCatalogIndex(controller.signal).then(({ catalog: data, local }) => {
       const combinations = data.combinations.filter(c => c.processMode !== 'reference_interpretation')
-      if (!data.cameraAdapters?.models.length || combinations.some(c => c.status === 'ready' && !selectStdAsset(c, data.cameraAdapters!.defaultCamera))) throw new Error('카메라별 STD LUT 파일 정보를 확인하지 못했습니다. 다시 불러와 주세요.')
       const counts = Object.fromEntries(Object.keys(data.counts).map(status => [status, combinations.filter(c => c.status === status).length]))
       if (controller.signal.aborted) return
-      const initialCamera = data.cameraAdapters.models.some(model => model.id === cameraId) ? cameraId : data.cameraAdapters.defaultCamera
+      localDetails.current = local
+      setLoadedFilms(new Set()); setDetailError('')
+      const initialCamera = data.cameraAdapters!.models.some(model => model.id === cameraId) ? cameraId : data.cameraAdapters!.defaultCamera
       setCameraId(initialCamera)
       const initialSample = sampleForCamera(data.samples, DEFAULT_CAMERA) || data.samples[0]
       setSampleId(initialSample.id)
@@ -250,6 +257,20 @@ function App() {
     }).catch(e => { if (e.name !== 'AbortError') setLoadError(e instanceof SyntaxError ? '카탈로그 형식을 읽지 못했습니다. 다시 불러와 주세요.' : e.message) })
     return () => controller.abort()
   }, [attempt])
+
+  // Load the chosen film's details once (files, print recipes and packs).
+  const detailFilm = catalog && selectedFilm && !detailsReady ? selectedFilm.id : ''
+  useEffect(() => {
+    if (!detailFilm) return
+    const controller = new AbortController()
+    setDetailError('')
+    loadFilmDetail(detailFilm, localDetails.current, controller.signal).then(detail => {
+      if (controller.signal.aborted) return
+      setCatalog(previous => previous && withFilmDetail(previous, detail))
+      setLoadedFilms(previous => new Set(previous).add(detailFilm))
+    }).catch(e => { if (e.name !== 'AbortError') setDetailError(e instanceof SyntaxError ? '카탈로그 형식을 읽지 못했습니다. 다시 불러와 주세요.' : e.message) })
+    return () => controller.abort()
+  }, [detailFilm, detailAttempt])
 
   useEffect(() => {
     const syncView = () => setView(viewFromHash())
@@ -289,20 +310,23 @@ function App() {
     window.requestAnimationFrame(() => previewPanel.current?.focus({ preventScroll: true }))
   }
 
-  async function downloadTiming(filename: string) {
+  // Browser-made LUT: neutral and lab-aim looks, and any adjusted gauge. ZIPs hold both cubes.
+  async function downloadTiming(filename: string, cubes: { std: string; vlog: string }, readme: string) {
     setDownloading(true); setNotice('')
     try {
-      if (format === 'zip') throw new Error('인화 필터를 조정한 LUT는 STD 또는 V-Log 파일로 내려받을 수 있습니다.')
-      const text = await timing.bake(format, exportCameraId)
-      if (await saveFile(filename, text, 'text/plain')) setDownloaded(true), setNotice(`${filename} · 인화 필터 조정값으로 만든 파일을 다운로드했습니다.`)
+      const data = format === 'zip'
+        ? await buildLutZip([{ name: cubes.std, text: await timing.bake('std', exportCameraId) }, { name: cubes.vlog, text: await timing.bake('vlog', exportCameraId) }], readme, await lutLicenseFiles(catalog?.lutLicenses))
+        : await timing.bake(format, exportCameraId)
+      if (await saveFile(filename, data, format === 'zip' ? 'application/zip' : 'text/plain')) setDownloaded(true), setNotice(`${filename} · 브라우저에서 만든 파일을 다운로드했습니다.`)
     } catch (e) { setNotice(e instanceof Error ? e.message : '다운로드하지 못했습니다.') }
     finally { setDownloading(false) }
   }
 
   // Text of the selected STD or V-Log LUT, exactly what the download would save.
   async function cameraCube(): Promise<string> {
-    if (format === 'zip' || !selectedAsset) throw new Error('STD 또는 V-Log 형식을 골라 주세요.')
+    if (format === 'zip') throw new Error('STD 또는 V-Log 형식을 골라 주세요.')
     if (timing.active) return timing.bake(format, exportCameraId)
+    if (!selectedAsset) throw new Error('STD 또는 V-Log 형식을 골라 주세요.')
     return new TextDecoder().decode(await fetchVerifiedAsset(selectedAsset))
   }
 
@@ -334,21 +358,35 @@ function App() {
   const castLabel = t("추천 현상 방법")
   const labLabel = t("제조사 기준 인화")
   const presetLabel = onLabPreset ? labLabel : onCastPreset && controlsAtZero ? castLabel : ''
+  // Browser-made neutral / lab-aim looks sitting on their preset read as presets, not adjustments.
+  const adjusted = timing.active && !(onLabPreset || (onNeutral && !onCastPreset && controlsAtZero))
   const controlsLabel = [Math.abs(timing.controls.exposure) >= 0.05 ? t("노출 {0}스톱", [formatShift(timing.controls.exposure)]) : '', timing.controls.fade >= 1 ? t("페이드 {0}%", [timing.controls.fade]) : ''].filter(Boolean).join(' · ')
-  const timingLabel = timing.active ? [`M ${formatShift(timing.total.m)} · Y ${formatShift(timing.total.y)} CC`, controlsLabel].filter(Boolean).join(' · ') : ''
+  const timingLabel = adjusted ? [`M ${formatShift(timing.total.m)} · Y ${formatShift(timing.total.y)} CC`, controlsLabel].filter(Boolean).join(' · ') : ''
   const processLabel0 = isSupplied ? t("후지 필름 시뮬레이션 · 인화지 없음") : isSlide ? t("인화지 없음 · 슬라이드 직접 스캔") : isNegativeDigital ? t("sosang 디지털 변환 · 실험") : presetLabel ? `${paperLabel(paper)} · ${presetLabel}` : paperLabel(paper)
   const processLabel = timingLabel ? `${processLabel0} · ${timingLabel}` : processLabel0
   // Print looks keep one fixed status line (cast preset and/or adjustment) so the preview does not move.
-  const lookStatus = [presetLabel || (labSelected ? labLabel : onCastPreset ? castLabel : ''), timing.active ? t("인화 조정 · {0}", [timingLabel]) : ''].filter(Boolean).join(' · ')
+  const lookStatus = [presetLabel || (labSelected ? labLabel : onCastPreset ? castLabel : ''), adjusted ? t("인화 조정 · {0}", [timingLabel]) : ''].filter(Boolean).join(' · ')
   const referenceLabel = isNegativeDigital ? t("디지털 변환 기준") : t("직접 엔진")
   const sample = activePhoto?.sample || builtinSample!
   const resultPath = photoLook.path
   if (resultPath) miniFrame.current = resultPath
   const miniSrc = resultPath ?? miniFrame.current
   const publishedAsset = selectDownloadAsset(combo, format, exportCameraId)
-  const selectedAsset = timing.active ? (format === 'zip' ? undefined : publishedAsset) : publishedAsset
-  const publishedFilename = downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, format, camera?.name || exportCameraId, printVariant(combo))
-  const selectedFilename = timing.active && format !== 'zip' ? publishedFilename.replace(/(VLOG)?\.cube$/, `${shiftCode(timing.total.m, timing.total.y)}$1.cube`) : publishedFilename
+  const selectedAsset = timing.active ? undefined : publishedAsset
+  // Browser-made files need the pair's pack; published ones their verified asset.
+  const canDownload = combo.status === 'ready' && (timing.active ? timing.available && !timing.loading && !timing.error : !!selectedAsset)
+  const code = adjusted ? shiftCode(timing.total.m, timing.total.y) : ''
+  const nameFor = (kind: 'std' | 'vlog' | 'zip') => {
+    const name = downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, kind, camera?.name || exportCameraId, printVariant(combo))
+    return !code ? name : kind === 'zip' ? name.replace(/-([A-Za-z0-9]+)\.zip$/, `${code}-$1.zip`) : name.replace(/(VLOG)?\.cube$/, `${code}$1.cube`)
+  }
+  const selectedFilename = nameFor(format)
+  const timingReadme = () => [`sosang / ${combo.id}${code ? ` / ${timingLabel}` : ''}`, `Camera: ${camera?.name || exportCameraId}`, '',
+    `${nameFor('std')}: ${exportCameraId} Standard -> V-Log Alchemy adapter -> print look.`, `${nameFor('vlog')}: Panasonic V-Log / V-Gamut -> sRGB.`,
+    'Both are 33 x 33 x 33, full range 0..1. Apply only one creative cube.', '',
+    `Made in the browser from the spektrafilm print filter timing data (${catalog.printTiming?.method ?? ''}): M ${timing.total.m.toFixed(1)} / Y ${timing.total.y.toFixed(1)} CC from the database neutral filters, print exposure ${timing.controls.exposure.toFixed(2)} stop, fade ${timing.controls.fade}%.`,
+    'spektrafilm by Andrea Volpato, https://github.com/andreavolpato/spektrafilm',
+    'SPEKTRAFILM_LICENSE.txt and spektrafilm-LICENSE.txt preserve upstream terms.', 'V-Log Alchemy by shenmintao, Apache-2.0; license included.', ''].join('\n')
   const castIsReference = baseCombo?.film === catalog.filmCast?.referenceFilm
   const castDescription = !castCombo ? t("이 조합에는 추천 현상 방법이 없어 중립(M·Y 0)으로 인화합니다.") : t("Portra 400은 기준 필름이라 중립 현상과 색이 같습니다.")
   const stdLabel = `${camera?.name || '—'} · STD`
@@ -430,7 +468,6 @@ function App() {
               <p className="film-cast-note">{t("E: 인화 노출(스톱). + 쪽이 인화지를 더 오래 노출해 어두워집니다. F: 페이드. 인화지의 가장 어두운 검정을 들어 올려 바랜 그림자를 만듭니다.")}</p>
               <div className="timing-actions"><span className="timing-buttons"><button type="button" disabled={onDefault} onClick={() => { resetTiming(); setNotice('') }}>{t("초기화")}</button></span></div>
               <p className="film-cast-note">{t("미리보기와 다운로드 LUT에 바로 반영됩니다. 값은 새로고침 전까지 조합마다 기억합니다.")}</p>
-              {format === 'zip' && <p className="film-cast-note">{t("인화 필터를 조정한 LUT는 STD 또는 V-Log 파일로 내려받을 수 있습니다.")}</p>}
             </fieldset>}
             {!isDigital && !labSelected && onNeutral && controlsAtZero && <p className="paper-balance-note">{t("중간 회색을 맞추는 인화 보정으로 같은 인화지의 필름 룩은 비슷해질 수 있습니다.")} <button onClick={() => dialog.current?.showModal()}>{t("생성 기준 보기")}</button></p>}
           </div>
@@ -440,10 +477,10 @@ function App() {
             {!isSupplied && camera?.cameraUse === 'post-only' && format !== 'vlog' && <p className="reference-export-note">{t("이 모델의 STD LUT는 편집 프로그램용입니다. 카메라 내 LUT 적용 지원을 뜻하지 않습니다.")}</p>}
             <label className="output-label" htmlFor="output-format">{t("파일 형식")}</label><select id="output-format" value={format} onChange={e => { setFormat(e.target.value as typeof format); setNotice('') }}><option value="std">{`${stdLabel} (.cube)`}</option>{!isSupplied && <><option value="vlog">V-Log / V-Gamut (.cube)</option><option value="zip">{t("카메라별 STD + V-Log (ZIP)")}</option></>}</select>
             <p className="export-process">{shortName(film.name)} <span>· {isDigital ? t("인화지 없음") : paperLabel(paper, true)}</span><code className="export-filename">{selectedFilename}</code></p>
-            <button className={`download-button${downloading ? ' is-busy' : downloaded ? ' is-done' : ''}`} aria-label={t("{0} LUT 다운로드", [`${processLabel} · ${formatName}`])} title={selectedFilename} disabled={!selectedAsset || combo.status !== 'ready' || downloading} onClick={() => selectedAsset && void (timing.active ? downloadTiming(selectedFilename) : download(selectedAsset, selectedFilename))}><span className="download-icon" aria-hidden="true">{downloading ? <i className="download-spinner"/> : <Icon name={downloaded ? 'check' : 'download'} size={18}/>}</span><span>{downloading ? t("파일 검증 중…") : downloaded ? t("다운로드 완료") : combo.status === 'ready' ? t("LUT 다운로드") : t("다운로드 준비 전")}</span>{!downloading && !downloaded && <Icon name="arrow" size={17}/>}</button>
-            <div className="download-meta">{selectedAsset ? <><span>{formatName}</span><span>{sizeLabel(selectedAsset.bytes)}</span></> : <span>{combo.status === 'unsupported' ? t("이 조합은 지원하지 않습니다.") : t("생성된 파일이 없습니다.")}</span>}</div>
+            <button className={`download-button${downloading ? ' is-busy' : downloaded ? ' is-done' : ''}`} aria-label={t("{0} LUT 다운로드", [`${processLabel} · ${formatName}`])} title={selectedFilename} disabled={!canDownload || downloading} onClick={() => { if (timing.active) void downloadTiming(selectedFilename, { std: nameFor('std'), vlog: nameFor('vlog') }, timingReadme()); else if (selectedAsset) void download(selectedAsset, selectedFilename) }}><span className="download-icon" aria-hidden="true">{downloading ? <i className="download-spinner"/> : <Icon name={downloaded ? 'check' : 'download'} size={18}/>}</span><span>{downloading ? t("파일 검증 중…") : downloaded ? t("다운로드 완료") : combo.status === 'ready' ? t("LUT 다운로드") : t("다운로드 준비 전")}</span>{!downloading && !downloaded && <Icon name="arrow" size={17}/>}</button>
+            <div className="download-meta">{selectedAsset ? <><span>{formatName}</span><span>{sizeLabel(selectedAsset.bytes)}</span></> : canDownload ? <><span>{formatName}</span><span>{t("브라우저에서 만듦")}</span></> : !detailsReady || timing.loading ? <span>{t("불러오는 중…")}</span> : <span>{combo.status === 'unsupported' ? t("이 조합은 지원하지 않습니다.") : t("생성된 파일이 없습니다.")}</span>}</div>
             <p className="download-notice" role="status" aria-live="polite">{message(notice)}</p>
-            <CameraRegister t={t} filename={selectedFilename} format={format} ready={!!selectedAsset && combo.status === 'ready'} cameraAliases={camera?.aliases ?? []} cameraName={camera?.name || exportCameraId} getCube={cameraCube}/>
+            <CameraRegister t={t} filename={selectedFilename} format={format} ready={canDownload} cameraAliases={camera?.aliases ?? []} cameraName={camera?.name || exportCameraId} getCube={cameraCube}/>
             <div className="camera-notice"><button onClick={() => dialog.current?.showModal()}><Icon name="info" size={16}/><span>{t("출처/라이선스")}</span></button></div>
           </div>
         </aside>
@@ -467,7 +504,7 @@ function App() {
         <h3>V-Log Alchemy · shenmintao</h3><p>{t("선택한 카메라의 Standard → V-Log 변환과 필름·인화지 V-Log LUT를 합성합니다. 내보내는 STD 파일은 선택한 카메라에 맞춰집니다.")}</p><code>{catalog.cameraAdapters?.commit}</code>
         <p>{t("Standard의 클리핑과 색역 압축은 완전히 역변환할 수 없습니다. 잘린 하이라이트와 색은 복원하지 못합니다.")}</p>
         {combo.qa && <details><summary>{t("측정된 보간 오차")}</summary><p>{t("STD 합성 파일과 카메라 변환·V-Log 룩을 순서대로 적용한 결과의 출력 sRGB 오차입니다. 카메라나 실제 필름의 색 일치를 나타내는 점수가 아닙니다.")}</p><table><thead><tr><th>{t("비교")}</th><th>{t("평균")}</th><th>{t("99백분위")}</th><th>{t("최대")}</th></tr></thead><tbody>{[[`V-Log ↔ ${referenceLabel}`,combo.qa.vlogVsDirectEngine.tetrahedral],...(stdMetric ? [[t("STD 합성 ↔ 순차 적용 · 사면체"),stdMetric.tetrahedral],[t("STD 합성 ↔ 순차 적용 · 삼선형"),stdMetric.trilinear]] : [])].map(([name,m]) => { const metric = m as { mean: number; p99: number; max: number }; return <tr key={String(name)}><td>{String(name)}</td><td>{metric.mean.toFixed(5)}</td><td>{metric.p99.toFixed(5)}</td><td>{metric.max.toFixed(5)}</td></tr> })}</tbody></table>{stdWarnings.map(w => <p key={w}>{message(w)}</p>)}</details>}
-        <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">spektrafilm ↗</a><a href={catalog.cameraAdapters?.sourceUrl} target="_blank" rel="noreferrer">V-Log Alchemy ↗</a><a href={serverUrl("/licenses/SPEKTRAFILM_LICENSE.txt")} target="_blank" rel="noreferrer">{t("spektrafilm 라이선스 ↗")}</a><a href={serverUrl("/camera-adapters/V-Log-Alchemy-LICENSE.txt")} target="_blank" rel="noreferrer">{t("카메라 변환 라이선스 ↗")}</a>{combo.files && <><a href={serverUrl(combo.files.qa.path)} target="_blank" rel="noreferrer">{t("S1II 기본 QA 보고서 ↗")}</a><a href={serverUrl(combo.files.provenance.path)} target="_blank" rel="noreferrer">{t("S1II 기본 생성 설정 · 해시 ↗")}</a></>}</div>
+        <div className="detail-links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noreferrer">spektrafilm ↗</a><a href={catalog.cameraAdapters?.sourceUrl} target="_blank" rel="noreferrer">V-Log Alchemy ↗</a><a href={serverUrl("/licenses/SPEKTRAFILM_LICENSE.txt")} target="_blank" rel="noreferrer">{t("spektrafilm 라이선스 ↗")}</a><a href={serverUrl("/camera-adapters/V-Log-Alchemy-LICENSE.txt")} target="_blank" rel="noreferrer">{t("카메라 변환 라이선스 ↗")}</a>{combo.files?.qa && <a href={serverUrl(combo.files.qa.path)} target="_blank" rel="noreferrer">{t("S1II 기본 QA 보고서 ↗")}</a>}{combo.files?.provenance && <a href={serverUrl(combo.files.provenance.path)} target="_blank" rel="noreferrer">{t("S1II 기본 생성 설정 · 해시 ↗")}</a>}</div>
       </>}
       <h3>{t("사진과 미리보기")}</h3><p>{t("샘플과 갤러리 사진의 권리는 촬영자에게 있습니다. 샘플 미리보기는 S1II STD 기준이며, 갤러리는 촬영 당시 LUT가 적용된 JPG입니다.")}</p><p>{t("업로드 사진에는 내보내기에서 선택한 카메라의 STD LUT를 적용합니다. 사진은 브라우저 안에서 처리하며 서버에 저장하지 않습니다.")}</p>
       {catalog.sourceCode && <div className="detail-links"><a href={serverUrl(catalog.sourceCode.path)} download>{t("sosang 소스 코드 · GPLv3 ↓")}</a></div>}

@@ -10,6 +10,7 @@ import { restoreCameraArchives } from './split-camera-archives.mjs';
 import { verifyPrintTiming } from './verify-print-timing.mjs';
 import { verifyGallery } from './verify-gallery.mjs';
 import { verifySuppliedFuji } from './verify-supplied-fuji.mjs';
+import { verifySplit, verifySlim } from './verify-split.mjs';
 import { validateUpdateManifest, hostedReleaseFiles, APP_UPDATE_TARGET } from './app-update.mjs';
 
 export const MAX_FILES = 20_000;
@@ -28,6 +29,8 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
   const root = path.resolve(rootDir), source = path.resolve(sourceDir);
   const sourceCatalog = JSON.parse(await fs.readFile(path.join(source, 'catalog.json'), 'utf8'));
   const { catalog: expected, removedIds } = publicCatalog(sourceCatalog);
+  // Without the old layout (LEGACY_LAYOUT off) only the split catalog describes the build.
+  if (!await fs.access(path.join(root, 'catalog.json')).then(() => true, () => false)) return verifySlimBuild(root);
   const catalog = JSON.parse(await fs.readFile(path.join(root, 'catalog.json'), 'utf8'));
   const { sourceCode, ...publicSubset } = catalog;
   // Compare JSON text: a failing deepEqual on the 16 MB catalog builds a diff too large to print.
@@ -156,8 +159,30 @@ export async function verifyCloudflare(rootDir = 'dist-cloudflare', sourceDir = 
   const suppliedFuji = await verifySuppliedFuji(root, catalog);
   const cameraStd = await verifyCameraStd(root, catalog);
   const printTiming = await verifyPrintTiming(root, catalog);
+  const split = await verifySplit(root, catalog);
   const largest = [...files].sort((a, b) => b[1] - a[1])[0];
-  return { passed: true, appVersion, combinations: publicLooks, luts: cameraStd.luts + suppliedFuji.luts, assets, cameraStd, printTiming, suppliedFuji, gallery, jsonAssetReferences: references, files: files.size, bytes: [...files.values()].reduce((sum, size) => sum + size, 0), largestFile: { path: largest[0], bytes: largest[1] } };
+  return { passed: true, appVersion, combinations: publicLooks, luts: cameraStd.luts + suppliedFuji.luts, assets, split, cameraStd, printTiming, suppliedFuji, gallery, jsonAssetReferences: references, files: files.size, bytes: [...files.values()].reduce((sum, size) => sum + size, 0), largestFile: { path: largest[0], bytes: largest[1] } };
+}
+
+async function listFiles(root) {
+  const files = new Map();
+  async function walk(directory) {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name), relative = path.relative(root, filename).split(path.sep).join('/');
+      assert(!entry.isSymbolicLink(), `Symlink in public build: ${relative}`);
+      if (entry.isDirectory()) await walk(filename);
+      else { const size = (await fs.stat(filename)).size; assert(size <= MAX_FILE_BYTES, `Cloudflare file limit exceeded: ${relative}`); files.set(relative, size); }
+    }
+  }
+  await walk(root);
+  return files;
+}
+
+async function verifySlimBuild(root) {
+  const files = await listFiles(root);
+  assert(files.size <= MAX_FILES, 'Cloudflare file count limit exceeded');
+  const split = await verifySlim(root, files);
+  return { passed: true, legacy: false, split, files: files.size, bytes: [...files.values()].reduce((sum, size) => sum + size, 0) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

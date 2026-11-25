@@ -66,8 +66,8 @@ export function runtimeMessage(locale: Locale, message: string | undefined): str
   if (sample) return translate(locale, '샘플 사진을 불러오지 못했습니다 ({0}).', [sample[1]])
   const download = message.match(/^([\s\S]+) · 검증된 파일을 다운로드했습니다\.$/)
   if (download) return translate(locale, '{0} · 검증된 파일을 다운로드했습니다.', [download[1]])
-  const timed = message.match(/^([\s\S]+) · 인화 필터 조정값으로 만든 파일을 다운로드했습니다\.$/)
-  if (timed) return translate(locale, '{0} · 인화 필터 조정값으로 만든 파일을 다운로드했습니다.', [timed[1]])
+  const timed = message.match(/^([\s\S]+) · 브라우저에서 만든 파일을 다운로드했습니다\.$/)
+  if (timed) return translate(locale, '{0} · 브라우저에서 만든 파일을 다운로드했습니다.', [timed[1]])
   const credit = message.match(/^사용자 촬영 · ([\s\S]+)$/)
   if (credit) return translate(locale, '사용자 촬영 · {0}', [credit[1]])
   return exact

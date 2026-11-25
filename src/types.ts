@@ -24,7 +24,7 @@ export type NegativeProcessMode = 'negative_print' | 'negative_digital' | 'refer
 export type OfficialProcessMode = 'official_direct' | 'official_print'
 export type ProcessPreference = NegativeProcessMode | OfficialProcessMode
 export type ProcessMode = ProcessPreference | 'positive_direct' | 'supplied_direct'
-export type LutFiles = Record<'vlog' | 'std' | 'zip' | 'qa' | 'provenance', Asset>
+export type LutFiles = Record<'vlog' | 'std' | 'zip', Asset> & Partial<Record<'qa' | 'provenance', Asset>>
 export interface FilmReference { title: string; url: string; author?: string; evidence?: string; camera?: string; exposure?: string; development?: string; scanner?: string; post?: string; role?: string; observation?: string }
 export interface ReferenceLook { film: string; name: string; description: string; adjustments?: string[]; references: FilmReference[] }
 export interface ReferenceStudy { methodId: string; looks: ReferenceLook[]; limitation?: string }
@@ -49,6 +49,8 @@ export interface Combination {
   castBaseId?: string; filmCast?: FilmCast;
   /** Experimental manufacturer lab-aim variant: the base negative print it belongs to. */
   labAimBaseId?: string; labAim?: LabAim;
+  /** Split catalog: no published files; made in the browser from the pair's print-timing pack. */
+  synth?: true;
   processMode: ProcessMode;
   status: 'ready' | 'failed' | 'unsupported' | 'not-generated'; reason?: string;
   seconds?: number; files?: LutFiles;
@@ -83,4 +85,8 @@ export interface Catalog {
     packs: Record<string, { asset: Asset; wire: { min: number; max: number }; qa: Record<string, { mean: number; p99: number; max: number }> }>
   }
   sourceCode?: { path: string; bytes: number; sha256: string }
+  /** 'split-v1': per-film details load separately (src/catalogSplit.ts). */
+  layout?: 'split-v1'
+  /** Split catalog: licences the browser adds to the LUT ZIPs it builds. */
+  lutLicenses?: Asset[]
 }

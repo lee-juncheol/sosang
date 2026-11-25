@@ -196,7 +196,7 @@ export function crc32(bytes: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0
 }
 
-async function deflateRaw(bytes: Uint8Array): Promise<Uint8Array | undefined> {
+export async function deflateRaw(bytes: Uint8Array): Promise<Uint8Array | undefined> {
   if (typeof CompressionStream === 'undefined') return undefined
   try {
     const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream('deflate-raw'))

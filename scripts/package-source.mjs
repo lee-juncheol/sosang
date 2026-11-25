@@ -35,7 +35,10 @@ function runTar(args) {
 const destinationStat = await fs.lstat(destination);
 assert(destinationStat.isDirectory() && !destinationStat.isSymbolicLink(), 'Destination must be a real prepared deployment directory');
 assert(destination !== root && !directories.some(name => within(path.join(root, name), destination)), 'Destination overlaps the source tree');
-const catalogPath = path.join(destination, 'catalog.json');
+// The old catalog.json while it is published (prepare-cloudflare LEGACY_LAYOUT), else the split index.
+const indexPath = path.join(destination, 'catalog', 'index.json');
+const legacyCatalog = await fs.lstat(path.join(destination, 'catalog.json')).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+const catalogPath = legacyCatalog ? path.join(destination, 'catalog.json') : indexPath;
 const catalogStat = await fs.lstat(catalogPath);
 assert(catalogStat.isFile() && !catalogStat.isSymbolicLink(), 'Destination catalog must be a regular file');
 const catalogBytes = await fs.readFile(catalogPath);
@@ -203,9 +206,15 @@ try {
   try {
     await fs.writeFile(stagedArchive, archive, { flag: 'wx', mode: 0o644 });
     catalog.sourceCode = { path: `/source/${archiveName}`, bytes: archive.length, sha256: sha256(archive) };
-    await fs.writeFile(stagedCatalog, JSON.stringify(catalog, null, 2) + '\n', { flag: 'wx', mode: 0o644 });
+    await fs.writeFile(stagedCatalog, (legacyCatalog ? JSON.stringify(catalog, null, 2) : JSON.stringify(catalog)) + '\n', { flag: 'wx', mode: 0o644 });
     await fs.rename(stagedArchive, path.join(sourceDirectory, archiveName));
     await fs.rename(stagedCatalog, catalogPath);
+    // The split index carries the same link for the current site and app.
+    if (legacyCatalog && await fs.access(indexPath).then(() => true, () => false)) {
+      const index = JSON.parse(await fs.readFile(indexPath, 'utf8'));
+      index.sourceCode = catalog.sourceCode;
+      await fs.writeFile(indexPath, JSON.stringify(index) + '\n');
+    }
   } finally {
     await fs.rm(stagedArchive, { force: true });
     await fs.rm(stagedCatalog, { force: true });

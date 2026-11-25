@@ -5,10 +5,18 @@ import { pathToFileURL } from 'node:url';
 import { assertLookInventory, publicLookCount } from './look-inventory.mjs';
 import { publishUpdateManifest } from './app-update.mjs';
 import { cameraArchivePaths, splitCameraArchives } from './split-camera-archives.mjs';
+import { createHash } from 'node:crypto';
+import { splitCatalog, CATALOG_INDEX_PATH, filmDetailPath } from '../src/catalogSplit.ts';
 
 export { PUBLIC_LOOKS } from './look-inventory.mjs';
 export const REMOVED_REFERENCE_LOOKS = 4;
 export const EXTERNAL_SAMPLE_MANIFEST = 'samples/external/manifest.json';
+// Licenses every LUT ZIP carries; the browser adds them to the ZIPs it builds (index.lutLicenses).
+export const LUT_LICENSES = ['/licenses/SPEKTRAFILM_LICENSE.txt', '/licenses/spektrafilm-LICENSE.txt', '/camera-adapters/V-Log-Alchemy-LICENSE.txt'];
+// Keep catalog.json and every look's files for desktop apps up to 0.1.9, which read the old
+// layout. Turn off once those apps have updated: then only the split catalog, the baked looks'
+// LUTS ZIP and camera notes ZIP are published (scripts/verify-cloudflare.mjs checks both modes).
+export const LEGACY_LAYOUT = true;
 export const EMPTY_EXTERNAL_SAMPLES = { schemaVersion: 1, localOnly: true, samples: [], models: [], scenes: [], missing: [] };
 
 // Keep the personal catalog intact; the public distribution is a separate build.
@@ -35,7 +43,38 @@ export function publicCatalog(source) {
   return { catalog, removedIds };
 }
 
-export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cloudflare') {
+/** Writes /catalog/index.json and one file per film; without legacy, drops what only the old layout used. */
+export async function writeSplitCatalog(catalog, output, { legacy = LEGACY_LAYOUT } = {}) {
+  const { index, films } = splitCatalog(catalog, { slim: !legacy });
+  // verify-cloudflare requires all three in a real build; small test fixtures may have none.
+  const licenses = [];
+  for (const url of LUT_LICENSES) {
+    const bytes = await fs.readFile(path.join(output, url.slice(1))).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (bytes) licenses.push({ path: url, name: path.basename(url), bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
+  }
+  if (licenses.length) index.lutLicenses = licenses;
+  await fs.mkdir(path.join(output, path.dirname(filmDetailPath('x').slice(1))), { recursive: true });
+  await fs.writeFile(path.join(output, CATALOG_INDEX_PATH.slice(1)), JSON.stringify(index) + '\n');
+  for (const [film, detail] of Object.entries(films)) await fs.writeFile(path.join(output, filmDetailPath(film).slice(1)), JSON.stringify(detail) + '\n');
+  let removedFiles = 0;
+  if (!legacy) {
+    const keep = new Set();
+    for (const combo of index.combinations) {
+      const detail = films[combo.film]?.looks[combo.id];
+      if (combo.synth || !detail) continue;
+      for (const asset of [...Object.values(detail.files ?? {}), ...Object.values(detail.stdByCamera ?? {}).flatMap(entry => [entry.std, entry.zip])]) keep.add(asset.path.slice(1));
+    }
+    for (const dir of await fs.readdir(path.join(output, 'luts'))) for (const name of await fs.readdir(path.join(output, 'luts', dir))) {
+      if (keep.has(`luts/${dir}/${name}`)) continue;
+      await fs.rm(path.join(output, 'luts', dir, name)); removedFiles++;
+    }
+    for (const dir of await fs.readdir(path.join(output, 'luts'))) if (!(await fs.readdir(path.join(output, 'luts', dir))).length) await fs.rmdir(path.join(output, 'luts', dir));
+    await fs.rm(path.join(output, 'catalog.json')); removedFiles++;
+  }
+  return { films: Object.keys(films).length, synth: index.combinations.filter(combo => combo.synth).length, indexBytes: JSON.stringify(index).length, removedFiles };
+}
+
+export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cloudflare', { legacy = LEGACY_LAYOUT } = {}) {
   const source = path.resolve(sourceDir), output = path.resolve(outputDir);
   // Only replace the dedicated sibling build directory, never source/public/.
   assert.equal(path.basename(output), 'dist-cloudflare', 'Output must be named dist-cloudflare');
@@ -77,11 +116,12 @@ export async function prepareCloudflare(sourceDir = 'dist', outputDir = 'dist-cl
   await fs.writeFile(externalManifest, JSON.stringify(EMPTY_EXTERNAL_SAMPLES, null, 2) + '\n');
   const cameraSplit = await splitCameraArchives(catalog, source, output);
   await fs.writeFile(path.join(output, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
+  const split = await writeSplitCatalog(catalog, output, { legacy });
   // Desktop app update information from the release step, when there is a release.
   const appVersion = await publishUpdateManifest(path.dirname(source), output);
-  return { output, combinations: catalog.combinations.length, excluded: removedIds.size, counts: catalog.counts, appVersion, cameraSplit };
+  return { output, combinations: catalog.combinations.length, excluded: removedIds.size, counts: catalog.counts, appVersion, cameraSplit, split, legacy };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  console.log(JSON.stringify(await prepareCloudflare(process.argv[2], process.argv[3]), null, 2));
+  console.log(JSON.stringify(await prepareCloudflare(process.argv[2], process.argv[3], process.argv.includes('--no-legacy') ? { legacy: false } : {}), null, 2));
 }
