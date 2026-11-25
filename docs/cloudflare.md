@@ -101,3 +101,13 @@ npm run release:app -- --version 0.2.0 --notes "바뀐 점" --deploy --github
 - 같은 주소에서는 1분에 3건까지만 받습니다(`CONTACT_LIMIT`). IP 주소는 이 제한에만 쓰고 저장하지 않습니다.
 - 받은 메시지 보기: `npm run contact:inbox` (`--all`, `--delete msg:<key>`).
 - 새 메시지 알림을 받으려면 Discord 웹훅 URL을 비밀값으로 넣습니다: `npx wrangler secret put CONTACT_WEBHOOK --config wrangler.jsonc`. 없으면 저장만 합니다.
+
+## 카메라 사용 기록
+
+데스크톱 앱은 카메라를 읽거나 쓸 때마다 익명 기록 한 줄을 Worker의 `/api/usage`로 보냅니다(`src/platform.ts`의 `cameraCall`).
+
+- 보내는 것: 작업 종류(`status`, `list`, `register`, `delete`, `rearrange`, `restore`), 기종, 펌웨어, 쓰기 지원 여부(`supported`, `experimental`, `unsupported`), 결과(`ok` 또는 오류 코드), 걸린 시간, 앱 버전, OS.
+- 보내지 않는 것: 시리얼, 기기 ID, 파일 이름, 사진. IP 주소는 1분에 30건 제한(`USAGE_LIMIT`)에만 쓰고 저장하지 않습니다.
+- 같은 줄은 컴퓨터마다 하루에 한 번만 보냅니다. 앱(`tauri://`, `tauri.localhost`)에서 온 요청만 받습니다.
+- 저장: D1 데이터베이스 `sosang-usage`(바인딩 `USAGE`). id가 없으므로 첫 배포 때 wrangler가 만들고, 표는 Worker가 첫 기록 때 만듭니다.
+- 보기: `npm run usage` (기종·펌웨어별 집계), `npm run usage -- --days 7`, `npm run usage -- --recent`.

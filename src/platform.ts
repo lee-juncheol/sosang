@@ -72,25 +72,70 @@ export class CameraError extends Error {
   constructor(code: CameraErrorCode, message: string) { super(message); this.code = code }
 }
 
+// Anonymous usage: which body and firmware the app reached and whether each kind of camera
+// call worked (server/worker.mjs `/api/usage`). Never the serial, file names or photos; each
+// distinct row goes out at most once a day per computer.
+export type UsageEvent = 'status' | 'list' | 'register' | 'delete' | 'rearrange' | 'restore'
+const USAGE_EVENTS: Record<string, UsageEvent> = {
+  camera_status: 'status', camera_list_luts: 'list', camera_register_lut: 'register', camera_register_luts: 'register',
+  camera_delete_luts: 'delete', camera_rearrange_luts: 'rearrange', camera_restore_backup: 'restore',
+}
+const USAGE_SENT_KEY = 'sosang.usage-sent'
+
+export function usageSupport(camera: Pick<CameraStatus, 'writeSupported' | 'writeExperimental'>): 'supported' | 'experimental' | 'unsupported' {
+  return camera.writeSupported ? 'supported' : camera.writeExperimental ? 'experimental' : 'unsupported'
+}
+
+/** The report for one camera call, or null for calls that are not reported. */
+export function usageReport(cmd: string, result: string, ms: number, camera: CameraStatus | null, version: string, os: string | undefined) {
+  const event = USAGE_EVENTS[cmd]
+  if (!event) return null
+  return { event, model: camera?.model ?? '', firmware: camera?.firmware ?? '', support: camera ? usageSupport(camera) : '', result, ms: Math.round(ms), version, ...(os ? { os } : {}) }
+}
+
+let appVersion: Promise<string> | null = null
+async function reportUsage(cmd: string, result: string, ms: number) {
+  try {
+    appVersion ??= import('@tauri-apps/api/app').then(m => m.getVersion())
+    const report = usageReport(cmd, result, ms, lastCamera, await appVersion, typeof navigator === 'object' ? osName(navigator.userAgent) : undefined)
+    if (!report) return
+    const today = new Date().toISOString().slice(0, 10)
+    const key = [report.event, report.model, report.firmware, report.support, report.result, report.version].join('|')
+    let sent: Record<string, string> = {}
+    try { sent = JSON.parse(localStorage.getItem(USAGE_SENT_KEY) || '{}') } catch { /* start over */ }
+    if (sent[key] === today) return
+    for (const [k, day] of Object.entries(sent)) if (day !== today) delete sent[k]
+    sent[key] = today
+    try { localStorage.setItem(USAGE_SENT_KEY, JSON.stringify(sent)) } catch { /* sends again next time */ }
+    await fetch(serverUrl('/api/usage'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report), keepalive: true })
+  } catch { /* usage reports never affect the app */ }
+}
+
 async function cameraCall<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const app = tauri()
   if (!app) throw new CameraError('unsupported_platform', 'Camera access needs the sosang app')
+  const started = performance.now()
   try {
-    return await app.invoke(cmd, args) as T
+    const value = await app.invoke(cmd, args) as T
+    const camera = cmd === 'camera_status' ? value as CameraStatus : cmd === 'camera_list_luts' ? (value as CameraLibrary).camera : null
+    if (camera) remember(camera)
+    void reportUsage(cmd, 'ok', performance.now() - started)
+    return value
   } catch (e) {
     const err = e as { code?: CameraErrorCode; message?: string } | string
-    if (typeof err === 'object' && err && err.code) throw new CameraError(err.code, err.message || err.code)
-    throw new CameraError('internal', String(typeof err === 'object' ? err?.message : err))
+    const error = typeof err === 'object' && err && err.code ? new CameraError(err.code, err.message || err.code) : new CameraError('internal', String(typeof err === 'object' ? err?.message : err))
+    if (error.code !== 'busy') void reportUsage(cmd, error.code, performance.now() - started)
+    throw error
   }
 }
 
 // Model and firmware of the camera last read in this session, for the contact form. The serial
 // number is never kept here.
-let lastCamera: { model: string; firmware: string } | null = null
-function remember(camera: CameraStatus) { lastCamera = { model: camera.model, firmware: camera.firmware } }
+let lastCamera: CameraStatus | null = null
+function remember(camera: CameraStatus) { lastCamera = { manufacturer: camera.manufacturer, model: camera.model, firmware: camera.firmware, writeSupported: camera.writeSupported, writeExperimental: camera.writeExperimental } }
 
-export const cameraStatus = () => cameraCall<CameraStatus>('camera_status').then(status => { remember(status); return status })
-export const cameraListLuts = () => cameraCall<CameraLibrary>('camera_list_luts').then(library => { remember(library.camera); return library })
+export const cameraStatus = () => cameraCall<CameraStatus>('camera_status')
+export const cameraListLuts = () => cameraCall<CameraLibrary>('camera_list_luts')
 
 async function withProgress<T>(run: () => Promise<T>, onProgress?: (step: CameraProgress) => void): Promise<T> {
   let unlisten: (() => void) | undefined

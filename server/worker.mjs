@@ -141,11 +141,64 @@ async function contact(request, env, ctx) {
   return json({ ok: true }, 200, headers);
 }
 
+// Anonymous camera usage from the desktop app: which body and firmware it reached and whether
+// reads and writes worked. Rows hold no serial, device id, IP address, file name or photo; the
+// app sends each distinct row at most once a day. Stored in the USAGE D1 database (created on
+// the first deploy, like CONTACT); USAGE_LIMIT allows 30 rows a minute from one address.
+const USAGE_PATH = '/api/usage';
+const USAGE_EVENTS = ['status', 'list', 'register', 'delete', 'rearrange', 'restore'];
+const USAGE_SUPPORT = ['supported', 'experimental', 'unsupported'];
+const USAGE_TEXT = /^[\w .()/+-]{1,40}$/;
+
+/** The row kept from a usage report, or null when it is not acceptable. */
+export function usageRow(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const { event, model = '', firmware = '', support = '', result, ms, version, os = '' } = input;
+  if (!USAGE_EVENTS.includes(event)) return null;
+  if (typeof result !== 'string' || !/^[a-z_]{1,40}$/.test(result)) return null;
+  if (!Number.isInteger(ms) || ms < 0 || ms > 3_600_000) return null;
+  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) return null;
+  for (const text of [model, firmware, os]) if (typeof text !== 'string' || (text && !USAGE_TEXT.test(text))) return null;
+  if (support && !USAGE_SUPPORT.includes(support)) return null;
+  return { event, model, firmware, support, result, ms, version, os };
+}
+
+let usageTableReady = false;
+async function usage(request, env) {
+  const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', Vary: 'Origin' };
+  const origin = request.headers.get('Origin');
+  if (isAppOrigin(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  if (request.method === 'OPTIONS' && isAppOrigin(origin)) {
+    return new Response(null, { status: 204, headers: { ...headers, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' } });
+  }
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, { ...headers, Allow: 'POST' });
+  if (!isAppOrigin(origin)) return json({ error: 'forbidden' }, 403, headers);
+  if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) return json({ error: 'bad_request' }, 415, headers);
+  if (!env.USAGE) return json({ error: 'unavailable' }, 503, headers);
+  if (env.USAGE_LIMIT) {
+    const { success } = await env.USAGE_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    if (!success) return json({ error: 'rate_limited' }, 429, headers);
+  }
+  const raw = await request.text();
+  if (raw.length > 2048) return json({ error: 'bad_request' }, 413, headers);
+  let row;
+  try { row = usageRow(JSON.parse(raw)); } catch { row = null; }
+  if (!row) return json({ error: 'bad_request' }, 400, headers);
+  if (!usageTableReady) {
+    await env.USAGE.prepare('CREATE TABLE IF NOT EXISTS usage (id INTEGER PRIMARY KEY, received TEXT NOT NULL, event TEXT NOT NULL, model TEXT, firmware TEXT, support TEXT, result TEXT NOT NULL, ms INTEGER, version TEXT, os TEXT)').run();
+    usageTableReady = true;
+  }
+  await env.USAGE.prepare('INSERT INTO usage (received, event, model, firmware, support, result, ms, version, os) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(new Date().toISOString(), row.event, row.model, row.firmware, row.support, row.result, row.ms, row.version, row.os).run();
+  return json({ ok: true }, 200, headers);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (pathname === '/api/locale') return locale(request);
     if (pathname === CONTACT_PATH) return contact(request, env, ctx);
+    if (pathname === USAGE_PATH) return usage(request, env);
     if (pathname === APP_UPDATE_PATH) return appUpdate(request, env);
     return env.ASSETS.fetch(request);
   },

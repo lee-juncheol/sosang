@@ -61,6 +61,6 @@ test('Wrangler invokes the Worker first only for locale lookup and app updates a
   assert.equal(configuration.main, 'server/worker.mjs');
   assert.equal(configuration.assets.binding, 'ASSETS');
   assert.equal(configuration.assets.directory, './dist-cloudflare');
-  assert.deepEqual(configuration.assets.run_worker_first, ['/api/locale', '/api/contact', '/app/latest.json']);
+  assert.deepEqual(configuration.assets.run_worker_first, ['/api/locale', '/api/contact', '/api/usage', '/app/latest.json']);
   assert.equal(configuration.assets.not_found_handling, 'none');
 });
