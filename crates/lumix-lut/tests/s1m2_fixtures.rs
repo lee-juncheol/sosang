@@ -361,7 +361,7 @@ fn delete_is_refused_when_the_selected_entry_cannot_be_read() {
 /// before): names and styles moved between entries 28..=36, the LUT records stayed put, and each
 /// moved entry's link points at its old record.
 #[test]
-fn camera_reordered_entries_are_found_and_left_alone() {
+fn camera_reordered_entries_are_found_and_not_overwritten() {
     let (Some(before), Some(after)) = (fixture("s1m2_fw15_before_camera_reorder.bin"), fixture("s1m2_fw15_after_camera_reorder.bin")) else { return };
     let (before, after) = (SettingsBlob::parse(before).unwrap(), SettingsBlob::parse(after).unwrap());
     assert!(before.camera_reordered().is_empty() && before.shared_records().is_empty());
@@ -379,9 +379,52 @@ fn camera_reordered_entries_are_found_and_left_alone() {
     let lut = test01();
     let err = after.with_lut(31, "TEST01", BaseStyle::Standard, &lut, true).unwrap_err();
     assert!(matches!(err, Error::Reordered(_)), "{err}");
-    let order: Vec<Option<usize>> = a.iter().map(|e| e.in_use.then_some(e.index)).collect();
-    assert!(matches!(after.rearranged(&order), Err(Error::Reordered(_))));
     // Free entries whose records nobody uses still take new LUTs.
     assert_eq!(after.free_slots(), vec![20, 21, 37, 38, 39, 40]);
     assert!(after.with_lut(37, "TEST01", BaseStyle::Standard, &lut, false).is_ok());
+}
+
+/// Moving LUTs in the app after a reorder in the camera's menu: the moved LUTs and every
+/// camera-reordered entry are written back with their own link, each keeping the LUT it showed.
+#[test]
+fn moving_after_a_camera_reorder_keeps_every_lut_and_clears_the_reorder() {
+    let Some(after) = fixture("s1m2_fw15_after_camera_reorder.bin") else { return };
+    let s = SettingsBlob::parse(after).unwrap();
+    let before = s.entries();
+    let selected = s.selected_entries().unwrap();
+    let movable: Vec<usize> = (2..before.len()).filter(|&k| before[k].in_use && !selected.contains(&k)).collect();
+    let free = *s.free_slots().last().unwrap();
+
+    // A swap plus a move into an empty entry, inside the range the camera reordered.
+    let (a, c) = (29, 34);
+    assert!(movable.contains(&a) && movable.contains(&c) && movable.contains(&31));
+    let mut order = identity(&s);
+    order.swap(a, c);
+    order[free] = Some(31);
+    order[31] = None;
+    let out = s.rearranged(&order).unwrap();
+
+    assert!(out.camera_reordered().is_empty(), "every used entry has its own link again");
+    assert!(out.shared_records().is_empty());
+    let after = out.entries();
+    for (k, from) in order.iter().enumerate() {
+        match from {
+            Some(f) => {
+                assert_eq!(after[k].name, before[*f].name, "entry {k}");
+                assert_eq!(after[k].style_code, before[*f].style_code, "entry {k}");
+                assert_eq!(out.lut(k), s.lut(*f), "entry {k} shows the LUT entry {f} showed");
+            }
+            None => assert!(!after[k].in_use, "entry {k} is empty"),
+        }
+    }
+    // Moving back gives the same names and LUTs in the original places (links now normalized).
+    let mut back = identity(&out);
+    back.swap(a, c);
+    back[31] = Some(free);
+    back[free] = None;
+    let again = out.rearranged(&back).unwrap();
+    for k in 0..before.len() {
+        assert_eq!(again.entries()[k].name, before[k].name);
+        assert_eq!(again.lut(k), s.lut(k), "entry {k}");
+    }
 }

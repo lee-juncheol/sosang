@@ -70,6 +70,25 @@ fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
             let r = register_lut(&cam, slot, name, cube.base_style()?, &cube.lut, overwrite, backups, progress)?;
             println!("registered {:?} in entry {} (backup {}, other changed bytes {})", r.name, r.index, r.backup.display(), r.other_changes);
         }
+        Some("--swap") => {
+            // Swap two entries' LUTs with the app's rearrange, then check every LUT by name.
+            let (a, c): (usize, usize) = (args[1].parse()?, args[2].parse()?);
+            let entries = blob.entries();
+            let mut order: Vec<Option<usize>> = entries.iter().map(|e| e.in_use.then_some(e.index)).collect();
+            order.swap(a, c);
+            let expected: Vec<lumix_ptp::Expected> = entries.iter().map(|e| (e.index, e.in_use.then(|| e.name.clone()))).collect();
+            let r = lumix_ptp::rearrange_luts(&cam, &order, &expected, backups, progress)?;
+            println!("moved {:?} (backup {})", r.moved, r.backup.display());
+            let after = cam.read_settings()?;
+            let mut wrong = 0;
+            for e in after.entries().iter().filter(|e| e.in_use) {
+                let was = entries.iter().find(|x| x.in_use && x.name == e.name).map(|x| x.index);
+                let same = was.is_some_and(|w| blob.lut(w) == after.lut(e.index));
+                if !same { wrong += 1; println!("  MISMATCH entry {} {:?}", e.index, e.name); }
+            }
+            println!("checked every used entry by name: {wrong} mismatch(es)");
+            println!("camera reordered now: {:?}, shared: {:?}", after.camera_reordered(), after.shared_records());
+        }
         Some("--test01") => {
             let slot = args[1].parse()?;
             let r = register_lut(&cam, slot, "TEST01", BaseStyle::Standard, &test01(), overwrite, backups, progress)?;

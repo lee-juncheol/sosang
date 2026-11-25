@@ -237,7 +237,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
   /** Slots whose content differs from the camera in the pending order. */
   const arrangeChanges = library && arrange ? arrange.flatMap((from, k) => from !== (library.entries[k].inUse ? k : null) ? [k] : []) : []
   const isLocked = (index: number) => !!library?.locked.includes(index)
-  const canArrange = canDeleteAny && !!library && !library.reordered && library.entries.filter((_, k) => k >= FIRST_USER_ENTRY && !isSelected(k)).length > 1
+  const canArrange = canDeleteAny && !!library && library.entries.filter((_, k) => k >= FIRST_USER_ENTRY && !isSelected(k)).length > 1
   const ready = queue.filter(q => !q.error)
   const slotCounts = new Map<number, number>()
   for (const q of ready) if (q.slot !== null) slotCounts.set(q.slot, (slotCounts.get(q.slot) ?? 0) + 1)
@@ -374,7 +374,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
             </span>
           </>}
         </div>}
-        {library.reordered && <p className="lut-manager-note">{t("카메라 메뉴에서 LUT 순서를 바꾼 흔적이 있어, 앱의 위치 바꾸기를 막아 두었습니다. ‘카메라에서 순서 바뀜’ 칸은 다른 칸의 LUT 데이터를 함께 쓰고 있어 덮어쓸 수 없습니다. 지우기와 빈 칸에 넣기는 됩니다.")}</p>}
+        {library.reordered && <p className="lut-manager-note">{t("카메라 메뉴에서 LUT 순서를 바꾼 흔적이 있습니다. ‘카메라에서 순서 바뀜’ 칸은 다른 칸의 LUT 데이터를 함께 쓰고 있어 그대로는 덮어쓸 수 없습니다. 위치 바꾸기로 한 번 저장하면 앱 방식으로 정리되어 이 제한이 풀립니다.")}</p>}
         {!!library.selected?.length && <p className="lut-manager-note">{t("카메라에서 선택된 LUT는 지울 수 없습니다. 카메라 메뉴에서 다른 LUT를 고른 뒤 목록을 다시 읽어 주세요.")}</p>}
       </section>
 

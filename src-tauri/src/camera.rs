@@ -149,7 +149,7 @@ pub struct Library {
     /// Entries whose LUT record another entry renders since a reorder in the camera's menu;
     /// the app does not write LUTs there (deleting is fine).
     locked: Vec<usize>,
-    /// The camera's menu reordered LUTs, so moving them in the app is refused.
+    /// The camera's menu reordered LUTs; the next move in the app writes them back the app's way.
     reordered: bool,
 }
 

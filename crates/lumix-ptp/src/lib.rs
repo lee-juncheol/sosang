@@ -450,7 +450,7 @@ pub struct RearrangeReport {
 }
 
 /// Move LUTs between Library entries in a single write (see [`SettingsBlob::rearranged`] for
-/// `order`), with a backup and a read-back check of every moved entry's name, style and LUT.
+/// `order`), with a backup and a read-back check of every entry's name, style and LUT.
 /// `expected` should list every entry as the caller last saw it, so the write stops if the
 /// camera's Library changed since.
 pub fn rearrange_luts(camera: &Camera, order: &[Option<usize>], expected: &[Expected], backup_dir: &Path, mut progress: impl FnMut(&str)) -> Result<RearrangeReport, PtpError> {
@@ -470,7 +470,8 @@ pub fn rearrange_luts(camera: &Camera, order: &[Option<usize>], expected: &[Expe
 
     let after = write_and_read_back(camera, &current, &patched, false, &mut progress)?;
     let got = after.entries();
-    let mismatch = moved.iter().find_map(|&(k, _)| {
+    // Every entry, not only the moved ones: entries the camera reordered are rewritten too.
+    let mismatch = (0..want.len()).find_map(|k| {
         if got.get(k) != want.get(k) {
             Some(format!("entry {k} reads back as {:?}", got.get(k).map(|e| e.name.as_str())))
         } else if want[k].in_use && after.lut(k) != patched.lut(k) {

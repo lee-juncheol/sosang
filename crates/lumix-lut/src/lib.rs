@@ -276,8 +276,7 @@ impl SettingsBlob {
     /// (link != own index). The app stores entry k's LUT in record k - 1.
 
     /// Used entries whose link is not their own index (moved by the camera, or written that
-    /// way). Moving LUTs in the app assumes every link is its own index, so it is refused
-    /// while this is not empty.
+    /// way). `rearranged` writes them back with their own link.
     pub fn camera_reordered(&self) -> Vec<usize> {
         (1..self.layout.title_count).filter(|&k| self.link(k) != 0xFFFF && self.link(k) as usize != k).collect()
     }
@@ -528,19 +527,17 @@ impl SettingsBlob {
     /// new index, as the camera requires. Entries 0 and 1 and every entry selected in the
     /// camera stay where they are (the camera refers to selections by entry number), and
     /// nothing moves when the selection can't be read.
+    ///
+    /// Entries the camera's own menu reordered (link != own index) are written back the app's
+    /// way in the same go: every used entry k ends up with link k and its LUT in record k - 1,
+    /// copied from the record its old link pointed at. All copies read the blob as it was, so
+    /// records that swap places don't overwrite each other.
     pub fn rearranged(&self, order: &[Option<usize>]) -> Result<SettingsBlob, Error> {
         let count = self.layout.title_count;
         if order.len() != count {
             return Err(Error::Slot(format!("the new order lists {} entries, the camera has {count}", order.len())));
         }
         let entries = self.entries();
-        let mut reordered = self.camera_reordered();
-        reordered.extend(self.shared_records());
-        reordered.sort_unstable();
-        reordered.dedup();
-        if !reordered.is_empty() {
-            return Err(Error::Reordered(format!("entries {reordered:?} were reordered in the camera, so moving is left to the camera's menu")));
-        }
         let Some(selected) = self.selected_entries() else {
             return Err(Error::Slot("the LUT selected in the camera can't be read on this body, so moving is not supported yet".into()));
         };
@@ -561,9 +558,26 @@ impl SettingsBlob {
         if let Some(lost) = entries.iter().find(|e| e.in_use && !used[e.index]) {
             return Err(Error::Slot(format!("entry {} ({:?}) is missing from the new order", lost.index, lost.name)));
         }
-        let moved: Vec<usize> = (0..count).filter(|&k| order[k] != entries[k].in_use.then_some(k)).collect();
+        // Moved entries, plus used ones the camera reordered (rewritten in place with their own link).
+        let moved: Vec<usize> = (BUILT_IN_ENTRIES..count)
+            .filter(|&k| order[k] != entries[k].in_use.then_some(k) || (entries[k].in_use && self.link(k) as usize != k))
+            .collect();
         if moved.is_empty() {
             return Err(Error::Slot("nothing to move".into()));
+        }
+        for k in 0..BUILT_IN_ENTRIES {
+            let link = self.link(k) as usize;
+            if entries[k].in_use && link != k && moved.contains(&link) {
+                return Err(Error::Reordered(format!("built-in entry {k} shows record {link}, which the new order would overwrite")));
+            }
+        }
+        for &k in &moved {
+            if let Some(s) = order[k] {
+                let link = self.link(s) as usize;
+                if link == 0 || link - 1 >= self.layout.record_count {
+                    return Err(Error::Reordered(format!("entry {s} points at LUT record {link}, which does not exist")));
+                }
+            }
         }
 
         let record_len = 4 + LUT_RECORD_LEN as usize;
@@ -577,7 +591,7 @@ impl SettingsBlob {
                     let from = self.title_offset(s);
                     b[t + 4..t + 6].copy_from_slice(&(k as u16).to_le_bytes());
                     b[t + 6..t + TITLE_HEADER + TITLE_NAME_BYTES].copy_from_slice(&self.bytes[from + 6..from + TITLE_HEADER + TITLE_NAME_BYTES]);
-                    let (r, src) = (self.record_offset(k), self.record_offset(s));
+                    let (r, src) = (self.record_offset(k), self.record_offset(self.link(s) as usize));
                     b[r..r + record_len].copy_from_slice(&self.bytes[src..src + record_len]);
                     allowed.push(r..r + record_len);
                 }

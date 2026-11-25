@@ -609,7 +609,7 @@ export const english: Readonly<Record<string, string>> = {
   "카메라 메뉴에서 순서를 바꾼 칸이라, 앱에서 쓰면 다른 LUT를 덮어쓰게 됩니다. 아무것도 쓰지 않았습니다. 빈 칸을 고르거나 카메라 메뉴에서 바꿔 주세요.": "This entry was reordered in the camera's menu, so writing it from the app would overwrite another LUT. Nothing was written. Choose an empty entry or change it in the camera's menu.",
   "카메라 메뉴에서 순서를 바꾼 칸입니다. 앱에서는 덮어쓰거나 넣을 수 없고, 지우기만 됩니다.": "This entry was reordered in the camera's menu. The app can delete it but not overwrite it or put a LUT in it.",
   "카메라에서 순서 바뀜": "Reordered in camera",
-  "카메라 메뉴에서 LUT 순서를 바꾼 흔적이 있어, 앱의 위치 바꾸기를 막아 두었습니다. ‘카메라에서 순서 바뀜’ 칸은 다른 칸의 LUT 데이터를 함께 쓰고 있어 덮어쓸 수 없습니다. 지우기와 빈 칸에 넣기는 됩니다.": "LUTs were reordered in the camera's menu, so moving them in the app is turned off. Entries marked ‘Reordered in camera’ share LUT data with other entries and can't be overwritten. Deleting and adding to empty entries still work.",
+  "카메라 메뉴에서 LUT 순서를 바꾼 흔적이 있습니다. ‘카메라에서 순서 바뀜’ 칸은 다른 칸의 LUT 데이터를 함께 쓰고 있어 그대로는 덮어쓸 수 없습니다. 위치 바꾸기로 한 번 저장하면 앱 방식으로 정리되어 이 제한이 풀립니다.": "LUTs were reordered in the camera's menu. Entries marked ‘Reordered in camera’ share LUT data with other entries and can't be overwritten as they are. Saving once with Rearrange tidies them up the app's way and lifts this limit.",
   "카메라 작업이 끝나면 앱이 닫힙니다.": "The app will close when the camera operation finishes.",
   "업데이트를 설치하지 못했습니다. 잠시 뒤 다시 시도해 주세요.": "Couldn't install the update. Try again in a moment.",
   "내려받는 중… {0} / {1} MB": "Downloading… {0} / {1} MB",
