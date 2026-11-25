@@ -11,13 +11,15 @@ export type PatchNote = {
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
-  { id: '2026-11-25-browser-print', date: '2026-11-25', items: {
+  { id: '2026-11-25-browser-print', date: '2026-11-25', app: '0.1.10', items: {
     ko: ['중립 현상과 제조사 기준 인화 LUT는 이제 브라우저에서 만들어요. 예전에 받은 파일과 숫자가 아주 조금 다를 수 있지만 눈으로는 구분되지 않아요.',
       '인화 미세 조정을 바꾼 LUT도 카메라별 ZIP으로 받을 수 있어요.',
-      '필름 목록을 나눠 받아서 첫 화면이 더 빨리 열려요.'],
+      '필름 목록을 나눠 받아서 첫 화면이 더 빨리 열려요.',
+      '카메라 메뉴에서 LUT 순서를 바꾼 뒤에도 앱에서 위치를 바꿀 수 있어요.'],
     en: ['Neutral and manufacturer lab-aim print LUTs are now made in your browser. The numbers may differ very slightly from files you downloaded before, but not visibly.',
       'LUTs with adjusted print fine-tuning can now be downloaded as a per-camera ZIP too.',
-      'The film list now loads in parts, so the first screen opens faster.'] } },
+      'The film list now loads in parts, so the first screen opens faster.',
+      'You can rearrange LUTs in the app even after reordering them in the camera menu.'] } },
   { id: '2026-11-25-0.1.9', date: '2026-11-25', app: '0.1.9', items: {
     ko: ['중립 현상이 버튼으로 돌아왔어요. 누르면 인화 미세 조정이 모두 0이 돼요.',
       '사이트에서 데스크톱 앱 소개와 다운로드를 볼 수 있어요.'],
