@@ -10,6 +10,11 @@ export type PatchNote = {
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
+  { id: '2026-11-25', date: '2026-11-25', app: '0.1.8', items: {
+    ko: ['현상 방법에서 중립을 뺐어요. 인화 미세 조정의 "중립 (0)" 버튼을 누르면 같은 결과가 나와요.',
+      '인화 미세 조정 슬라이더 옆 칸에 숫자를 직접 입력할 수 있어요.'],
+    en: ['Neutral is no longer a development option. The "Neutral (0)" button in Print fine-tuning gives the same result.',
+      'Type values directly in the boxes beside the Print fine-tuning sliders.'] } },
   { id: '2026-11-24', date: '2026-11-24', app: '0.1.7', items: {
     ko: ['언어 버튼 옆에서 지금까지의 업데이트 내역을 볼 수 있어요.',
       '새로 추가된 필름과 인화지에 NEW 표시가 붙어요.',
