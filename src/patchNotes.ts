@@ -11,6 +11,11 @@ export type PatchNote = {
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
+  { id: '2026-11-27-0.1.11', date: '2026-11-27', app: '0.1.11', items: {
+    ko: ['USB 테더 연결이 없는 카메라(예: L10)도 SD 카드의 카메라 설정 파일로 LUT를 넣을 수 있어요. LUT 관리의 SD 카드 탭이나 카메라에 바로 등록의 "설정 파일에 바로 등록"을 쓰세요.',
+      'LUT를 넣을 때 기종 제한이 없어졌어요. 후지 필름 시뮬레이션도 L10에 넣을 수 있어요.'],
+    en: ['Cameras without a USB tether connection (such as the L10) can take LUTs through the camera settings file on the SD card. Use the SD card tab in LUT manager, or "Register in the settings file" under Register on camera.',
+      'Adding LUTs no longer depends on the camera model. Fujifilm simulations can go on the L10 too.'] } },
   { id: '2026-11-25-browser-print', date: '2026-11-25', app: '0.1.10', items: {
     ko: ['중립 현상과 제조사 기준 인화 LUT는 이제 브라우저에서 만들어요. 예전에 받은 파일과 숫자가 아주 조금 다를 수 있지만 눈으로는 구분되지 않아요.',
       '인화 미세 조정을 바꾼 LUT도 카메라별 ZIP으로 받을 수 있어요.',
