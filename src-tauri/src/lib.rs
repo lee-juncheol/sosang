@@ -1,4 +1,5 @@
 mod camera;
+mod card;
 mod courier;
 mod files;
 mod update;
@@ -33,6 +34,9 @@ pub fn run() {
             camera::camera_rearrange_luts,
             camera::camera_list_backups,
             camera::camera_restore_backup,
+            card::card_find_settings,
+            card::card_list_luts,
+            card::card_register_luts,
             courier::courier_pick_folder,
             courier::courier_list,
             courier::courier_list_saved,

@@ -1,8 +1,9 @@
 import { useRef, useState, type DragEvent } from 'react'
 import type { Locale, Translate } from './i18n'
-import { errorText, ExperimentalConsent } from './CameraRegister'
+import { errorText } from './CameraRegister'
 import { CameraBusyOverlay } from './CameraBusyOverlay'
 import { FeatureGuide } from './FeatureGuide'
+import { SdCardManager } from './SdCardManager'
 import { cameraDelete, cameraListBackups, cameraListLuts, cameraLutName, cameraRearrange, cameraRegisterMany, cameraRestoreBackup, cubeSummary, type CameraBackup, FIRST_USER_ENTRY, type CameraLibrary, type CameraProgress } from './platform.ts'
 import './lutManager.css'
 
@@ -23,7 +24,21 @@ function styleLabel(t: Translate, code: number): string {
   }
 }
 
+/** LUT management: over USB (tether) or through the camera's settings file on a card. */
 export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
+  const [source, setSource] = useState<'usb' | 'card'>('usb')
+  return <>
+    <div className="lut-source">
+      <div className="lut-source-tabs" role="group" aria-label={t("LUT 넣는 방법")}>
+        <button type="button" aria-pressed={source === 'usb'} onClick={() => setSource('usb')}>{t("USB 연결")}</button>
+        <button type="button" aria-pressed={source === 'card'} onClick={() => setSource('card')}>{t("SD 카드")}</button>
+      </div>
+    </div>
+    {source === 'usb' ? <UsbLutManager locale={locale} t={t}/> : <SdCardManager locale={locale} t={t}/>}
+  </>
+}
+
+function UsbLutManager({ locale, t }: { locale: Locale; t: Translate }) {
   const [library, setLibrary] = useState<CameraLibrary | null>(null)
   const [busy, setBusy] = useState<Busy>(null)
   const [step, setStep] = useState<CameraProgress | null>(null)
@@ -34,7 +49,6 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
   const [preferSlot, setPreferSlot] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
   const [confirmOverwrite, setConfirmOverwrite] = useState(false)
-  const [experimentalOk, setExperimentalOk] = useState(false)
   const nextId = useRef(1)
   const [backups, setBackups] = useState<CameraBackup[] | null>(null)
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
@@ -51,7 +65,6 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
     setBusy({ kind: 'reading' }); setError(null); setDone(null); setConfirmDelete(null); setConfirmBulk(false); setChecked(new Set()); setArrange(null)
     try {
       const next = await cameraListLuts()
-      if (!library || library.camera.model !== next.camera.model || library.camera.firmware !== next.camera.firmware) setExperimentalOk(false)
       setLibrary(next)
       setQueue(current => assignSlots(current.map(q => ({ ...q, slot: null })), next, null))
     } catch (e) { fail(e) }
@@ -228,7 +241,8 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
   }
 
   const experimental = !!library && !library.camera.writeSupported && library.camera.writeExperimental
-  const canWrite = !!library && (library.camera.writeSupported || (experimental && experimentalOk))
+  // Unverified Panasonic bodies are written too; every write is backed up and checked.
+  const canWrite = !!library && (library.camera.writeSupported || experimental)
   /** Deleting needs to know which LUTs the camera has selected in photo and video modes
    *  (those are never deleted). */
   const canDeleteAny = canWrite && library?.selected != null
@@ -285,8 +299,7 @@ export function LutManager({ locale, t }: { locale: Locale; t: Translate }) {
           <h2 id="lut-list-title">{t("카메라 LUT 목록")}</h2>
           <span>{library.camera.model} · {t("펌웨어 {0}", [library.camera.firmware])} · {t("{0}개 사용 · 빈 칸 {1}개", [used, library.freeSlots.length])}</span>
         </div>
-        {experimental ? <ExperimentalConsent t={t} camera={library.camera} checked={experimentalOk} disabled={!!busy} onChange={setExperimentalOk} className="lut-manager-confirm lut-manager-experimental"/>
-          : !canWrite && <p className="lut-manager-warning">{t("{0} 펌웨어 {1}에는 아직 등록하거나 지울 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])}</p>}
+        {!canWrite && <p className="lut-manager-warning">{t("{0} 펌웨어 {1}에는 아직 등록하거나 지울 수 없습니다. 목록 읽기만 할 수 있습니다.", [library.camera.model, library.camera.firmware])}</p>}
         {canWrite && library.selected == null && <p className="lut-manager-note">{t("이 카메라에서는 선택된 LUT를 읽지 못해 지우기를 막아 두었습니다. 넣기는 할 수 있습니다.")}</p>}
         {!arranging && canDeleteAny && deletable.length > 0 && !checkedEntries.length && <div className="lut-bulk" role="region" aria-label={t("여러 개 지우기")}>
           <p className="lut-bulk-hint">{t("왼쪽 칸을 체크하면 여러 LUT를 한 번에 지울 수 있습니다.")}</p>

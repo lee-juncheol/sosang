@@ -428,3 +428,31 @@ fn moving_after_a_camera_reorder_keeps_every_lut_and_clears_the_reorder() {
         assert_eq!(again.lut(k), s.lut(k), "entry {k}");
     }
 }
+
+/// LUMIX L10 settings saved to a card (2026-11-27): the same data as an S1II USB read without
+/// the 12-byte header, with a 192-byte block per entry after the titles holding the LUT
+/// display switch. The camera loaded TEST01 written here into entry 5, hidden; after turning
+/// it on in the menu and saving again, only that switch changed in the Library.
+#[test]
+fn l10_card_file_takes_a_lut_like_the_camera_stores_it() {
+    let (Some(original), Some(saved)) = (fixture("l10_camset_original.dat"), fixture("l10_camset_test01_shown.dat")) else { return };
+    let s = SettingsBlob::from_card_file(&original).unwrap();
+    assert_eq!(s.model(), "DC-L10");
+    assert!(s.card_file_bytes() == original.as_slice());
+    let names: Vec<String> = s.entries().iter().filter(|e| e.in_use).map(|e| e.name.clone()).collect();
+    assert_eq!(names, ["Vlog_709", "ARRI 709", "Sample LUT1", "Sample LUT2", "Sample LUT3"]);
+    assert_eq!((0..6).map(|k| s.shown(k).unwrap()).collect::<Vec<_>>(), [true, false, true, true, true, false]);
+
+    let out = s.with_lut(5, "TEST01", BaseStyle::Standard, &test01(), false).unwrap();
+    let camera = SettingsBlob::from_card_file(&saved).unwrap();
+    assert_eq!(out.entries(), camera.entries());
+    for k in 0..out.entries().len() {
+        assert_eq!(out.shown(k), camera.shown(k), "display switch of entry {k}");
+        assert_eq!(out.lut(k), camera.lut(k), "LUT of entry {k}");
+    }
+    assert_eq!(out.shown(5), Some(true));
+    // The S1II has no display switch.
+    if let Some(b) = fixture("s1m2_fw15_first_read.bin") {
+        assert_eq!(SettingsBlob::parse(b).unwrap().shown(2), None);
+    }
+}

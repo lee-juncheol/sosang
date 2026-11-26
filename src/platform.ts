@@ -64,7 +64,7 @@ export type CameraEntry = { index: number; name: string; styleCode: number; inUs
 export type CameraLibrary = { camera: CameraStatus; entries: CameraEntry[]; freeSlots: number[]; selected: number[] | null; locked: number[]; reordered: boolean }
 export type CameraDeleteResult = { deleted: { index: number; name: string }[]; backup: string }
 export type CameraRegisterResult = { index: number; name: string; backup: string; otherChanges: number }
-export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'reordered' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unconfirmed' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
+export type CameraErrorCode = 'no_camera' | 'timeout' | 'session' | 'not_verified' | 'unsupported_model' | 'bad_cube' | 'bad_name' | 'bad_slot' | 'slot_changed' | 'reordered' | 'bad_backup' | 'other_camera' | 'verify_failed' | 'rolled_back' | 'unconfirmed' | 'unknown_layout' | 'unsupported_platform' | 'busy' | 'card_file' | 'card_io' | 'camera_error' | 'update_failed' | 'no_update' | 'internal'
 export type CameraProgress = 'reading' | 'writing' | 'verifying' | 'restoring' | 'done'
 
 export class CameraError extends Error {
@@ -75,10 +75,11 @@ export class CameraError extends Error {
 // Anonymous usage: which body and firmware the app reached and whether each kind of camera
 // call worked (server/worker.mjs `/api/usage`). Never the serial, file names or photos; each
 // distinct row goes out at most once a day per computer.
-export type UsageEvent = 'status' | 'list' | 'register' | 'delete' | 'rearrange' | 'restore'
+export type UsageEvent = 'status' | 'list' | 'register' | 'delete' | 'rearrange' | 'restore' | 'card_list' | 'card_register'
 const USAGE_EVENTS: Record<string, UsageEvent> = {
   camera_status: 'status', camera_list_luts: 'list', camera_register_lut: 'register', camera_register_luts: 'register',
   camera_delete_luts: 'delete', camera_rearrange_luts: 'rearrange', camera_restore_backup: 'restore',
+  card_list_luts: 'card_list', card_register_luts: 'card_register',
 }
 const USAGE_SENT_KEY = 'sosang.usage-sent'
 
@@ -117,7 +118,8 @@ async function cameraCall<T>(cmd: string, args?: Record<string, unknown>): Promi
   const started = performance.now()
   try {
     const value = await app.invoke(cmd, args) as T
-    const camera = cmd === 'camera_status' ? value as CameraStatus : cmd === 'camera_list_luts' ? (value as CameraLibrary).camera : null
+    const camera = cmd === 'camera_status' ? value as CameraStatus : cmd === 'camera_list_luts' ? (value as CameraLibrary).camera
+      : cmd === 'card_list_luts' ? cardCamera(value as CardLibrary) : null
     if (camera) remember(camera)
     void reportUsage(cmd, 'ok', performance.now() - started)
     return value
@@ -180,6 +182,21 @@ export type CameraRearrangeResult = { moved: { index: number; name: string | nul
 export function cameraRearrange(order: (number | null)[], names: (string | null)[], experimental: boolean, onProgress?: (step: CameraProgress) => void): Promise<CameraRearrangeResult> {
   return withProgress(() => cameraCall<CameraRearrangeResult>('camera_rearrange_luts', { order, names, experimental }), onProgress)
 }
+
+// Camera settings files on a memory card (bodies without USB tether, e.g. L10). Shapes match
+// src-tauri/src/card.rs.
+export type CardFile = { path: string; volume: string; file: string; model: string; used: number; modified: number; error: CameraErrorCode | null }
+export type CardLibrary = { path: string; file: string; model: string; entries: CameraEntry[]; freeSlots: number[] }
+function cardCamera(library: CardLibrary): CameraStatus {
+  return { manufacturer: 'Panasonic', model: library.model, firmware: '', writeSupported: true, writeExperimental: false }
+}
+/** Settings files in `AD_LUMIX/CAMSET` on every card the computer shows, newest first. */
+export const cardFindSettings = () => cameraCall<CardFile[]>('card_find_settings')
+export const cardListLuts = (path: string) => cameraCall<CardLibrary>('card_list_luts', { path })
+/** Put LUTs in user entries of a card settings file, overwriting any LUT there (the original
+ *  file is backed up first). */
+export const cardRegisterLuts = (path: string, items: { cube: string; slot: number; name: string }[]) =>
+  cameraCall<{ registered: { index: number; name: string }[]; backup: string }>('card_register_luts', { path, items })
 
 /** A settings backup taken before a change; `action` says which change (English, from Rust). */
 export type CameraBackup = { id: string; model: string; firmware: string; created: number; action: string }

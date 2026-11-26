@@ -40,6 +40,8 @@ const SELECTED_AT: usize = 4;
 const SELECTED_BYTES: usize = 14;
 /// Entries 0 (Vlog_709) and 1 (ARRI 709) came with the camera and are never changed.
 const BUILT_IN_ENTRIES: usize = 2;
+const EXTRA_STRIDE: usize = 192;
+const EXTRA_SHOWN_AT: usize = 188;
 const LUT_RECORD_LEN: u32 = 0x34A4C; // grid u16 + flag u16 + 33^3*3 u16 + 2 pad bytes
 const LUT_DATA_BYTES: usize = LUT_ENTRIES * 6;
 const MODEL_OFFSET: usize = 0x1E;
@@ -131,6 +133,9 @@ struct Layout {
     title_count: usize,
     records: usize, // first LUT record
     record_count: usize,
+    /// L10: after the title entries comes one 192-byte block per entry whose byte 188 is the
+    /// camera menu's LUT display switch (1 = shown). The S1II has no such block.
+    shown: Option<usize>,
 }
 
 /// A validated settings blob (`[prop][len][datalen][data...][checksum]`).
@@ -209,31 +214,53 @@ impl SettingsBlob {
             return Err(Error::UnsupportedModel(model));
         }
 
-        // Title table payload: [u32 0x0A][u32 array bytes][entries...]
+        // Title table payload: [u32 0x0A][u32 array bytes][entries...]. On the S1II the array is
+        // exactly one entry per LUT record; the L10 adds more data after the entries, so the
+        // count comes from the LUT records below.
         let t = find_item(&bytes, ITEM_TITLES, |p, len| {
             len >= 8 && u32_at(&bytes, p) == 0x0A && {
                 let arr = u32_at(&bytes, p + 4) as usize;
-                arr + 8 <= len && arr % TITLE_STRIDE == 0 && arr > 0
+                arr + 8 <= len && arr >= TITLE_STRIDE
             }
         })?;
-        let title_count = u32_at(&bytes, t + 4) as usize / TITLE_STRIDE;
+        let title_bytes = u32_at(&bytes, t + 4) as usize;
         // LUT section payload: [u32 0x0C][records of (u32 len + len bytes)...][8 trailing bytes on fw 1.5]
         let l = find_item(&bytes, ITEM_LUTS, |p, len| {
             len > 4 + 4 + LUT_RECORD_LEN as usize && u32_at(&bytes, p) == 0x0C && u32_at(&bytes, p + 4) == LUT_RECORD_LEN
         })?;
         let llen = u32_at(&bytes, l - 4) as usize;
         let record_count = (llen - 4) / (4 + LUT_RECORD_LEN as usize);
-        let layout = Layout { titles: t + 8, title_count, records: l + 4, record_count };
+        let title_count = record_count;
+        let shown = (title_bytes == title_count * (TITLE_STRIDE + EXTRA_STRIDE)).then(|| t + 8 + title_count * TITLE_STRIDE + EXTRA_SHOWN_AT);
+        let layout = Layout { titles: t + 8, title_count, records: l + 4, record_count, shown };
         for r in 0..record_count {
             if u32_at(&bytes, layout.records + r * (4 + LUT_RECORD_LEN as usize)) != LUT_RECORD_LEN {
                 return Err(Error::Format(format!("LUT record {r} has an unexpected length")));
             }
         }
-        if title_count != record_count {
-            return Err(Error::Format(format!("{title_count} titles but {record_count} LUT records")));
+        if title_bytes < title_count * TITLE_STRIDE {
+            return Err(Error::Format(format!("{} titles but {record_count} LUT records", title_bytes / TITLE_STRIDE)));
         }
         let selected_at = Self::find_selected(&bytes);
         Ok(Self { bytes, layout, model, selected_at })
+    }
+
+    /// Read a settings file the camera saved to its card (`AD_LUMIX/CAMSET/CAMSETnn.DAT`). It
+    /// holds the same data as a USB read without the 12-byte property header, and its last
+    /// byte is the same checksum.
+    pub fn from_card_file(file: &[u8]) -> Result<Self, Error> {
+        let n = file.len() + 12;
+        let mut b = Vec::with_capacity(n);
+        b.extend_from_slice(&SETTINGS_PROP.to_le_bytes());
+        b.extend_from_slice(&((n - 8) as u32).to_le_bytes());
+        b.extend_from_slice(&((n - 12) as u32).to_le_bytes());
+        b.extend_from_slice(file);
+        Self::parse(b)
+    }
+
+    /// The bytes of a card settings file (see [`Self::from_card_file`]).
+    pub fn card_file_bytes(&self) -> &[u8] {
+        &self.bytes[12..]
     }
 
     /// Offsets of the first selection byte in the three copies of each selection item, when
@@ -263,6 +290,17 @@ impl SettingsBlob {
 
     fn title_offset(&self, index: usize) -> usize {
         self.layout.titles + index * TITLE_STRIDE
+    }
+
+    /// Whether the camera menu shows the entry's LUT, on bodies with that switch (L10);
+    /// `None` elsewhere.
+    pub fn shown(&self, index: usize) -> Option<bool> {
+        (index < self.layout.title_count).then(|| self.shown_offset(index)).flatten().map(|o| self.bytes[o] != 0)
+    }
+
+    /// Offset of the entry's LUT display switch, on bodies that have one (L10).
+    fn shown_offset(&self, index: usize) -> Option<usize> {
+        self.layout.shown.map(|o| o + index * EXTRA_STRIDE)
     }
 
     /// The title's link field: which LUT record (link - 1) the camera renders for it, or
@@ -395,6 +433,11 @@ impl SettingsBlob {
                 }
             }
             debug_assert_eq!(&b[r + 8 + LUT_DATA_BYTES..r + 8 + LUT_DATA_BYTES + 2], &[0, 0]);
+            // A new LUT is shown in the camera menu, as when the camera loads one from a card.
+            if let Some(o) = self.shown_offset(l.index) {
+                b[o] = 1;
+                allowed.push(o..o + 1);
+            }
             allowed.push(t..t + TITLE_STRIDE);
             allowed.push(r..r + 4 + LUT_RECORD_LEN as usize);
         }
@@ -594,6 +637,10 @@ impl SettingsBlob {
                     let (r, src) = (self.record_offset(k), self.record_offset(self.link(s) as usize));
                     b[r..r + record_len].copy_from_slice(&self.bytes[src..src + record_len]);
                     allowed.push(r..r + record_len);
+                    if let (Some(to), Some(from)) = (self.shown_offset(k), self.shown_offset(s)) {
+                        b[to] = self.bytes[from];
+                        allowed.push(to..to + 1);
+                    }
                 }
                 // Emptied the way the camera's own delete does it; the record is left as it is.
                 None => {

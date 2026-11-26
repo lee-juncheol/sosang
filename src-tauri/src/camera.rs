@@ -69,6 +69,16 @@ impl CommandError {
     pub(crate) fn new(code: &'static str, message: impl Into<String>) -> Self {
         CommandError { code, message: message.into() }
     }
+
+    pub(crate) fn code(&self) -> &'static str {
+        self.code
+    }
+
+    /// Prefix the message with where the error came from ("file 2 (Name)").
+    pub(crate) fn context(mut self, at: &str) -> Self {
+        self.message = format!("{at}: {}", self.message);
+        self
+    }
 }
 
 impl From<PtpError> for CommandError {
@@ -135,6 +145,12 @@ pub struct LibraryEntry {
     /// 0 = STD, 49 = V-Log, 37 = ARRI 709, 10 = Vlog_709 (built-in entry 0).
     style_code: u16,
     in_use: bool,
+}
+
+impl LibraryEntry {
+    pub(crate) fn new(index: usize, name: String, style_code: u16, in_use: bool) -> Self {
+        LibraryEntry { index, name, style_code, in_use }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -296,6 +312,12 @@ pub async fn camera_register_luts(app: AppHandle, items: Vec<NewLutRequest>, ove
 pub struct EntryName {
     index: usize,
     name: String,
+}
+
+impl EntryName {
+    pub(crate) fn new(index: usize, name: String) -> Self {
+        EntryName { index, name }
+    }
 }
 
 #[derive(Debug, Serialize)]

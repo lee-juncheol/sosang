@@ -146,7 +146,7 @@ async function contact(request, env, ctx) {
 // app sends each distinct row at most once a day. Stored in the USAGE D1 database (created on
 // the first deploy, like CONTACT); USAGE_LIMIT allows 30 rows a minute from one address.
 const USAGE_PATH = '/api/usage';
-const USAGE_EVENTS = ['status', 'list', 'register', 'delete', 'rearrange', 'restore'];
+const USAGE_EVENTS = ['status', 'list', 'register', 'delete', 'rearrange', 'restore', 'card_list', 'card_register'];
 const USAGE_SUPPORT = ['supported', 'experimental', 'unsupported'];
 const USAGE_TEXT = /^[\w .()/+-]{1,40}$/;
 

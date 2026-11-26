@@ -46,6 +46,7 @@ test('only the desktop app may report', async () => {
 
 test('reports outside the fixed shape are refused', () => {
   assert.deepEqual(usageRow(good), good);
+  assert.deepEqual(usageRow({ ...good, event: 'card_register', model: 'DC-L10', firmware: '' }), { ...good, event: 'card_register', model: 'DC-L10', firmware: '' });
   assert.deepEqual(usageRow({ event: 'status', result: 'no_camera', ms: 900, version: '0.1.9' }), { event: 'status', model: '', firmware: '', support: '', result: 'no_camera', ms: 900, version: '0.1.9', os: '' });
   for (const change of [
     { event: 'photo' }, { result: 'OK!' }, { ms: -1 }, { ms: 1.5 }, { ms: 4_000_000 }, { version: 'dev' },
