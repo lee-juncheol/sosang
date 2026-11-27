@@ -18,7 +18,7 @@ import { WhatsNew } from './WhatsNew'
 import { usePrintTiming } from './usePrintTiming'
 import { EXPOSURE_SPAN, filmCastShift, formatShift, neutralControls, sameShift, shiftCode } from './printTiming'
 import './style.css'
-import { installAppLinkHandler, isApp, saveFile, serverUrl } from './platform.ts'
+import { installAppLinkHandler, isApp, reportDownload, saveFile, serverUrl } from './platform.ts'
 import { LutManager } from './LutManager'
 import { PhotoCourier } from './PhotoCourier'
 import { CameraRegister } from './CameraRegister'
@@ -317,7 +317,7 @@ function App() {
       const data = format === 'zip'
         ? await buildLutZip([{ name: cubes.std, text: await timing.bake('std', exportCameraId) }, { name: cubes.vlog, text: await timing.bake('vlog', exportCameraId) }], readme, await lutLicenseFiles(catalog?.lutLicenses))
         : await timing.bake(format, exportCameraId)
-      if (await saveFile(filename, data, format === 'zip' ? 'application/zip' : 'text/plain')) setDownloaded(true), setNotice(`${filename} · 브라우저에서 만든 파일을 다운로드했습니다.`)
+      if (await saveFile(filename, data, format === 'zip' ? 'application/zip' : 'text/plain')) reportDownload(filename, 'made'), setDownloaded(true), setNotice(`${filename} · 브라우저에서 만든 파일을 다운로드했습니다.`)
     } catch (e) { setNotice(e instanceof Error ? e.message : '다운로드하지 못했습니다.') }
     finally { setDownloading(false) }
   }
@@ -338,7 +338,7 @@ function App() {
         [selectStdAsset(combo, exportCameraId)!.name]: downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, 'std', exportCameraId, printVariant(combo)),
         [combo.files.vlog.name]: downloadFilename(film, combo.paper ? paper : undefined, combo.processMode, 'vlog', exportCameraId, printVariant(combo)),
       }) : verified
-      if (await saveFile(filename, buffer, asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain')) setDownloaded(true), setNotice(`${filename} · 검증된 파일을 다운로드했습니다.`)
+      if (await saveFile(filename, buffer, asset.name.endsWith('.zip') ? 'application/zip' : 'text/plain')) reportDownload(filename, 'file'), setDownloaded(true), setNotice(`${filename} · 검증된 파일을 다운로드했습니다.`)
     } catch (e) { setNotice(e instanceof Error ? e.message : '다운로드하지 못했습니다.') }
     finally { setDownloading(false) }
   }

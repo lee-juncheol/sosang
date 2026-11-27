@@ -193,12 +193,61 @@ async function usage(request, env) {
   return json({ ok: true }, 200, headers);
 }
 
+// LUT downloads from the website and the app: the saved file's name (which film look, print and
+// format), whether the server's file or a browser-made one was saved, and where. One row per
+// saved file; no IP address or anything else about the person. Same USAGE database and
+// USAGE_LIMIT as camera usage.
+const DOWNLOAD_PATH = '/api/download';
+const DOWNLOAD_KINDS = ['file', 'made'];
+const DOWNLOAD_SOURCES = ['web', 'app'];
+
+/** The row kept from a download report, or null when it is not acceptable. */
+export function downloadRow(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const { lut, kind, source } = input;
+  if (typeof lut !== 'string' || !/^[A-Za-z0-9-]{1,80}\.(cube|zip)$/.test(lut)) return null;
+  if (!DOWNLOAD_KINDS.includes(kind) || !DOWNLOAD_SOURCES.includes(source)) return null;
+  return { lut, format: lut.endsWith('.zip') ? 'zip' : /VLOG\.cube$/.test(lut) ? 'vlog' : 'std', kind, source };
+}
+
+let downloadTableReady = false;
+async function download(request, env) {
+  const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', Vary: 'Origin' };
+  const origin = request.headers.get('Origin');
+  const allowed = isAppOrigin(origin) || origin === new URL(request.url).origin;
+  if (isAppOrigin(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  if (request.method === 'OPTIONS' && isAppOrigin(origin)) {
+    return new Response(null, { status: 204, headers: { ...headers, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' } });
+  }
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, { ...headers, Allow: 'POST' });
+  if (!allowed) return json({ error: 'forbidden' }, 403, headers);
+  if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) return json({ error: 'bad_request' }, 415, headers);
+  if (!env.USAGE) return json({ error: 'unavailable' }, 503, headers);
+  if (env.USAGE_LIMIT) {
+    const { success } = await env.USAGE_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    if (!success) return json({ error: 'rate_limited' }, 429, headers);
+  }
+  const raw = await request.text();
+  if (raw.length > 1024) return json({ error: 'bad_request' }, 413, headers);
+  let row;
+  try { row = downloadRow(JSON.parse(raw)); } catch { row = null; }
+  if (!row) return json({ error: 'bad_request' }, 400, headers);
+  if (!downloadTableReady) {
+    await env.USAGE.prepare('CREATE TABLE IF NOT EXISTS downloads (id INTEGER PRIMARY KEY, received TEXT NOT NULL, lut TEXT NOT NULL, format TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL)').run();
+    downloadTableReady = true;
+  }
+  await env.USAGE.prepare('INSERT INTO downloads (received, lut, format, kind, source) VALUES (?, ?, ?, ?, ?)')
+    .bind(new Date().toISOString(), row.lut, row.format, row.kind, row.source).run();
+  return json({ ok: true }, 200, headers);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (pathname === '/api/locale') return locale(request);
     if (pathname === CONTACT_PATH) return contact(request, env, ctx);
     if (pathname === USAGE_PATH) return usage(request, env);
+    if (pathname === DOWNLOAD_PATH) return download(request, env);
     if (pathname === APP_UPDATE_PATH) return appUpdate(request, env);
     return env.ASSETS.fetch(request);
   },

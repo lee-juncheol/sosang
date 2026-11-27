@@ -56,6 +56,14 @@ export async function saveFile(filename: string, data: BlobPart, type: string): 
   return true
 }
 
+/** Count one saved LUT (server/worker.mjs `/api/download`): only its file name, whether it was the
+ *  server's file or made in the browser, and website or app. Never affects the download. */
+export function reportDownload(lut: string, kind: 'file' | 'made') {
+  try {
+    void fetch(serverUrl('/api/download'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lut, kind, source: isApp() ? 'app' : 'web' }), keepalive: true }).catch(() => {})
+  } catch { /* counting never affects the download */ }
+}
+
 // Camera commands (app only). Shapes match src-tauri/src/camera.rs.
 export type CameraStatus = { manufacturer: string; model: string; firmware: string; writeSupported: boolean; writeExperimental: boolean }
 export type CameraEntry = { index: number; name: string; styleCode: number; inUse: boolean }
